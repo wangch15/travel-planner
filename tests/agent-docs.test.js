@@ -99,3 +99,14 @@ test('HELPER.md 是給作者的前置說明，且不需要 repo 權限就能跑'
   assert.ok(/不要.*猜|卡在哪/.test(boot), '要有「卡住就說、不要猜」');
   assert.ok(read('README.md').includes('HELPER.md'), 'README 要連到 HELPER.md');
 });
+
+test('辦帳號的說明有講到 Cloudflare 會影響公開網址', () => {
+  const h = read('HELPER.md');
+  assert.ok(h.includes('workers.dev'), 'HELPER 要說明網址的形式');
+  assert.ok(/不要直接用預設值|讓我自己決定/.test(h), '要提醒使用者自己選那段代號');
+  // tp-setup 要教 agent 停下來問，而不是直接採用預設
+  const setup = read('.ai/skills/tp-setup/SKILL.md');
+  assert.ok(setup.includes('workers.dev'), 'tp-setup 要說明網址組成');
+  assert.ok(/不要直接採用.*預設值/.test(setup), 'tp-setup 要禁止直接採用預設子網域');
+  assert.ok(setup.includes('deploy.name'), 'tp-setup 要提到行程名稱那一段也會公開');
+});
