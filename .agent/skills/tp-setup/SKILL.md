@@ -20,31 +20,53 @@ description: 一次性環境準備。使用者第一次要用這個模板做行�
 
 遇到這些步驟，**停下來，把要做什麼講清楚，等使用者說做完了再繼續**。
 
+## 前提：假設使用者的電腦上什麼都沒有
+
+**不要假設 git、gh、Node 已經裝好，也不要假設使用者知道它們是什麼。**
+他多半是照 README 複製一段 prompt 貼給你的，除此之外沒做過任何設定。
+
+講話用白話，不要丟指令叫他自己跑——**能你跑的你自己跑**。
+真的需要他本人的步驟（註冊帳號、在瀏覽器按授權），就停下來講清楚要點哪裡。
+
+**任何一步卡住就直接說卡在哪、需要他做什麼。不要猜、不要跳過、不要假裝成功。**
+
 ## 步驟
 
-### 1. 檢查工具
+### 1. 檢查並補齊工具
 
-確認這些都在，缺的給安裝指令：
+一個一個檢查，缺的**你幫他裝**（或給出他那個作業系統的安裝指令並帶他做完）：
 
-- **Node.js ≥ 20**（`node --version`）。這是硬需求，版本不夠就先裝。
-- **git**（`git --version`）
-- **gh**（GitHub CLI，`gh --version`）。fork 要用。
-- wrangler 不用另外裝，它是專案的 devDependency，`npm install` 就有。
+| 工具 | 檢查 | 缺了怎麼辦 |
+|---|---|---|
+| **Node.js ≥ 20** | `node --version` | macOS 用 Homebrew、Windows 用官方安裝檔。版本不夠也要處理。 |
+| **git** | `git --version` | macOS 裝 Xcode Command Line Tools 即可、Windows 用 Git for Windows。 |
+| **gh**（GitHub CLI） | `gh --version` | fork 與私有 repo 授權都要用它。 |
+
+wrangler 不用另外裝，它是專案的 devDependency，`npm install` 就有。
 
 ### 2. GitHub 帳號與登入
 
-**人類必做：** 沒有 GitHub 帳號的話先去註冊。
+**人類必做：** 沒有 GitHub 帳號的話先去 github.com 註冊。
 
-然後跑 `gh auth login`，它會開瀏覽器請使用者授權。**這一步要等人。**
+然後跑 `gh auth login`，它會開瀏覽器請他授權。**這一步要等人**，講清楚畫面上要按什麼。
 
-### 3. Fork 並 clone
+**這個模板的 repo 是私有的**，使用者是被加為協作者才看得到。
+所以**一定要先完成這一步**，否則下一步會失敗，而且錯誤訊息看起來像「repo 不存在」。
+
+### 3. 取得專案
 
 ```
 gh repo fork wangch15/travel-planner --clone
 ```
 
-跑完用 `git remote -v` 確認：`origin` 是使用者自己的 fork、`upstream` 是模板。
-兩個都對才往下走——`upstream` 沒接好，以後就拿不到引擎更新。
+fork 是**你幫他做**的，他不需要知道 fork 是什麼。跑完用 `git remote -v` 確認：
+`origin` 是他自己的、`upstream` 是模板。兩個都對才往下走——`upstream` 沒接好，以後就拿不到引擎更新。
+
+**如果這一步失敗：**
+
+- 訊息提到權限或找不到 repo → 多半是第 2 步沒完成，或他還沒被加為協作者。
+  請他確認有收到邀請並接受，或請模板作者把他加進去。
+- 訊息提到 git 沒設定 `user.name`／`user.email` → 你幫他設好。
 
 ### 4. 安裝與自我檢查
 
