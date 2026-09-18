@@ -3,7 +3,9 @@
   "version": "0.3.0",
   "private": true,
   "description": "可 fork 的旅程網頁模板：引擎 + trips/<slug>/ 內容",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "check": "node scripts/check.js",
     "build": "node scripts/build.js",
@@ -13,8 +15,13 @@
     "migrate": "node scripts/migrate.js",
     "basemap": "node tools/basemap/index.mjs",
     "photos": "node scripts/photos.js",
-    "test": "node --test \"tests/**/*.test.js\" \"tests/**/*.test.mjs\""
+    "test": "node --test \"tests/**/*.test.js\" \"tests/**/*.test.mjs\"",
+    "sync:agent-assets": "node scripts/sync-agent-assets.mjs"
   },
-  "dependencies": { "pngjs": "^7.0.0" },
-  "devDependencies": { "wrangler": "^4.133.0" }
+  "dependencies": {
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.133.0"
+  }
 }

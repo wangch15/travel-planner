@@ -1,0 +1,12 @@
+{
+  "kit": "agent-assets-kit",
+  "updatedAt": "2026-09-18T14:03:06.929Z",
+  "files": {
+    ".ai/README.md": "5bb14df9bf68b7c6bc1125bf9ae4819a7556ec5abc93b6fc4ac983984ab99331",
+    ".ai/commands/create-rule-folder.md": "796859fee6e7d2ff657a33504589662aca91bdb3814ca3bc646b06682b4c3001",
+    ".ai/entrypoints/project-context.md": "fbd91a61d42697f5a8776926892d2c4862a1baa2ad35d4db1d6f1a39b148c1e5",
+    ".ai/rules/agent-asset-management-rules.md": "704a39e7517cb483a6b67879183d422a6ab80fc39e1f4044782261ebfa75e318",
+    ".ai/skills/create-rule-folder/SKILL.md": "6095e45dc14ce0599aa4e9fc4726282043083d76d314479684e3d9025643449a",
+    "scripts/sync-agent-assets.mjs": "d7f2da1044363a5b0cae452ca552308df77f169949cbb279d9be986d3090c6b3"
+  }
+}
