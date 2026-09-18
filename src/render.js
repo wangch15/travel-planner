@@ -94,12 +94,16 @@ function dayHTML(day) {
     + '<div class="meta"><span class="bar"></span><span>Day ' + day.id + '</span><span>' + esc(day.date) + '</span>'
     + (day.weekday ? '<span>' + esc(day.weekday) + '</span>' : '') + '</div>'
     + '<div class="day-title-row"><h2>' + esc(day.title) + '</h2>'
-    + (hasList ? '<a class="map-list-link" href="' + esc(day.mapList.url) + '" target="_blank" rel="noopener noreferrer" aria-label="在 Google Maps 開啟 ' + esc(day.mapList.name) + ' 私人清單（新分頁）" aria-describedby="map-list-note-' + day.id + '">地圖清單</a>' : '')
+    + (hasList ? '<div class="map-list">'
+      + '<a class="map-list-link" href="' + esc(day.mapList.url) + '" target="_blank" rel="noopener noreferrer" aria-label="在 Google Maps 開啟 ' + esc(day.mapList.name) + ' 私人清單（新分頁）" aria-describedby="map-list-note-' + day.id + '">地圖清單</a>'
+      // 說明緊貼按鈕，才看得出是在講這顆按鈕；同時是它的 aria-describedby
+      + '<p class="map-list-note" id="map-list-note-' + day.id + '">私人清單・'
+      + (day.mapList.placeKeys.length + (day.mapList.extraPlaces || []).length) + ' 個地點，含餐食與備案<br>需登入有權限的 Google 帳號</p>'
+      + '</div>' : '')
     + '</div>'
     + '<div class="brief"><span class="tag">這天的輪廓</span><p>' + esc(day.theme) + '</p></div>'
     + '<p class="lead">' + esc(day.lead) + '</p>'
     + (hasMeals ? '<a class="meal-jump" href="#meals-' + day.id + '">查看今天的餐食・價位・訂位建議 ↓</a>' : '')
-    + (hasList ? '<p class="map-list-note" id="map-list-note-' + day.id + '">私人清單・' + (day.mapList.placeKeys.length + (day.mapList.extraPlaces || []).length) + ' 個地點，含餐食與備案；需登入有權限的 Google 帳號。</p>' : '')
     + '</div>';
   h += '<ol class="stops">' + day.stops.map((st, i) => stopHTML(st, i, day.stops)).join('') + '</ol>';
   if (hasMeals) h += mealsHTML(day);

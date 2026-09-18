@@ -112,3 +112,17 @@ test('自煮的食材預算不會重複前綴（money 本身就含「每人約�
   assert.ok(html.includes('自煮食材 每人約 ¥1,200–1,800／2 人約 ¥2,400–3,600'), html.match(/自煮[^<；]*/));
   assert.ok(!/人食材約 每人約/.test(html), '不該出現「N 人食材約 每人約」這種重複前綴');
 });
+
+test('地圖清單的說明緊貼按鈕，而不是掉在日誌末尾', () => {
+  const trip = makeTrip();
+  trip.config.sections.mapLists = true;
+  trip.DAYS[0].mapList = { name: 'D1', url: 'https://maps.example.com/1', placeKeys: ['hubA', 'stayA'] };
+  const html = ctxFor(trip).dayHTML(trip.DAYS[0]);
+  const link = html.indexOf('map-list-link');
+  const note = html.indexOf('map-list-note');
+  const lead = html.indexOf('class="lead"');
+  assert.ok(link > -1 && note > -1);
+  assert.ok(note > link && note < lead, '說明必須排在按鈕之後、引言之前');
+  assert.ok(html.includes('aria-describedby="map-list-note-1"'), '仍要保留無障礙關聯');
+  assert.ok(html.includes('2 個地點'), '地點數要算對');
+});
