@@ -56,7 +56,9 @@ travel-planner/
 ├── src/                               引擎前端
 │   ├── index.html                     外殼與佔位符
 │   ├── styles.css
-│   └── app.js
+│   ├── util.js                        esc/ico/連結產生等純函式
+│   ├── render.js                      產 HTML 字串的純函式（可在 Node 測）
+│   └── app.js                         地圖、燈箱、互動（碰 DOM）
 ├── scripts/
 │   ├── new-trip.js  check.js  build.js  ship.js  preview.js  photos.js  migrate.js
 │   ├── lib/load-trip.js               合併五個資料檔、驗證、掛接
@@ -99,12 +101,15 @@ travel-planner/
 {
   "schemaVersion": 1,
   "title": "仙台山形自駕手帳",
+  "heading": "仙台・山形・鳴子・松島",
   "subtitle": "2026/10/11–17　7天6夜",
   "description": "meta description 用的一句話",
   "lang": "zh-Hant",
   "dates": { "start": "2026-10-11", "end": "2026-10-17" },
   "region": { "country": "JP", "bbox": [139.95, 37.85, 141.45, 39.00] },
   "transport": ["drive", "transit"],
+  "party": 5,
+  "currency": "¥",
   "sections": { "overview": true, "dining": true, "mapLists": true, "checklist": true },
   "theme": { "accent": "#B0552D", "favicon": "🗾" },
   "basemap": { "dem": "auto", "detail": "normal", "contourLevels": null },
@@ -113,6 +118,8 @@ travel-planner/
 ```
 
 - 天數從 `data.js` 的 `DAYS` 推，不放 config。
+- `title` 進 `<title>` 與 meta；`heading` 是頁首 h1，省略時用 `title`。
+- `party` 是同行人數，只用來算「N 人約 ¥…」的餐費乘數；`currency` 是金額前綴符號。
 - `region.bbox` 是 `[lngMin, latMin, lngMax, latMax]`，同時給底圖範圍與座標驗證用。
 - `sections` 關掉的區塊不渲染、不驗證。
 - `basemap.dem`：`auto`（JP → 国土地理院，其他 → Terrarium）、`gsi`、`terrarium`。`detail`：`low | normal | high`。`contourLevels` 為 null 時自動選。
@@ -160,8 +167,22 @@ build 時 `require()` 後 `JSON.stringify` 嵌進頁面，不再用字串切 sou
 // transit: via 寫路線名（「JR 仙山線 快速」），fare 選填，url 用 travelmode=transit
 // walk:    dist/time/url，travelmode=walking
 
-// data.js 新增
-OVERVIEW = { intro: string, notes: string[] }   // 原本寫死在 template 的航班／租車段落
+// STAYS[i] 新增 day：入住那天的 DAYS id，住宿色條與燈箱用它取當天顏色（原本寫死 DAYS[0/3/4]）
+{ place, day, range, nights, meals, check, role }
+
+// data.js 新增 OVERVIEW：原本寫死在 template 的總覽文字，每個欄位都選填，空的就不渲染
+OVERVIEW = {
+  checked: '2026/09/17',                       // 景點資料查核日期，燈箱註記用
+  dining: { hint, notes: string[], chips: [{ detail: placeKey, label } | { day: dayId, label }] },
+  stays: { title, hint, arrive, depart },      // arrive/depart 預設「Day 1 抵達」「Day N 返程」
+  addonsHint,
+  foot: string[],                               // 頁尾段落（路線查核日期、航班等）
+}
+
+// dining.js 新增（皆選填）
+checklist: string[]                             // 併入 CHECKLIST（原本在 data.js 尾端 push）
+cooking.total: [lo, hi]                         // 自煮食材總預算，渲染「自煮 N 人食材約 ¥lo–hi」
+days[id][i].budget: [lo, hi]                    // 覆寫該餐每人預算（原本寫死的早餐採買 ¥300–700）
 ```
 
 引擎依 `mode`：路線連結的 travelmode、地圖線型（drive 實線、transit 虛線、walk 點線）、燈箱該段的顯示欄位。有 `parking` 的地點，drive 模式的導航連結指向停車場座標；燈箱多一個「停車」區；每日頁尾自動列該日所有有 `parking` 的停留點（有資料才出現）。
@@ -217,20 +238,20 @@ OVERVIEW = { intro: string, notes: string[] }   // 原本寫死在 template 的�
 | `npm run migrate -- <slug>` | 從 trip 的 `schemaVersion` 依序套 `scripts/migrate/<n>-to-<n+1>.js` 到引擎版本 |
 | `npm run basemap -- <slug>` | §4 |
 | `npm run photos -- <slug>` | Commons：`https://commons.wikimedia.org/wiki/Special:FilePath/<檔名>?width=1024`；直接網址原樣下載。只補缺的；`--force` 全抓。純 Node |
-| `npm run build -- <slug>` | check → `dist/<slug>/index.html`（單檔內嵌）、`img/`、`public/` 的 `_headers` 與 `robots.txt`、由 config 生成的 `wrangler.json` |
+| `npm run build -- <slug>` | check → `dist/<slug>/site/`（單檔 `index.html`、`img/`、`public/` 的 `_headers` 與 `robots.txt`）與 `dist/<slug>/wrangler.json`（由 config 生成，放在 site 外層，不會被當靜態檔發布） |
 | `npm run preview -- <slug>` | build → Node 靜態伺服器 `localhost:4173`，不依賴 wrangler |
-| `npm run ship -- <slug>` | build → `target: workers`：`wrangler deploy --config dist/<slug>/wrangler.json`；`target: pages`：`wrangler pages deploy dist/<slug> --project-name <name>` |
+| `npm run ship -- <slug>` | build → `target: workers`：`wrangler deploy --config dist/<slug>/wrangler.json`；`target: pages`：`wrangler pages deploy dist/<slug>/site --project-name <name>` |
 | `npm test` | 引擎測試：basemap 幾何、load-trip 驗證（合法／各種不合法）、對 `trips/_example` 完整 build 並斷言關鍵內容、migrate 對舊格式的合成樣本（不用真實行程資料） |
 
 生成的 `wrangler.json`：
 
 ```json
-{ "name": "<deploy.name>", "compatibility_date": "<build 當天>", "assets": { "directory": "./" } }
+{ "name": "<deploy.name>", "compatibility_date": "<build 當天>", "assets": { "directory": "./site" } }
 ```
 
 Workers 靜態資源第一次 `wrangler deploy` 會自動建 Worker；新帳號會被問要不要註冊 workers.dev 子網域，`tp-setup` 涵蓋。網址 `<name>.<帳號>.workers.dev`。
 
-`src/template.html`（1176 行）拆成 `index.html`、`styles.css`、`app.js`；build 仍內嵌成單一 HTML。漏在 template 裡的行程文字（title、h1、副標、總覽段落）抽到 config 與 `OVERVIEW`。
+`src/template.html`（1176 行）拆成 `index.html`、`styles.css`、`util.js`、`render.js`、`app.js`；`render.js` 只產 HTML 字串、不碰 DOM，測試用 `vm` 注入資料全域直接呼叫。build 仍內嵌成單一 HTML。漏在 template 裡的行程文字（title、h1、副標、總覽段落）抽到 config 與 `OVERVIEW`。
 
 `_headers` 維持 `X-Robots-Tag: noindex…`、`Referrer-Policy: no-referrer`、`img/*` 一週快取。
 
@@ -335,10 +356,10 @@ check → build → preview → **閘門二**：列出該看的幾個地方（�
 
 ## 10. 實作順序
 
-1. 骨架：引擎目錄、agent-assets-kit setup、npm scripts、template 拆檔、`load-trip` + `schema.js` + `docs/schema/`、`_example`、`npm test` 綠。
+1. 骨架：引擎目錄、npm scripts、template 拆檔與泛化（config 驅動、`OVERVIEW` 抽出、`STAYS.day`、天數動態）、`load-trip` + `schema.js` + `docs/schema/`、`migrate/0-to-1.js`（`_example` 要靠它從 SENTAI 資料轉出）、`_example`、check／build／preview／ship／new、`npm test` 綠。
 2. 底圖 Node 化 + 測試；用 SENTAI bbox 比對。
-3. 照片 Node 化、`migrate/0-to-1.js`、check 泛化、transport 與 parking 進 UI、`OVERVIEW` 抽出。
-4. Skills、rules、`AGENTS.md`、`GEMINI.md`、issue 模板、README、CHANGELOG、tag v1.0.0。
+3. 照片 Node 化、transit 地圖線型與圖示、parking 欄位進 UI。
+4. agent-assets-kit setup、Skills、rules、`AGENTS.md`、`GEMINI.md`、issue 模板、README、CHANGELOG、tag v1.0.0。
 5. SENTAI2026 搬家與比對，ship 到原 Pages。
 6. 找一位朋友試跑 `tp-setup` → `tp-plan`，修摩擦。
 
