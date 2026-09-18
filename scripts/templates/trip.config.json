@@ -1,0 +1,18 @@
+{
+  "_readme": "改這個檔之前先讀 docs/schema/trip-config.md。填完後刪掉這一行。",
+  "schemaVersion": 1,
+  "title": "我的行程手帳",
+  "heading": "",
+  "subtitle": "",
+  "description": "一句話說明這趟行程，會進 meta description。",
+  "lang": "zh-Hant",
+  "dates": { "start": "", "end": "" },
+  "region": { "country": "", "bbox": [0, 0, 0, 0] },
+  "transport": ["drive"],
+  "party": 2,
+  "currency": "¥",
+  "sections": { "overview": true, "dining": true, "mapLists": false, "checklist": true },
+  "theme": { "accent": "#B0552D", "favicon": "🗺" },
+  "basemap": { "dem": "auto", "detail": "normal", "contourLevels": null },
+  "deploy": { "name": "__SLUG__", "target": "workers" }
+}
