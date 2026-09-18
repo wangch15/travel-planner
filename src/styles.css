@@ -381,11 +381,10 @@ dialog.lb[open]::backdrop{animation:lbfade .34s ease}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}
   .map.anim .pin>*{opacity:1;transform:none}}
 
-/* 每日停車彙整 */
-.day-parking{margin:18px 0 0;padding:14px 16px;border:1px solid var(--rule);border-radius:12px;background:var(--card)}
-.day-parking h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:.95rem}
-.day-parking ul{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-.day-parking li{display:grid;gap:4px}
-.day-parking .pk-nm{font-weight:600}
-.day-parking .pk-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.85rem;color:var(--ink-2)}
-.day-parking .pk-note{color:var(--ink-3)}
+/* 停留點的停車提醒 */
+.stop-parking{margin:8px 0 0;padding:8px 10px;border-left:2px solid var(--rule-2);background:color-mix(in srgb,var(--sunk) 55%,transparent);border-radius:0 8px 8px 0}
+.stop-parking .pk-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.85rem}
+.stop-parking .pk-nm{font-weight:600}
+.stop-parking .pk-fee{color:var(--ink-2)}
+.stop-parking .pk-note{margin:4px 0 0;font-size:.82rem;color:var(--ink-3)}
+.stop-parking .glink{margin-top:6px;font-size:.82rem}

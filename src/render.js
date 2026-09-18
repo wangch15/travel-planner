@@ -25,6 +25,18 @@ function extraHTML(where, dayId) {
     .join('');
 }
 
+/* 停留點自己的停車提醒。掛在該點下面，才知道是在講哪一個點。 */
+function stopParkingHTML(p) {
+  const pk = p.parking;
+  if (!pk) return '';
+  return '<div class="stop-parking">'
+    + '<div class="pk-head">' + ico('i-car') + '<span class="pk-nm">' + esc(pk.name || '停車') + '</span>'
+    + (pk.fee ? '<span class="pk-fee">' + esc(pk.fee) + '</span>' : '') + '</div>'
+    + (pk.note ? '<p class="pk-note">' + esc(pk.note) + '</p>' : '')
+    + '<a class="glink" href="https://www.google.com/maps/search/?api=1&query=' + ll(pk)
+    + '" target="_blank" rel="noopener">導航到停車場' + ico('i-ext') + '</a>'
+    + '</div>';
+}
 function stopHTML(s, i, stops) {
   const p = PLACES[s.place];
   let h = '<li class="stop" data-place="' + esc(s.place) + '"' + (s.kind === 'stay' ? ' data-stay="1"' : '') + '>';
@@ -39,6 +51,7 @@ function stopHTML(s, i, stops) {
     + (s.note ? '<p class="snote">' + esc(s.note) + '</p>' : '')
     + (p.note && s.kind === 'stay' ? '<p class="snote">' + esc(p.note) + '</p>' : '')
     + '<a class="glink" href="' + esc(mapsUrl(p)) + '" target="_blank" rel="noopener">在 Google Maps 開啟' + ico('i-ext') + '</a>'
+    + stopParkingHTML(p)
     + '</div></li>';
   return h;
 }
@@ -73,29 +86,6 @@ function mealsHTML(day) {
     + (DINING.checked ? esc(DINING.checked) + ' 查閱。' : '') + '</p>'
     + mealRows + cooking + '<p class="meal-legend">地圖「餐」為餐廳、「購」為超市，點標記可開詳情；候選不代表全部都去，餐飲座標為概略位置。</p></section>';
 }
-/* 當天所有帶 parking 的停留點，彙整成一張表。自駕行程才會有東西。 */
-function dayParkingHTML(day) {
-  const seen = {};
-  const rows = day.stops.filter((s) => {
-    const p = PLACES[s.place];
-    if (!p || !p.parking || seen[s.place]) return false;
-    seen[s.place] = 1;
-    return true;
-  });
-  if (!rows.length) return '';
-  return '<section class="day-parking"><h3>' + ico('i-car') + '今天的停車</h3><ul>'
-    + rows.map((s) => {
-      const p = PLACES[s.place], pk = p.parking;
-      return '<li><div class="pk-nm">' + esc(pk.name || p.name) + '</div>'
-        + '<div class="pk-meta">'
-        + (pk.fee ? '<span>' + esc(pk.fee) + '</span>' : '')
-        + (pk.note ? '<span class="pk-note">' + esc(pk.note) + '</span>' : '')
-        + '</div>'
-        + '<a class="glink" href="https://www.google.com/maps/search/?api=1&query=' + ll(pk)
-        + '" target="_blank" rel="noopener">導航到停車場' + ico('i-ext') + '</a></li>';
-    }).join('')
-    + '</ul></section>';
-}
 function dayHTML(day) {
   const hasList = !!(day.mapList && CONFIG.sections.mapLists);
   const hasMeals = !!(CONFIG.sections.dining && (day.meals || []).length);
@@ -127,7 +117,6 @@ function dayHTML(day) {
     h += '<details><summary>' + ico('i-note') + '出發前要確認的事<span class="n">' + day.cautions.length + '</span></summary><ul class="cautions">'
       + day.cautions.map((c) => '<li>' + ico('i-note') + '<span>' + esc(c) + '</span></li>').join('') + '</ul></details>';
   }
-  h += dayParkingHTML(day);
   h += extraHTML('day', day.id);
   return '<div class="panel-in" style="--dc:' + day.color + '">' + h + '</div>';
 }
