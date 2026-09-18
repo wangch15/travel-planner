@@ -74,33 +74,33 @@ scripts/sync-agent-assets.mjs
 - Consumes: 無
 - Produces: `.ai/` 目錄與 `scripts/sync-agent-assets.mjs`；`npm run sync:agent-assets` 可用
 
-- [ ] **Step 1: 執行 setup（已獲授權，不要加 --force）**
+- [x] **Step 1: 執行 setup（已獲授權，不要加 --force）**
 
 Run: `pnpm dlx github:wangch15/agent-assets-kit setup`
 Expected: 寫入那 6 個檔，並把 `sync:agent-assets` 加進 `package.json`
 
-- [ ] **Step 2: 確認實際寫入的檔案與 dry-run 一致**
+- [x] **Step 2: 確認實際寫入的檔案與 dry-run 一致**
 
 Run: `git status --short && node -e "console.log(Object.keys(require('./package.json').scripts).join(', '))"`
 Expected: 只有那 6 個檔是新增、`package.json` 被改；scripts 多了 `sync:agent-assets`，原本的 9 個都還在。
 **若有任何預期外的檔案被改動或刪除，停下來問人，不要自己判斷。**
 
-- [ ] **Step 3: 跑一次 sync，看它產出什麼**
+- [x] **Step 3: 跑一次 sync，看它產出什麼**
 
 Run: `npm run sync:agent-assets && git status --short`
 Expected: 產出 `AGENTS.md` 與 `CLAUDE.md`（可能還有工具專屬目錄）。把實際產出的清單記下來，Task 6 要用。
 
-- [ ] **Step 4: 確認 `.gitignore` 沒有把 `.ai/` 或產物擋掉**
+- [x] **Step 4: 確認 `.gitignore` 沒有把 `.ai/` 或產物擋掉**
 
 Run: `git check-ignore -v .ai/README.md AGENTS.md CLAUDE.md || echo "都沒有被 ignore"`
 Expected: 印出「都沒有被 ignore」
 
-- [ ] **Step 5: 全部測試仍然通過**
+- [x] **Step 5: 全部測試仍然通過**
 
 Run: `npm test`
 Expected: PASS（134 個）
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -120,17 +120,17 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: 無
 - Produces: 四份 Markdown。每份都以一句話的「什麼時候適用」開頭，再列規則。
 
-- [ ] **Step 1: 寫 `.ai/rules/engine-content-boundary.md`**
+- [x] **Step 1: 寫 `.ai/rules/engine-content-boundary.md`**
 
 固定四節：**這條邊界是什麼** → **哪些是引擎、哪些是內容**（照 spec §2 的目錄表）→ **為什麼重要**（作者與行程擁有者的 commit 檔案集合不相交，`git merge upstream/main` 才不會衝突）→ **想改引擎之前**（先試 `theme.css` 換配色、`extra.js` 加區塊；真的改了要記進 `trips/<slug>/docs/engine-changes.md`，並說明為什麼插槽做不到）。
 
 明列：引擎是 `src/`、`scripts/`、`tools/`、`.ai/`、`docs/schema/`、`public/`；內容是 `trips/<slug>/`。`dist/` 整個 gitignore。
 
-- [ ] **Step 2: 寫 `.ai/rules/data-schema-reference.md`**
+- [x] **Step 2: 寫 `.ai/rules/data-schema-reference.md`**
 
 **只放指路，不要把欄位表複製過來**（複製就會脫節）。內容：改任何一個資料檔之前先讀 `docs/schema/` 對應那一份；六個檔對六份文件的對照表；改完一定要跑 `npm run check -- <slug>`；`check` 的錯誤訊息就是待辦清單，不要為了讓它過而刪資料。
 
-- [ ] **Step 3: 寫 `.ai/rules/research-integrity.md`**
+- [x] **Step 3: 寫 `.ai/rules/research-integrity.md`**
 
 規則：
 
@@ -141,7 +141,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - **沒有瀏覽器或搜尋工具的 agent 要停下來說明**，不要用記憶裡的內容填表。
 - 完成的定義是 `npm run check -- <slug>` 通過**且** `docs/sources.md` 列得出每一條的來源。
 
-- [ ] **Step 4: 寫 `.ai/rules/privacy.md`**
+- [x] **Step 4: 寫 `.ai/rules/privacy.md`**
 
 規則：
 
@@ -151,7 +151,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - 勾選狀態只存在瀏覽器 localStorage，不同步、不上傳。
 - 住宿座標用街區層級並標 `approximate: true`，不要把確切門牌寫進公開頁面。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .ai/rules
@@ -173,7 +173,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: Task 2 的 rules
 - Produces: 三份 SKILL.md。每份開頭一段 YAML frontmatter：`name`、`description`（一句話說明何時用），其餘為步驟。
 
-- [ ] **Step 1: 寫 `.ai/skills/tp-setup/SKILL.md`**
+- [x] **Step 1: 寫 `.ai/skills/tp-setup/SKILL.md`**
 
 照 spec §6 的六步，**把人類必做的步驟用粗體標出來並明確停下來等**：
 
@@ -186,7 +186,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 結尾加一節「agent 不做的事」：不代替使用者註冊帳號、不代填密碼、不代授權。
 
-- [ ] **Step 2: 寫 `.ai/skills/tp-plan/SKILL.md`**
+- [x] **Step 2: 寫 `.ai/skills/tp-plan/SKILL.md`**
 
 照 spec §6 的六步：
 
@@ -197,11 +197,11 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 5. 寫 `docs/plan.md`：逐日文字草案，每天含備案與待確認事項。
 6. **閘門一**：請人確認 `plan.md`。**確認前不要碰五個資料檔、不要做深度查核。**
 
-- [ ] **Step 3: 寫 `.ai/skills/tp-maps-lists/SKILL.md`**
+- [x] **Step 3: 寫 `.ai/skills/tp-maps-lists/SKILL.md`**
 
 選用的 skill。內容：`trip.config` 的 `sections.mapLists` 為 `false` 時整個跳過；**順序很重要**——人先在 Google Maps 建每日私人清單並把地點加進去，agent 再對帳填 `map-lists.js`，反過來做會讓檔案通過驗證但手機上的清單少東西；`npm run check` 會驗證清單涵蓋當天所有 stop／meal／alt。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .ai/skills/tp-setup .ai/skills/tp-plan .ai/skills/tp-maps-lists
@@ -221,37 +221,37 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: Task 2 的 `research-integrity.md`
 - Produces: 一份精簡的 SKILL.md 與六份 reference。
 
-- [ ] **Step 1: 寫 `.ai/skills/tp-research/SKILL.md`（保持精簡）**
+- [x] **Step 1: 寫 `.ai/skills/tp-research/SKILL.md`（保持精簡）**
 
 只寫：什麼時候用（閘門一通過之後）、六份 reference 的路由表（要查地點讀 `places.md`、要查路線讀 `routes.md`…）、完成條件（五個資料檔寫好、`npm run check` 通過、`docs/sources.md` 列出所有來源與日期）、以及「不確定就標待確認」這條底線。**細節一律放 references/，不要寫進 SKILL.md。**
 
-- [ ] **Step 2: 寫 `references/places.md`**
+- [x] **Step 2: 寫 `references/places.md`**
 
 每個地點要查：座標（Nominatim／Overpass 或 Google Maps，注意連鎖店會配到別的分店）、當地語言名稱（填 `local`，地圖搜尋用）、官網的營業時間與費用、**旅行當天是否公休或有活動管制**、建議停留時間、為何值得去（寫進 `summary`，至少 40 字）、`refs` 至少一筆官方來源。
 
-- [ ] **Step 3: 寫 `references/routes.md`**
+- [x] **Step 3: 寫 `references/routes.md`**
 
 自駕：用**實際停留點的座標**（不是參考地標）查 Google Maps 路線，記距離／時間／主要道路／是否收費／查核日期 → `docs/route-check.md`，再寫進 `leg`（`mode: 'drive'`，`dist` 必填）。
 大眾運輸：官方時刻表或 Google 轉乘，記路線名／時間／票價／班距 → `leg`（`mode: 'transit'`，`via` 必填寫路線名）。
 緩衝規則：市區與轉乘多的日子抓 1.3 倍，山路與旺季抓 1.5 倍，並寫進 `buffer`；車程不含休息、找車位、景區接駁。
 
-- [ ] **Step 4: 寫 `references/parking.md`**
+- [x] **Step 4: 寫 `references/parking.md`**
 
 自駕行程**每個景點都要查**：官方停車場或最近的合法停車場、費用、容量、注意事項（旺季客滿、單行道、禁止進入）→ 填 `PLACES[key].parking`（`lat`／`lng` 必填，其餘選填）。查不到就在 `note` 標待確認並推進 `CHECKLIST`，不要猜。有 `parking` 的地點，導航連結會指向停車場座標，而且會出現在每日頁尾的停車彙整。
 
-- [ ] **Step 5: 寫 `references/dining.md`**
+- [x] **Step 5: 寫 `references/dining.md`**
 
 每個餐段：主選＋備案、**那一天那個星期幾**的營業時間（公休日常常是週幾而不是日期）、訂位方式與是否接受、菜色與每人價位（填 `venues[key].budget`）、超市熟食後備。**使用者的飲食限制只用來挑店，不要寫進資料檔**（那屬於 `docs/`）→ 過程記 `docs/dining-research.md`。
 
-- [ ] **Step 6: 寫 `references/alternatives.md`**
+- [x] **Step 6: 寫 `references/alternatives.md`**
 
 每天至少想三種替代：下雨版、走累版、店休版，寫進 `day.alts`；被引用的地點要有 `details`。`ADDONS` 要附時間成本（`cost`），讓人知道砍掉會省多少。
 
-- [ ] **Step 7: 寫 `references/photos.md`**
+- [x] **Step 7: 寫 `references/photos.md`**
 
 Commons 優先，`license` 必須符合 `CC` 或 `Public domain`，並附 `page`（檔案頁面）。沒有 Commons 就用官網照片，填 `url` 與 `credit`。**授權不明一律不要收**——`npm run check` 會擋。怎麼找：Commons 搜尋、看檔案頁的授權欄位、確認不是「僅供編輯使用」。填好 `photos.json` 後跑 `npm run photos -- <slug>`。
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add .ai/skills/tp-research
@@ -271,7 +271,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: Task 2 的 rules
 - Produces: 四份 SKILL.md
 
-- [ ] **Step 1: 寫 `.ai/skills/tp-basemap/SKILL.md`**
+- [x] **Step 1: 寫 `.ai/skills/tp-basemap/SKILL.md`**
 
 內容：先確認 `trip.config` 的 `region.bbox` 已經填好且涵蓋所有地點 → `npm run basemap -- <slug>` → 看輸出的島數、等高線層級、檔案大小 → 超過 600 KB 就把 `basemap.detail` 改成 `low` 重跑 → `npm run preview` 肉眼確認海陸沒有畫反、山勢有浮現。
 
@@ -279,13 +279,13 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 `basemap.dem`：日本用 `gsi`，其他地區用 `terrarium`，`auto` 會自己選。
 
-- [ ] **Step 2: 寫 `.ai/skills/tp-photos/SKILL.md`**
+- [x] **Step 2: 寫 `.ai/skills/tp-photos/SKILL.md`**
 
 內容：填 `photos.json`（格式指向 `docs/schema/photos.md`）→ `npm run photos -- <slug>` → 預設只補缺的、`--force` 全部重抓 → 檔名是 `<placeKey>-<n>.jpg`，`n` 對應陣列順序 → `npm run build` 只會收實際存在的檔案，所以少抓幾張不會壞掉 → 在 preview 的燈箱確認照片與 credit 都正確。
 
 **必寫**：授權不明就不要收；官網照片要標 credit 與來源頁；單張失敗會列出原因，把那一筆從 `photos.json` 拿掉或換一張，不要硬塞。
 
-- [ ] **Step 3: 寫 `.ai/skills/tp-ship/SKILL.md`**
+- [x] **Step 3: 寫 `.ai/skills/tp-ship/SKILL.md`**
 
 流程：`npm run check` → `npm run build` → `npm run preview` → **閘門二** → `npm run ship` → 回報網址。
 
@@ -295,13 +295,13 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 維護模式：收到改動請求 → 對應到哪個資料檔（用 `docs/schema/` 的對照表）→ 改 → 重跑 check／build／preview → 再走一次閘門二。
 
-- [ ] **Step 4: 寫 `.ai/skills/tp-update/SKILL.md`**
+- [x] **Step 4: 寫 `.ai/skills/tp-update/SKILL.md`**
 
 流程：`git fetch upstream` → 列出落後幾個 commit 與 `CHANGELOG.md` 的摘要（特別是「資料需要 migrate：是／否」那一行）→ 問使用者要不要更新 → `git merge upstream/main` → `npm install` → 需要的話 `npm run migrate -- <slug>` → `npm run check` → `npm run build` → `npm run preview` → 閘門二 → `npm run ship`。
 
 **衝突策略**：引擎檔（`src/`、`scripts/`、`tools/`、`docs/schema/`、`public/`）取上游；`trips/` 取本地；其他對照 `trips/<slug>/docs/engine-changes.md` 逐一解。若 `engine-changes.md` 不存在而引擎檔仍衝突，代表有人改過引擎卻沒記錄——停下來問人。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .ai/skills/tp-basemap .ai/skills/tp-photos .ai/skills/tp-ship .ai/skills/tp-update
@@ -323,7 +323,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: Task 1 的 sync 腳本、Task 2–5 的 rules 與 skills
 - Produces: `AGENTS.md` 與 `CLAUDE.md` 同步產物；`GEMINI.md` 手寫
 
-- [ ] **Step 1: 改寫 `.ai/entrypoints/project-context.md`**
+- [x] **Step 1: 改寫 `.ai/entrypoints/project-context.md`**
 
 把 installer 給的預設內容換成 travel-planner 的。固定六節：
 
@@ -334,17 +334,17 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 5. **硬規則指路**：四份 rules 各一行。
 6. **改引擎之前**：先試 `theme.css` 與 `extra.js`；真的改了要記 `trips/<slug>/docs/engine-changes.md`，並考慮用 `.github/ISSUE_TEMPLATE/` 回報給模板作者。
 
-- [ ] **Step 2: 執行同步**
+- [x] **Step 2: 執行同步**
 
 Run: `npm run sync:agent-assets && git status --short`
 Expected: `AGENTS.md`、`CLAUDE.md` 更新成新的內容
 
-- [ ] **Step 3: 確認同步產物真的包含新內容**
+- [x] **Step 3: 確認同步產物真的包含新內容**
 
 Run: `grep -c "tp-research\|tp-ship" AGENTS.md CLAUDE.md`
 Expected: 兩個檔都 > 0。若產物沒有跟上，先確認 sync 腳本的來源路徑，**不要手動編輯產物**（下次 sync 會被蓋掉）。
 
-- [ ] **Step 4: 手寫 `GEMINI.md`**
+- [x] **Step 4: 手寫 `GEMINI.md`**
 
 Gemini CLI 到 v0.49 仍不預設讀 `AGENTS.md`（[issue #28227](https://github.com/google-gemini/gemini-cli/issues/28227)），所以這一份要手寫且**不由 sync 管理**：
 
@@ -357,7 +357,7 @@ Gemini CLI 到 v0.49 仍不預設讀 `AGENTS.md`（[issue #28227](https://github
 改 `.ai/entrypoints/project-context.md` 再跑 `npm run sync:agent-assets`。）
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .ai/entrypoints AGENTS.md CLAUDE.md GEMINI.md
@@ -378,13 +378,13 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: Task 2–6 的所有文件
 - Produces: 兩個 issue 模板；一組確保文件與程式碼不脫節的測試
 
-- [ ] **Step 1: 寫兩個 issue 模板**
+- [x] **Step 1: 寫兩個 issue 模板**
 
 `.github/ISSUE_TEMPLATE/bug.md`：frontmatter 有 `name`、`about`、`labels: bug`。欄位：引擎版本（`package.json` 的 `version`）、行程 slug、跑了什麼指令、預期什麼、實際發生什麼（附完整錯誤訊息）、Node 版本與作業系統。加一句「請不要貼上任何個人資料（訂單號、聯絡方式、門鎖密碼）」。
 
 `.github/ISSUE_TEMPLATE/feature.md`：frontmatter `labels: enhancement`。欄位：引擎版本、想做到什麼、**為什麼 `theme.css` 與 `extra.js` 兩個插槽做不到**（這一題是重點，逼提案先試過插槽）、如果自己改了引擎請附 `engine-changes.md` 的摘要。
 
-- [ ] **Step 2: 寫守門測試 `tests/agent-docs.test.js`**
+- [x] **Step 2: 寫守門測試 `tests/agent-docs.test.js`**
 
 ```js
 const test = require('node:test');
@@ -463,16 +463,16 @@ test('skills 與 rules 不含特定行程的專有名詞', () => {
 });
 ```
 
-- [ ] **Step 3: 執行測試，缺什麼補什麼**
+- [x] **Step 3: 執行測試，缺什麼補什麼**
 
 Run: `node --test tests/agent-docs.test.js`
 Expected: PASS。失敗時**補文件，不要放寬測試**。
 
-- [ ] **Step 4: 更新 `README.md`**
+- [x] **Step 4: 更新 `README.md`**
 
 把「目前是第 3 階段」那段拿掉（v1.0.0 就是完整版了）。新增一節「怎麼開始」：把 repo 網址給你的 coding agent，說「請讀 AGENTS.md，我想做一個行程」，其餘照 skill 走。指令表加一列 `npm run sync:agent-assets`。加一節「回報問題」指向 issue 模板。
 
-- [ ] **Step 5: 更新 `CHANGELOG.md` 與版本**
+- [x] **Step 5: 更新 `CHANGELOG.md` 與版本**
 
 `package.json` 的 `version` 改成 `1.0.0`。`CHANGELOG.md` 最上面加：
 
@@ -486,12 +486,12 @@ Expected: PASS。失敗時**補文件，不要放寬測試**。
 - 資料需要 migrate：否。
 ```
 
-- [ ] **Step 6: 全部測試與完整流程最後跑一次**
+- [x] **Step 6: 全部測試與完整流程最後跑一次**
 
 Run: `npm test && npm run check -- _example && npm run build -- _example`
 Expected: 全部 PASS
 
-- [ ] **Step 7: Commit 並打 tag**
+- [x] **Step 7: Commit 並打 tag**
 
 ```bash
 git add .github README.md CHANGELOG.md package.json tests/agent-docs.test.js

@@ -1,5 +1,14 @@
 # 變更紀錄
 
+## 1.0.0（2026-09-18）
+
+- 加入 `.ai/`：agent 文件的唯一來源，`npm run sync:agent-assets` 同步出 `AGENTS.md` 與 `CLAUDE.md`；`GEMINI.md` 為手寫指路檔（Gemini CLI 目前不讀 AGENTS.md）。
+- 八個 skill：tp-setup、tp-plan、tp-research（含六份 reference）、tp-basemap、tp-photos、tp-ship、tp-update、tp-maps-lists。
+- 四份 rules：引擎／內容邊界、schema 指路、研究誠信、隱私。
+- 加入 bug 與 feature 兩個 issue 模板；feature 模板要求先說明為什麼兩個插槽做不到。
+- 新增文件守門測試：確保每個 npm 指令、每個 skill、三道人類閘門都真的寫進文件。
+- 資料需要 migrate：否。
+
 ## 0.3.0（2026-09-18）
 
 - 新增 `npm run photos -- <slug>`：把 `photos.json` 列的 Commons 與官網照片抓進 `trips/<slug>/photos/`，預設只補缺的，`--force` 全部重抓；單張失敗只記錄原因，不中斷整批。
@@ -7,8 +16,6 @@
 - 有 `parking` 的停留點會在每天的頁尾彙整成一張表，含費用、注意事項與導航到停車場的連結；沒有停車資料的日子不會出現空區塊。
 - `trips/_example` 附三張 CC BY-SA 授權的實際照片。
 - 資料需要 migrate：否。
-
-尚未實作：agent skills 與 `.ai/`。
 
 ## 0.2.0（2026-09-18）
 

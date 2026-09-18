@@ -1,6 +1,6 @@
 {
   "name": "travel-planner",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "private": true,
   "description": "可 fork 的旅程網頁模板：引擎 + trips/<slug>/ 內容",
   "engines": {

@@ -4,7 +4,15 @@
 
 **主要用法是：把你想做的事直接告訴你的 coding agent。** 這個 repo 裡有給 agent 看的操作說明，你不需要自己讀程式碼。
 
-> 目前是第 3 階段（照片與 UI）。agent 用的 skills 尚未建立。
+## 怎麼開始
+
+把這個 repo 交給你的 coding agent（Claude Code、Codex、Gemini CLI 都可以），然後說：
+
+> 請讀 AGENTS.md，我想做一個行程網頁。
+
+agent 會照 `.ai/skills/` 裡的流程帶你走：準備環境 → 收集你的行程想法 → 查核資料 → 產生地圖與照片 → 預覽 → 部署。
+
+過程中有三個地方**一定會停下來等你**：確認逐日草案、部署前的預覽、以及任何要花錢或代表你的動作（訂房、訂位、註冊帳號——agent 只給連結，不會替你做）。
 
 ## 需要什麼
 
@@ -39,6 +47,7 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 | `npm run basemap -- <slug>` | 從 OpenStreetMap 與公開高程資料產生地形底圖 |
 | `npm run photos -- <slug>` | 依 `photos.json` 把照片抓進行程資料夾 |
 | `npm run migrate -- <slug>` | 引擎更新後，把舊格式的資料升版 |
+| `npm run sync:agent-assets` | 改過 `.ai/` 之後，重新產生 `AGENTS.md` 與 `CLAUDE.md` |
 | `npm test` | 引擎自己的測試 |
 
 `ship` 第一次跑之前要先 `npx wrangler login`（會開瀏覽器請你授權）。
@@ -81,3 +90,9 @@ travel-planner/
 ## 授權與資料來源
 
 地圖使用 OpenStreetMap 圖資（© OpenStreetMap 貢獻者，ODbL）與公開高程資料（日本為国土地理院，其他地區為 Terrain Tiles）。照片只收 CC／Public domain 授權，或官網照片並標明來源——授權不明的一律不收，`npm run check` 會擋。
+
+## 回報問題
+
+用 GitHub issue：[bug 模板](.github/ISSUE_TEMPLATE/bug.md) 或 [功能建議模板](.github/ISSUE_TEMPLATE/feature.md)。
+
+開功能建議之前，先試試看 `theme.css`（換配色）與 `extra.js`（加自訂區塊）這兩個插槽——九成的需求它們就能解決，而且不用等新版本。
