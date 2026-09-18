@@ -219,6 +219,28 @@ function armFab() {
 }
 
 /* ── 依分頁畫標記與連線 ── */
+/* 逐段畫動線：每一段的線型取自「終點那個 stop 的 leg.mode」，
+   這樣坐電車的段落在地圖上就看得出來是虛線。 */
+function drawRoute(day, pts, color) {
+  const base = { fill:'none', stroke:color, opacity:.7,
+    'stroke-linejoin':'round', 'stroke-linecap':'round', 'vector-effect':'non-scaling-stroke' };
+  if (!day) {
+    if (pts.length > 1) {
+      routeLayer.appendChild(shape('path', { d: d(pts.map((p) => [p.lng, p.lat])), ...base, 'stroke-width':2.2 }));
+    }
+    return;
+  }
+  const stops = day.stops;
+  for (let i = 1; i < stops.length; i += 1) {
+    const from = PLACES[stops[i - 1].place], to = PLACES[stops[i].place];
+    if (!from || !to || stops[i - 1].place === stops[i].place) continue;   // 同一個地點不用畫線
+    const st = legStyle(stops[i].leg && stops[i].leg.mode);
+    const attrs = { d: d([[from.lng, from.lat], [to.lng, to.lat]]), ...base, 'stroke-width': st.width };
+    if (st.dash) attrs['stroke-dasharray'] = st.dash;
+    routeLayer.appendChild(shape('path', attrs));
+  }
+}
+
 function renderMap(day) {
   pinsBox.textContent = '';
   routeLayer.textContent = '';
@@ -240,12 +262,7 @@ function renderMap(day) {
   else OVERVIEW_ROUTE.forEach((k) => push(k, PLACES[k].cat === 'stay'));
 
   const pts = seq.map((s) => PLACES[s.key]);
-  if (pts.length > 1) {
-    routeLayer.appendChild(shape('path', {
-      d: d(pts.map((p) => [p.lng, p.lat])), fill:'none', stroke:color, 'stroke-width':2.2, opacity:.7,
-      'stroke-linejoin':'round', 'stroke-linecap':'round', 'vector-effect':'non-scaling-stroke',
-    }));
-  }
+  drawRoute(day, pts, color);
   // 候選餐廳／超市只加標記，不接到主路線上。
   if (day) (day.meals || []).forEach(meal => {
     [...meal.places, ...(meal.backupPlaces || [])].forEach(key => {

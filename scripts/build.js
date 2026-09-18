@@ -70,6 +70,7 @@ function inline(trip, dir, photos) {
     .replace('/*__PHOTOS__*/null', json(photos))
     .replace('/*__DATA__*/', data)
     .replace('<link rel="stylesheet" href="styles.css">', `<style>\n${readEngine('src', 'styles.css')}\n${theme}</style>`)
+    .replace('<script src="map-modes.js"></script>', `<script>\n${readEngine('src', 'map-modes.js')}\n</script>`)
     .replace('<script src="util.js"></script>', `<script>\n${readEngine('src', 'util.js')}\n</script>`)
     .replace('<script src="render.js"></script>', `<script>\n${readEngine('src', 'render.js')}\n</script>`)
     .replace('<script src="app.js"></script>', `<script>\n${readEngine('src', 'app.js')}\n</script>`);
