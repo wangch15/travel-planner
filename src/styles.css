@@ -162,17 +162,11 @@ dialog.mapdlg[open]{animation:lbin .3s var(--ease)}
 
 /* ── 每日 ── */
 .dayhead{padding:16px 0 2px}
-.day-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px;flex-wrap:wrap}
+.day-title-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px;flex-wrap:wrap}
 .day-title-row h2{flex:1;min-width:0}
 .map-list-link{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;white-space:nowrap;min-height:44px;padding:9px 13px;border:1px solid var(--rule-2);border-radius:8px;color:var(--dct);font-size:13px;font-weight:500;text-decoration:none}
 .map-list-link:hover{background:var(--sunk);border-color:var(--dct)}
-.map-list{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;max-width:240px}
-.map-list-note{font-size:12px;line-height:1.5;color:var(--ink-3);margin:0;text-align:right}
-@media (max-width:560px){
-  .day-title-row{gap:8px}
-  .map-list{align-items:flex-start;max-width:100%;width:100%}
-  .map-list-note{text-align:left}
-}
+@media (max-width:560px){ .day-title-row{gap:8px} }
 .dayhead .meta{display:flex;align-items:center;gap:10px;font:400 11.5px/1.5 var(--mono);color:var(--ink-3);letter-spacing:.04em;margin-bottom:8px}
 .dayhead .bar{width:28px;height:3px;border-radius:2px;background:var(--dc)}
 .dayhead h2{font-size:clamp(22px,3.6vw,29px);letter-spacing:-.005em;margin:0}
