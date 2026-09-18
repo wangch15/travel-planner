@@ -59,7 +59,7 @@
 - Consumes: 無
 - Produces: `scripts/lib/paths.js` 匯出 `ROOT: string`、`resolveSlug(argv: string[]): string`、`tripDir(slug: string): string`、`distDir(slug: string): string`、`listTrips(): string[]`。`resolveSlug` 取 `argv` 第一個非 `--` 開頭的值；沒給值時掃 `trips/` 下不以 `_` 開頭的資料夾，恰好一個就回傳它，零個或多個則 `throw new Error`。
 
-- [ ] **Step 1: 建立 `package.json`**
+- [x] **Step 1: 建立 `package.json`**
 
 ```json
 {
@@ -82,7 +82,7 @@
 }
 ```
 
-- [ ] **Step 2: 建立 `.gitignore`**
+- [x] **Step 2: 建立 `.gitignore`**
 
 ```
 node_modules/
@@ -92,7 +92,7 @@ dist/
 trips/*/.cache/
 ```
 
-- [ ] **Step 3: 寫失敗的測試 `tests/paths.test.js`**
+- [x] **Step 3: 寫失敗的測試 `tests/paths.test.js`**
 
 ```js
 const test = require('node:test');
@@ -131,12 +131,12 @@ test('路徑落在專案內', () => {
 });
 ```
 
-- [ ] **Step 4: 執行測試確認失敗**
+- [x] **Step 4: 執行測試確認失敗**
 
 Run: `npm test`
 Expected: FAIL，訊息為 `Cannot find module '../scripts/lib/paths.js'`
 
-- [ ] **Step 5: 實作 `scripts/lib/paths.js`**
+- [x] **Step 5: 實作 `scripts/lib/paths.js`**
 
 ```js
 // slug 解析與路徑計算。引擎所有 CLI 都從這裡取得行程資料夾位置。
@@ -165,12 +165,12 @@ function resolveSlug(argv) {
 module.exports = { ROOT, tripDir, distDir, listTrips, resolveSlug };
 ```
 
-- [ ] **Step 6: 執行測試確認通過**
+- [x] **Step 6: 執行測試確認通過**
 
 Run: `npm test`
 Expected: PASS，5 個測試全過
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add package.json .gitignore scripts/lib/paths.js tests/paths.test.js
@@ -192,7 +192,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `schema.js` 匯出 `SCHEMA_VERSION = 1`、`validate(trip): string[]`、`KINDS`、`MODES`、`CATS`（皆為 `Set<string>`）。`trip` 是 Task 3 `loadTrip` 合併後的物件，回傳空陣列代表通過。
   - `tests/fixtures/make-trip.js` 匯出 `makeTrip(overrides?: object): Trip`、`place(over?): object`、`detail(over?): object`。`makeTrip` 回傳一份最小但合法的行程物件，`overrides` 以淺層合併覆蓋頂層鍵。
 
-- [ ] **Step 1: 寫 fixture `tests/fixtures/make-trip.js`**
+- [x] **Step 1: 寫 fixture `tests/fixtures/make-trip.js`**
 
 ```js
 // 最小但合法的行程物件，供 schema 測試逐條破壞。全為合成資料。
@@ -247,7 +247,7 @@ function makeTrip(overrides = {}) {
 module.exports = { makeTrip, place, detail };
 ```
 
-- [ ] **Step 2: 寫失敗的測試 `tests/schema.test.js`**
+- [x] **Step 2: 寫失敗的測試 `tests/schema.test.js`**
 
 ```js
 const test = require('node:test');
@@ -367,12 +367,12 @@ test('照片授權不明會被抓到', () => {
 });
 ```
 
-- [ ] **Step 3: 執行測試確認失敗**
+- [x] **Step 3: 執行測試確認失敗**
 
 Run: `npm test`
 Expected: FAIL，`Cannot find module '../scripts/lib/schema.js'`
 
-- [ ] **Step 4: 實作 `scripts/lib/schema.js`**
+- [x] **Step 4: 實作 `scripts/lib/schema.js`**
 
 規則逐條對應 spec §3「驗證規則」。為了守住 50 行的函式上限，`validate` 只負責串接，各段拆成獨立函式。
 
@@ -517,12 +517,12 @@ function validate(trip) {
 module.exports = { SCHEMA_VERSION, validate, KINDS, MODES, CATS };
 ```
 
-- [ ] **Step 5: 執行測試確認通過**
+- [x] **Step 5: 執行測試確認通過**
 
 Run: `npm test`
 Expected: PASS，schema 的 18 個測試全過
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add scripts/lib/schema.js tests/schema.test.js tests/fixtures/make-trip.js
@@ -542,7 +542,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `paths.js` 的 `tripDir`；`schema.js` 的 `validate`
 - Produces: `load-trip.js` 匯出 `loadTrip(slug: string, opts?: { validate?: boolean }): Trip`。`Trip` 欄位如 Task 2 的 fixture。`opts.validate` 預設 `true`，驗證失敗時 `throw new Error`，訊息含所有錯誤。載入時做三件接線：把 `DINING.places` 併入 `PLACES` 並標 `approximate: true`、把 `DINING.days[id]` 掛成 `day.meals`、把 `MAP_LISTS[id]` 掛成 `day.mapList`、把 `DINING.checklist` 併入 `CHECKLIST`。
 
-- [ ] **Step 1: 寫失敗的測試 `tests/load-trip.test.js`**
+- [x] **Step 1: 寫失敗的測試 `tests/load-trip.test.js`**
 
 測試用暫存資料夾寫出一份行程，避免依賴 `trips/_example`（它在 Task 5 才出現）。
 
@@ -616,12 +616,12 @@ test('資料夾不存在時給明確訊息', () => {
 });
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run: `npm test`
 Expected: FAIL，`Cannot find module '../scripts/lib/load-trip.js'`
 
-- [ ] **Step 3: 實作 `scripts/lib/load-trip.js`**
+- [x] **Step 3: 實作 `scripts/lib/load-trip.js`**
 
 ```js
 // 讀 trips/<slug>/ 的 config 與資料檔，合併接線後驗證。
@@ -676,12 +676,12 @@ function loadTrip(slug, opts = {}) {
 module.exports = { loadTrip };
 ```
 
-- [ ] **Step 4: 執行測試確認通過**
+- [x] **Step 4: 執行測試確認通過**
 
 Run: `npm test`
 Expected: PASS，load-trip 的 6 個測試全過
 
-- [ ] **Step 5: 實作 `scripts/check.js`**
+- [x] **Step 5: 實作 `scripts/check.js`**
 
 ```js
 #!/usr/bin/env node
@@ -702,7 +702,7 @@ try {
 }
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add scripts/lib/load-trip.js scripts/check.js tests/load-trip.test.js
@@ -728,14 +728,14 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `src/render.js` 定義 `legHTML(leg, fromKey, toKey)`、`stopHTML(s, i, stops)`、`mealsHTML(day)`、`dayHTML(day)`、`overviewHTML()`、`roleOf(key)`、`detailBodyHTML(key)`。全部只回傳字串，不觸碰 `document`。
   - `src/app.js` 保留所有碰 DOM 的程式：投影與地圖繪製、pin 佈局、地圖對話框、FAB、燈箱開關、分頁、勾選狀態、主題、啟動序列。
 
-- [ ] **Step 1: 複製既有頁面程式碼**
+- [x] **Step 1: 複製既有頁面程式碼**
 
 ```bash
 mkdir -p src
 cp /Users/wangch/GitHub/SENTAI2026/src/template.html src/legacy-template.html
 ```
 
-- [ ] **Step 2: 寫測試輔助 `tests/helpers/render-ctx.js`**
+- [x] **Step 2: 寫測試輔助 `tests/helpers/render-ctx.js`**
 
 ```js
 const vm = require('node:vm');
@@ -772,7 +772,7 @@ function legacySlice(html, startMarker, endMarker) {
 module.exports = { renderContext, legacySlice };
 ```
 
-- [ ] **Step 3: 寫失敗的 parity 測試 `tests/render-parity.test.js`**
+- [x] **Step 3: 寫失敗的 parity 測試 `tests/render-parity.test.js`**
 
 ```js
 const test = require('node:test');
@@ -842,12 +842,12 @@ test('拆檔後的 render.js 與原 template 產出完全一致', () => {
 });
 ```
 
-- [ ] **Step 4: 執行測試確認失敗**
+- [x] **Step 4: 執行測試確認失敗**
 
 Run: `node --test tests/render-parity.test.js`
 Expected: FAIL，`ENOENT`（`src/util.js` 尚未存在）
 
-- [ ] **Step 5: 從 legacy-template.html 抽出 `src/styles.css` 與 `src/index.html`**
+- [x] **Step 5: 從 legacy-template.html 抽出 `src/styles.css` 與 `src/index.html`**
 
 - `src/styles.css`：`legacy-template.html` 第 6 行（`<style>` 的下一行）到 `</style>` 前一行的全部內容，原樣搬移，不改任何一條規則。
 - `src/index.html`：`<title>` 那行改成 `<title>/*__TITLE__*/</title>`、字型 `<link>` 三行、`<link rel="stylesheet" href="styles.css">`，接著原樣搬入 `</style>` 之後到 `<script>` 之前的 body 標記（SVG sprite、`header.top`、`.wrap`、`.fab`、兩個 `<dialog>`），最後放四個佔位符：
@@ -866,7 +866,7 @@ const PHOTOS = /*__PHOTOS__*/null;
 
 （build 會把這些 `<script src>` 換成內嵌內容；`src/` 直接用瀏覽器開不是支援的用法。）
 
-- [ ] **Step 6: 建立 `src/util.js`**
+- [x] **Step 6: 建立 `src/util.js`**
 
 搬入 legacy 的 `esc`、`ico`、`md`、`KIND`、`ll`、`mapsUrl`、`routeUrl`，**內容一字不改**，只把 `routeUrl` 的第三個參數從 `walking` 改名為 `mode` 並保持既有行為：
 
@@ -886,27 +886,27 @@ const routeUrl = (from, to, mode) => 'https://www.google.com/maps/dir/?api=1&ori
   + '&destination=' + ll(to) + '&travelmode=' + (mode === 'walk' ? 'walking' : 'driving');
 ```
 
-- [ ] **Step 7: 建立 `src/render.js`**
+- [x] **Step 7: 建立 `src/render.js`**
 
 搬入 legacy 的 `legHTML`、`stopHTML`、`mealsHTML`、`dayHTML`、`overviewHTML`、`roleOf`，以及 `openDetail` 裡組 `lbBody.innerHTML` 的那段（抽成 `detailBodyHTML(key)`，回傳同一個字串，照片區塊仍留在 `app.js`）。**這一步一個字都不改**——包含 `legHTML` 裡 `/步行/.test(leg.drive)` 這種舊欄位用法，那是 Task 5 的事。
 
-- [ ] **Step 8: 建立 `src/app.js`**
+- [x] **Step 8: 建立 `src/app.js`**
 
 legacy `<script>` 內剩下的全部：`$`／`el`／`reduced`、投影與地圖（`prj`、`d`、`shape`、`drawBase`、`setView`、`fitTo`、`zoom`、`drawScale`、`placePins`、`layoutLabels`）、地圖對話框與 FAB、`renderMap`、`focusPlace`、`startSpy`、`openDetail`（改為呼叫 `detailBodyHTML`）、`afterDetailClose`／`closeDetail`、`openFromHash`、`buildTabs`、`show`、勾選狀態、主題、啟動序列。整份仍包在 `(function(){ 'use strict'; … })()` 裡。
 
 localStorage 的 key 從寫死的 `sentai.*` 改為 `CONFIG.deploy.name + '.'` 前綴（`checks`／`tab`／`theme`），這樣同一台裝置開不同行程不會互相覆蓋。
 
-- [ ] **Step 9: 執行 parity 測試確認通過**
+- [x] **Step 9: 執行 parity 測試確認通過**
 
 Run: `node --test tests/render-parity.test.js`
 Expected: PASS，兩天的 `dayHTML` 與 `overviewHTML` 完全一致
 
-- [ ] **Step 10: 確認檔案大小都在上限內**
+- [x] **Step 10: 確認檔案大小都在上限內**
 
 Run: `wc -l src/*.js src/*.css src/*.html`
 Expected: 每個檔案 < 800 行
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add src tests/helpers/render-ctx.js tests/render-parity.test.js
@@ -930,7 +930,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: Task 4 的 `renderContext`、Task 2 的 `makeTrip`
 - Produces: `render.js` 的函式簽章不變，但輸出改為由 `CONFIG` 與 `OVERVIEW` 驅動。新增 `money(range: [number, number]): string`（放 `util.js`），回傳 `每人約 ¥800–1,500／2 人約 ¥1,600–3,000`，幣別取 `CONFIG.currency`、人數取 `CONFIG.party`。
 
-- [ ] **Step 1: 寫失敗的測試 `tests/render.test.js`**
+- [x] **Step 1: 寫失敗的測試 `tests/render.test.js`**
 
 ```js
 const test = require('node:test');
@@ -1022,12 +1022,12 @@ test('leg 依 mode 決定圖示與導航模式，不再靠字串比對', () => {
 });
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run: `node --test tests/render.test.js`
 Expected: FAIL，多條：引擎含「仙台」等字眼、`money is not a function`、總覽仍寫「七天主軸」
 
-- [ ] **Step 3: 在 `src/util.js` 加 `money`**
+- [x] **Step 3: 在 `src/util.js` 加 `money`**
 
 ```js
 const money = (range) => {
@@ -1038,7 +1038,7 @@ const money = (range) => {
 };
 ```
 
-- [ ] **Step 4: 改寫 `legHTML`**
+- [x] **Step 4: 改寫 `legHTML`**
 
 ```js
 const MODE_ICON = { drive:'i-car', transit:'i-train', walk:'i-walk', taxi:'i-car', ferry:'i-ship' };
@@ -1064,7 +1064,7 @@ function legHTML(leg, fromKey, toKey) {
 <symbol id="i-ship" viewBox="0 0 24 24"><path d="M4 14.5 12 12l8 2.5-1.6 5H5.6Z"/><path d="M6.5 12V7.5h11V12M12 4v3.5"/></symbol>
 ```
 
-- [ ] **Step 5: 新增 `extraHTML`，讓 `extra.js` 插槽真的被渲染**
+- [x] **Step 5: 新增 `extraHTML`，讓 `extra.js` 插槽真的被渲染**
 
 ```js
 // trips/<slug>/extra.js 的自訂區塊。html 是行程擁有者自己的內容，原樣插入。
@@ -1093,12 +1093,12 @@ test('extra.js 的自訂區塊會被渲染到指定位置', () => {
 });
 ```
 
-- [ ] **Step 6: 改寫 `dayHTML`／`mealsHTML` 的區塊開關**
+- [x] **Step 6: 改寫 `dayHTML`／`mealsHTML` 的區塊開關**
 
 - `dayHTML`：`day.mapList && CONFIG.sections.mapLists` 才輸出 `map-list-link` 與 `map-list-note`；`CONFIG.sections.dining && day.meals.length` 才輸出 `meal-jump` 與 `mealsHTML(day)`。
 - `mealsHTML`：每人預算一律走 `money(venue.budget)`；`meal.budget` 存在時優先用它；`meal.cooking` 那段的金額改讀 `DINING.cooking.total`（缺就不輸出那行）；固定文案裡的「五人」改成 `CONFIG.party + ' 人'`。
 
-- [ ] **Step 7: 改寫 `overviewHTML`**
+- [x] **Step 7: 改寫 `overviewHTML`**
 
 各區塊改為資料驅動，缺資料就整段不輸出：
 
@@ -1113,30 +1113,30 @@ test('extra.js 的自訂區塊會被渲染到指定位置', () => {
 
 住宿色條與列表的顏色改成 `DAYS.find((d) => d.id === s.day).color`，取代原本寫死的 `DAYS[i === 0 ? 0 : (i === 1 ? 3 : 4)]`。最後一天的過夜欄仍標「返程」。
 
-- [ ] **Step 8: 改寫 `detailBodyHTML`**
+- [x] **Step 8: 改寫 `detailBodyHTML`**
 
 - `p.jp` 改 `p.local`。
 - 查閱日期的兩句話改讀 `DINING.checked` 與 `OVERVIEW.checked`，缺就不輸出該句。
 - 「僅供家人旅行參考」改為中性的「照片來源標於各張下方」。
 - `p.parking` 存在時，在「實用資訊」之後插入停車區塊：名稱、費用、`note`，以及一個導向停車場座標的 Google Maps 連結。
 
-- [ ] **Step 9: 執行測試確認通過**
+- [x] **Step 9: 執行測試確認通過**
 
 Run: `node --test tests/render.test.js`
 Expected: PASS，11 個測試全過
 
-- [ ] **Step 10: 刪掉 legacy 與 parity 測試**
+- [x] **Step 10: 刪掉 legacy 與 parity 測試**
 
 ```bash
 git rm src/legacy-template.html tests/render-parity.test.js
 ```
 
-- [ ] **Step 11: 全部測試再跑一次**
+- [x] **Step 11: 全部測試再跑一次**
 
 Run: `npm test`
 Expected: PASS
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add src tests/render.test.js
@@ -1161,7 +1161,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: Task 3 的 `loadTrip`
 - Produces: 一個能通過 `node scripts/check.js _example` 的行程資料夾。`basemap.json` 是手寫的最小佔位檔，格式與 Task 2 階段的產物相同：`{ meta: { bbox, dem: 'placeholder', generatedAt }, sea: [], islands: [], contour: {}, motorway: [], trunk: [], primary: [], river: [], lake: [], border: [], towns: [] }`，第 2 階段會被真正產生的內容取代。
 
-- [ ] **Step 1: 寫 `trip.config.json`**
+- [x] **Step 1: 寫 `trip.config.json`**
 
 ```json
 {
@@ -1183,7 +1183,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 }
 ```
 
-- [ ] **Step 2: 寫 `data.js`**
+- [x] **Step 2: 寫 `data.js`**
 
 `PLACES` 六筆：`stationA`（`cat: 'hub'`，用真實車站座標）、`yamadera`、`ginzan`、`matsushima`（`cat: 'sight'`）、`innA`、`innB`（`cat: 'stay'`，名稱寫「範例民宿 A／B」，座標用街區層級並標 `approximate: true`）。`yamadera` 與 `ginzan` 各帶一組 `parking`，示範停車欄位。
 
@@ -1207,15 +1207,15 @@ const OVERVIEW = {
 
 `STAYS` 兩筆，各帶 `day: 1` 與 `day: 2`。`ADDONS` 兩筆、`CHECKLIST` 三條，全部用中性文字。檔尾 `module.exports = { PLACES, DAYS, OVERVIEW_ROUTE, ADDONS, CHECKLIST, STAYS, OVERVIEW };`
 
-- [ ] **Step 3: 寫 `details.js`**
+- [x] **Step 3: 寫 `details.js`**
 
 除 `stationA`（hub）外每個地點一筆：`summary` 至少 40 字、`highlights` 至少兩點、`stay`、`info`（含一列「停車」示範）、`refs` 指向真實官方網站。
 
-- [ ] **Step 4: 寫 `dining.js`**
+- [x] **Step 4: 寫 `dining.js`**
 
 `places` 兩筆（一間餐廳 `cat: 'food'`、一間超市 `cat: 'shop'`，名稱用「範例食堂」「範例超市」），`venues` 對應兩筆含 `menu`／`booking`／`budget`／`hours`／`route`，`days` 三天各兩餐（午餐、晚餐），`checklist` 一條。這些地點也要在 `details.js` 有對應說明（`dining: true`）。
 
-- [ ] **Step 5: 寫其餘檔案**
+- [x] **Step 5: 寫其餘檔案**
 
 ```bash
 echo '{}' > trips/_example/photos.json
@@ -1241,12 +1241,12 @@ printf '// 這趟行程沒有建立 Google Maps 清單（trip.config 的 section
 範例資料僅供參考，住宿為虛構名稱，出發前請以官方網站為準。
 ```
 
-- [ ] **Step 6: 執行 check 確認通過**
+- [x] **Step 6: 執行 check 確認通過**
 
 Run: `node scripts/check.js _example`
 Expected: `✓ _example：8 個地點、3 天、…`（地點數依實際筆數）
 
-- [ ] **Step 7: 寫測試 `tests/example-trip.test.js`**
+- [x] **Step 7: 寫測試 `tests/example-trip.test.js`**
 
 ```js
 const test = require('node:test');
@@ -1279,12 +1279,12 @@ test('_example 不含個人或訂位資訊', () => {
 });
 ```
 
-- [ ] **Step 8: 執行測試確認通過**
+- [x] **Step 8: 執行測試確認通過**
 
 Run: `npm test`
 Expected: PASS
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add trips/_example tests/example-trip.test.js
@@ -1304,7 +1304,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `loadTrip`、`resolveSlug`、`distDir`
 - Produces: `build.js` 匯出 `buildTrip(slug: string): { html: string, outDir: string, bytes: number, photos: number }` 並在直接執行時當 CLI 用。產物：`dist/<slug>/site/index.html`、`dist/<slug>/site/img/*`、`dist/<slug>/site/{_headers,robots.txt}`、`dist/<slug>/wrangler.json`。
 
-- [ ] **Step 1: 建立 `public/` 的兩個靜態檔**
+- [x] **Step 1: 建立 `public/` 的兩個靜態檔**
 
 `public/_headers`：
 
@@ -1327,7 +1327,7 @@ User-agent: *
 Disallow: /
 ```
 
-- [ ] **Step 2: 寫失敗的測試 `tests/build.test.js`**
+- [x] **Step 2: 寫失敗的測試 `tests/build.test.js`**
 
 ```js
 const test = require('node:test');
@@ -1381,12 +1381,12 @@ test('theme.css 接在引擎 CSS 之後', () => {
 });
 ```
 
-- [ ] **Step 3: 執行測試確認失敗**
+- [x] **Step 3: 執行測試確認失敗**
 
 Run: `node --test tests/build.test.js`
 Expected: FAIL，`Cannot find module '../scripts/build.js'`
 
-- [ ] **Step 4: 實作 `scripts/build.js`**
+- [x] **Step 4: 實作 `scripts/build.js`**
 
 流程：`loadTrip(slug)` → 讀 `src/index.html`、`styles.css`、`util.js`、`render.js`、`app.js` → 取代佔位符 → 把 `<link rel="stylesheet">` 換成 `<style>` 內容 + `theme.css`、把三個 `<script src>` 換成 `<script>` 內容 → 補上完整文件外殼（`<!doctype html>`、`meta viewport`、`meta robots`、`meta description`、`color-scheme`、`theme-color`、emoji favicon `data:` URI）→ 寫檔 → 複製照片與 `public/` → 產 `wrangler.json`。
 
@@ -1399,17 +1399,17 @@ Expected: FAIL，`Cannot find module '../scripts/build.js'`
 - 結束時印出 `✓ dist/<slug>/site/index.html <大小> KB，照片 N 張 M MB，靜態檔 K 個`。
 - 檔尾：`if (require.main === module) { … CLI … }`，讓測試可以直接 `require`。
 
-- [ ] **Step 5: 執行測試確認通過**
+- [x] **Step 5: 執行測試確認通過**
 
 Run: `node --test tests/build.test.js`
 Expected: PASS，6 個測試全過
 
-- [ ] **Step 6: 用瀏覽器實際看一次**
+- [x] **Step 6: 用瀏覽器實際看一次**
 
 Run: `node scripts/build.js _example && node -e "const {execSync}=require('child_process');console.log(require('fs').statSync('dist/_example/site/index.html').size)"`
 接著用內建瀏覽器開啟 `dist/_example/site/index.html`，確認：分頁切換、地圖（此時只有點與連線、沒有底圖線條）、燈箱、手機寬度都正常，主控台沒有錯誤。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add scripts/build.js public tests/build.test.js
@@ -1429,7 +1429,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `buildTrip`、`resolveSlug`、`distDir`、`tripDir`
 - Produces: `new-trip.js` 匯出 `newTrip(slug: string): string`（回傳建立的資料夾路徑），已存在時 `throw`。
 
-- [ ] **Step 1: 實作 `scripts/preview.js`**
+- [x] **Step 1: 實作 `scripts/preview.js`**
 
 ```js
 #!/usr/bin/env node
@@ -1460,7 +1460,7 @@ http.createServer((req, res) => {
 });
 ```
 
-- [ ] **Step 2: 實作 `scripts/ship.js`**
+- [x] **Step 2: 實作 `scripts/ship.js`**
 
 ```js
 #!/usr/bin/env node
@@ -1487,11 +1487,11 @@ if (r.status !== 0) {
 }
 ```
 
-- [ ] **Step 3: 建立 `scripts/templates/` 骨架**
+- [x] **Step 3: 建立 `scripts/templates/` 骨架**
 
 六個檔案，每個都只有說明註解與一筆範例，並在開頭寫明「改這個檔之前先讀 `docs/schema/<name>.md`」：`trip.config.json`（`schemaVersion: 1`、其餘欄位留待填的預設值）、`data.js`、`details.js`、`dining.js`、`map-lists.js`、`photos.json`。另加 `theme.css`、`extra.js`、`docs/status.md` 三個空樣板。
 
-- [ ] **Step 4: 寫失敗的測試 `tests/new-trip.test.js`**
+- [x] **Step 4: 寫失敗的測試 `tests/new-trip.test.js`**
 
 ```js
 const test = require('node:test');
@@ -1520,26 +1520,26 @@ test('已存在時拒絕覆蓋', () => {
 });
 ```
 
-- [ ] **Step 5: 執行測試確認失敗**
+- [x] **Step 5: 執行測試確認失敗**
 
 Run: `node --test tests/new-trip.test.js`
 Expected: FAIL，`Cannot find module '../scripts/new-trip.js'`
 
-- [ ] **Step 6: 實作 `scripts/new-trip.js`**
+- [x] **Step 6: 實作 `scripts/new-trip.js`**
 
 複製 `scripts/templates/` 到 `trips/<slug>/`，把骨架裡的 `__SLUG__` 換成實際 slug；資料夾已存在時 `throw new Error('trips/<slug> 已經存在')`。結束時印出接下來要做什麼（填 `trip.config.json`、跑 `npm run check -- <slug>`）。
 
-- [ ] **Step 7: 執行測試確認通過**
+- [x] **Step 7: 執行測試確認通過**
 
 Run: `npm test`
 Expected: PASS
 
-- [ ] **Step 8: 手動驗證 preview**
+- [x] **Step 8: 手動驗證 preview**
 
 Run: `node scripts/preview.js _example`
 用內建瀏覽器開 `http://localhost:4173`，確認頁面正常後 Ctrl+C。
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add scripts/preview.js scripts/ship.js scripts/new-trip.js scripts/templates tests/new-trip.test.js
@@ -1561,11 +1561,11 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `tripDir`
 - Produces: `scripts/migrate/0-to-1.js` 匯出 `migrate(dir: string): string[]`，就地改寫 `dir` 底下的資料檔並回傳變更說明陣列。`scripts/migrate.js` 依 `trip.config.json` 的 `schemaVersion` 依序套用 `<n>-to-<n+1>.js` 直到等於 `SCHEMA_VERSION`。
 
-- [ ] **Step 1: 建立合成的舊格式樣本 `tests/fixtures/legacy-trip/`**
+- [x] **Step 1: 建立合成的舊格式樣本 `tests/fixtures/legacy-trip/`**
 
 `data.js` 用 schemaVersion 0 的寫法：地點有 `jp` 沒有 `local`、`leg` 是 `{ dist, drive, buffer, road, url }` 沒有 `mode`、檔尾有 `if (typeof module !== 'undefined') module.exports = …`、尾端有「把 dining 併進 PLACES、把 meals 掛到 day」的接線程式。另附 `dining.js`、`details.js`、`map-lists.js`、`photos.json`，以及一個沒有 `schemaVersion` 的 `trip.config.json`。內容全為合成值。
 
-- [ ] **Step 2: 寫失敗的測試 `tests/migrate.test.js`**
+- [x] **Step 2: 寫失敗的測試 `tests/migrate.test.js`**
 
 ```js
 const test = require('node:test');
@@ -1627,12 +1627,12 @@ test('回傳的變更說明涵蓋每一項改動', () => {
 });
 ```
 
-- [ ] **Step 3: 執行測試確認失敗**
+- [x] **Step 3: 執行測試確認失敗**
 
 Run: `node --test tests/migrate.test.js`
 Expected: FAIL，`Cannot find module '../scripts/migrate/0-to-1.js'`
 
-- [ ] **Step 4: 實作 `scripts/migrate/0-to-1.js`**
+- [x] **Step 4: 實作 `scripts/migrate/0-to-1.js`**
 
 以 `require` 載入舊 `data.js` 取得物件，轉換後用 `JSON.stringify` 寫回 `module.exports = …`（註解會消失，因此回傳的變更說明要提醒作者：原檔已備份成 `data.js.bak`，來源註解請自行搬回）。轉換規則：
 
@@ -1646,16 +1646,16 @@ Expected: FAIL，`Cannot find module '../scripts/migrate/0-to-1.js'`
 | 無 `OVERVIEW` | 建立 `{ checked: '', foot: [] }` 並提醒把原本寫死在 template 的文字搬進來 |
 | `trip.config.json` 無 `schemaVersion` | 補 `schemaVersion: 1`、`party`、`currency`、`sections`、`deploy` 等必填欄位的預設值 |
 
-- [ ] **Step 5: 實作 `scripts/migrate.js`**
+- [x] **Step 5: 實作 `scripts/migrate.js`**
 
 讀 `trip.config.json` 的 `schemaVersion`（缺就當 0），迴圈套用 `scripts/migrate/<n>-to-<n+1>.js` 直到等於 `SCHEMA_VERSION`，把每一步的變更說明印出來，最後提示跑 `npm run check -- <slug>`。
 
-- [ ] **Step 6: 執行測試確認通過**
+- [x] **Step 6: 執行測試確認通過**
 
 Run: `npm test`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add scripts/migrate.js scripts/migrate tests/migrate.test.js tests/fixtures/legacy-trip
@@ -1675,11 +1675,11 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `scripts/lib/schema.js`
 - Produces: 六份欄位文件；`tests/docs.test.js` 確保文件與驗證規則不脫節。
 
-- [ ] **Step 1: 寫 `docs/schema/` 六份文件**
+- [x] **Step 1: 寫 `docs/schema/` 六份文件**
 
 每份固定四節：**這個檔負責什麼** → **欄位表**（欄位／必填／型別／說明／範例）→ **完整範例**（可直接複製的一筆）→ **常見錯誤**（對應 `schema.js` 會吐出的訊息）。`data.md` 要涵蓋 `PLACES`（含 `parking`）、`DAYS`（含 `stops`、`leg` 五種 `mode`、`alts`、`cautions`）、`OVERVIEW_ROUTE`、`ADDONS`、`CHECKLIST`、`STAYS`、`OVERVIEW`。
 
-- [ ] **Step 2: 寫測試 `tests/docs.test.js`**
+- [x] **Step 2: 寫測試 `tests/docs.test.js`**
 
 ```js
 const test = require('node:test');
@@ -1704,16 +1704,16 @@ test('每個合法的 mode / kind / cat 都有被文件提到', () => {
 });
 ```
 
-- [ ] **Step 3: 執行測試確認通過**
+- [x] **Step 3: 執行測試確認通過**
 
 Run: `node --test tests/docs.test.js`
 Expected: PASS（若失敗，補上文件缺的那個值的說明）
 
-- [ ] **Step 4: 寫 `README.md`**
+- [x] **Step 4: 寫 `README.md`**
 
 給「拿到這個 repo 的人」看，不是給 agent 看（agent 讀 `AGENTS.md`，第 4 階段才會建立）。內容：這是什麼、需要什麼（Node 20+、GitHub 帳號、Cloudflare 免費帳號）、五個指令的用途、目錄結構的引擎／內容邊界、`trips/_example` 怎麼看、以及「請把想做的事直接告訴你的 coding agent」這個主要用法。標明目前為第 1 階段，底圖與照片指令尚未實作。
 
-- [ ] **Step 5: 寫 `CHANGELOG.md`**
+- [x] **Step 5: 寫 `CHANGELOG.md`**
 
 ```markdown
 # 變更紀錄
@@ -1729,12 +1729,12 @@ Expected: PASS（若失敗，補上文件缺的那個值的說明）
 尚未實作：`npm run basemap`、`npm run photos`，以及 agent skills。
 ```
 
-- [ ] **Step 6: 全部測試最後跑一次並確認 `_example` 能走完全程**
+- [x] **Step 6: 全部測試最後跑一次並確認 `_example` 能走完全程**
 
 Run: `npm test && node scripts/check.js _example && node scripts/build.js _example`
 Expected: 全部 PASS 且 build 成功
 
-- [ ] **Step 7: Commit 並打 tag**
+- [x] **Step 7: Commit 並打 tag**
 
 ```bash
 git add docs/schema README.md CHANGELOG.md tests/docs.test.js
