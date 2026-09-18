@@ -64,3 +64,19 @@ test('parking 只有座標時退回通用標題，不會顯示 undefined', () =>
   assert.ok(!/undefined/.test(html), html);
   assert.ok(html.includes('38.220000,140.520000'));
 });
+
+test('同一天重複造訪同一個地點，停車提醒只出現一次', () => {
+  const trip = withParking();
+  // Day 2 的 sightA 再排一次（午餐後回到同一個點）
+  trip.DAYS[1].stops.push({ time: '15:00', place: 'sightA', kind: 'main', label: '再回來走走' });
+  const html = ctxFor(trip).dayHTML(trip.DAYS[1]);
+  assert.equal(html.split('景點停車場').length - 1, 1, '車只停一次，提醒就該只出現一次');
+  assert.equal(html.split('住宿停車場').length - 1, 1);
+});
+
+test('不同天各自顯示，不會被前一天吃掉', () => {
+  const trip = withParking();
+  const ctx = ctxFor(trip);
+  assert.ok(ctx.dayHTML(trip.DAYS[0]).includes('住宿停車場'), 'Day 1 停 stayA');
+  assert.ok(ctx.dayHTML(trip.DAYS[1]).includes('住宿停車場'), 'Day 2 也停 stayA，要各自顯示');
+});

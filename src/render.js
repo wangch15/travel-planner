@@ -25,7 +25,8 @@ function extraHTML(where, dayId) {
     .join('');
 }
 
-/* 停留點自己的停車提醒。掛在該點下面，才知道是在講哪一個點。 */
+/* 停留點自己的停車提醒。掛在該點下面，才知道是在講哪一個點。
+   同一天重複造訪同一個地點時只在第一次出現——車只停一次。 */
 function stopParkingHTML(p) {
   const pk = p.parking;
   if (!pk) return '';
@@ -51,7 +52,7 @@ function stopHTML(s, i, stops) {
     + (s.note ? '<p class="snote">' + esc(s.note) + '</p>' : '')
     + (p.note && s.kind === 'stay' ? '<p class="snote">' + esc(p.note) + '</p>' : '')
     + '<a class="glink" href="' + esc(mapsUrl(p)) + '" target="_blank" rel="noopener">在 Google Maps 開啟' + ico('i-ext') + '</a>'
-    + stopParkingHTML(p)
+    + (stops.slice(0, i).some((x) => x.place === s.place) ? '' : stopParkingHTML(p))
     + '</div></li>';
   return h;
 }
