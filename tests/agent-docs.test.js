@@ -72,3 +72,27 @@ test('skills 與 rules 不含特定行程的專有名詞', () => {
     assert.ok(!all.includes(w), `skills/rules 不該出現行程專屬字眼：${w}`);
   }
 });
+
+test('README 有兩段可複製的 prompt：環境準備與開始做行程', () => {
+  const r = read('README.md');
+  const blocks = [...r.matchAll(/```text\n([\s\S]*?)```/g)].map((m) => m[1]);
+  assert.equal(blocks.length, 2, `應該有兩段 prompt，實際 ${blocks.length}`);
+  const [boot, start] = blocks;
+  // 第一段不需要碰 repo，所以不該要求 clone
+  assert.ok(/Node\.js/.test(boot) && /git/.test(boot) && /gh auth login/.test(boot), '環境準備那段要涵蓋 Node、git、gh 登入');
+  assert.ok(!boot.includes('github.com/wangch15'), '環境準備那段不該需要 repo 權限');
+  // 第二段要自帶 repo 網址與入口
+  assert.ok(start.includes('https://github.com/wangch15/travel-planner'), '第二段要帶 repo 網址');
+  assert.ok(start.includes('AGENTS.md') && start.includes('tp-setup'), '第二段要指名 AGENTS.md 與 tp-setup');
+  // 兩段都要有「卡住就說」
+  [boot, start].forEach((b, i) => assert.ok(/不要.*猜|卡在哪/.test(b), `第 ${i + 1} 段缺少「卡住就說、不要猜」`));
+});
+
+test('有一份可以直接傳給朋友的邀請訊息', () => {
+  assert.ok(exists('docs/invite.md'), '缺 docs/invite.md');
+  const inv = read('docs/invite.md');
+  for (const w of ['GitHub', 'Cloudflare', '協作者']) {
+    assert.ok(inv.includes(w), `invite.md 缺 ${w}`);
+  }
+  assert.ok(read('README.md').includes('docs/invite.md'), 'README 要連到邀請訊息');
+});
