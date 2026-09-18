@@ -1,0 +1,18 @@
+{
+  "name": "travel-planner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "可 fork 的旅程網頁模板：引擎 + trips/<slug>/ 內容",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "check": "node scripts/check.js",
+    "build": "node scripts/build.js",
+    "preview": "node scripts/preview.js",
+    "ship": "node scripts/ship.js",
+    "new": "node scripts/new-trip.js",
+    "migrate": "node scripts/migrate.js",
+    "test": "node --test \"tests/**/*.test.js\""
+  },
+  "dependencies": {},
+  "devDependencies": { "wrangler": "^4.133.0" }
+}
