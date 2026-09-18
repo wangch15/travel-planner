@@ -4,7 +4,7 @@
 
 **主要用法是：把你想做的事直接告訴你的 coding agent。** 這個 repo 裡有給 agent 看的操作說明，你不需要自己讀程式碼。
 
-> 目前是第 1 階段（引擎骨架）。`npm run basemap` 與 `npm run photos` 尚未實作，agent 用的 skills 也還沒建立。
+> 目前是第 2 階段（底圖）。`npm run photos` 尚未實作，agent 用的 skills 也還沒建立。
 
 ## 需要什麼
 
@@ -36,6 +36,7 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 | `npm run build -- <slug>` | 產出 `dist/<slug>/site/index.html`（單一檔案）與 `wrangler.json` |
 | `npm run preview -- <slug>` | build 後在 `localhost:4173` 開一個本機伺服器 |
 | `npm run ship -- <slug>` | build 後用 wrangler 部署 |
+| `npm run basemap -- <slug>` | 從 OpenStreetMap 與公開高程資料產生地形底圖 |
 | `npm run migrate -- <slug>` | 引擎更新後，把舊格式的資料升版 |
 | `npm test` | 引擎自己的測試 |
 
@@ -78,4 +79,4 @@ travel-planner/
 
 ## 授權與資料來源
 
-地圖使用 OpenStreetMap 圖資（© OpenStreetMap 貢獻者，ODbL）與公開高程資料。照片只收 CC／Public domain 授權，或官網照片並標明來源——授權不明的一律不收，`npm run check` 會擋。
+地圖使用 OpenStreetMap 圖資（© OpenStreetMap 貢獻者，ODbL）與公開高程資料（日本為国土地理院，其他地區為 Terrain Tiles）。照片只收 CC／Public domain 授權，或官網照片並標明來源——授權不明的一律不收，`npm run check` 會擋。

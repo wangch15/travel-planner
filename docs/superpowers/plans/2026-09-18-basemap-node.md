@@ -80,7 +80,7 @@
   - `join(ways: [number, number][][]): [number, number][][]` — 把共用端點的 way 串成連續線
   - `round2(pts: [number, number][], n: number): [number, number][]` — 每個座標四捨五入到小數 `n` 位
 
-- [ ] **Step 1: 在 `package.json` 加 basemap 指令並讓測試涵蓋 `.mjs`**
+- [x] **Step 1: 在 `package.json` 加 basemap 指令並讓測試涵蓋 `.mjs`**
 
 把 `scripts` 裡的 `test` 那行改掉並新增 `basemap`：
 
@@ -95,12 +95,12 @@
   "dependencies": { "pngjs": "^7.0.0" },
 ```
 
-- [ ] **Step 2: 安裝 pngjs**
+- [x] **Step 2: 安裝 pngjs**
 
 Run: `npm install`
 Expected: `node_modules/pngjs` 出現，`package-lock.json` 被建立或更新
 
-- [ ] **Step 3: 寫失敗的測試 `tests/basemap-geom.test.mjs`**
+- [x] **Step 3: 寫失敗的測試 `tests/basemap-geom.test.mjs`**
 
 ```js
 import test from 'node:test';
@@ -157,12 +157,12 @@ test('round2 把座標降到指定小數位', () => {
 });
 ```
 
-- [ ] **Step 4: 執行測試確認失敗**
+- [x] **Step 4: 執行測試確認失敗**
 
 Run: `npm test`
 Expected: FAIL，`ERR_MODULE_NOT_FOUND`（`tools/basemap/geom.mjs` 不存在）
 
-- [ ] **Step 5: 實作 `tools/basemap/geom.mjs`**
+- [x] **Step 5: 實作 `tools/basemap/geom.mjs`**
 
 ```js
 // 純幾何工具。移植自 SENTAI2026 tools/basemap/simplify.py 的同名函式。
@@ -229,12 +229,12 @@ export function join(ways) {
 export const round2 = (pts, n) => pts.map(([x, y]) => [Number(x.toFixed(n)), Number(y.toFixed(n))]);
 ```
 
-- [ ] **Step 6: 執行測試確認通過**
+- [x] **Step 6: 執行測試確認通過**
 
 Run: `npm test`
 Expected: PASS，geom 的 9 個測試全過，第 1 階段的 59 個也仍然過（總數 68）
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add package.json package-lock.json tools/basemap/geom.mjs tests/basemap-geom.test.mjs
@@ -261,7 +261,7 @@ OSM 慣例：沿著海岸線的儲存方向走，**陸地在左、海在右**。
   - `clipToBbox(line: [number, number][], bbox): [number, number][][]` — 把折線裁成若干段完全落在 bbox 內的子折線
   - `buildSea(coastWays: [number, number][][], bbox): { sea: [number, number][], islands: [number, number][][] }` — `sea` 是一個封閉環（首尾同點），沒有海岸線時為 `[]`
 
-- [ ] **Step 1: 寫失敗的測試 `tests/basemap-coast.test.mjs`**
+- [x] **Step 1: 寫失敗的測試 `tests/basemap-coast.test.mjs`**
 
 bbox 一律用 `[0, 0, 10, 10]`（`[lngMin, latMin, lngMax, latMax]`），好手算。
 
@@ -354,12 +354,12 @@ test('海岸線恰好沿著邊界時不會炸掉', () => {
 });
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run: `node --test tests/basemap-coast.test.mjs`
 Expected: FAIL，`ERR_MODULE_NOT_FOUND`
 
-- [ ] **Step 3: 實作 `tools/basemap/coast.mjs`**
+- [x] **Step 3: 實作 `tools/basemap/coast.mjs`**
 
 ```js
 // 海域多邊形：把海岸線裁進 bbox，再沿周界順時針接成封閉環。
@@ -483,14 +483,14 @@ export function buildSea(coastWays, bbox) {
 }
 ```
 
-- [ ] **Step 4: 執行測試確認通過**
+- [x] **Step 4: 執行測試確認通過**
 
 Run: `node --test tests/basemap-coast.test.mjs`
 Expected: PASS，11 個測試全過
 
 若「單次穿越」的面積是 50 但走的是上緣，代表順逆時針判斷反了：檢查 `perimeterT` 的四個分支順序，**不要改測試的期望值**——「陸左海右」是 OSM 的規範，不是可調參數。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/basemap/coast.mjs tests/basemap-coast.test.mjs
@@ -518,7 +518,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `buildGrid(tiles: Map<string, Float32Array>, range): { grid: Float32Array, w: number, h: number }` — 缺圖磚填 0
   - `gridToLngLat(col: number, row: number, range): [number, number]`
 
-- [ ] **Step 1: 寫失敗的測試 `tests/basemap-dem.test.mjs`**
+- [x] **Step 1: 寫失敗的測試 `tests/basemap-dem.test.mjs`**
 
 ```js
 import test from 'node:test';
@@ -587,12 +587,12 @@ test('gridToLngLat 把網格索引換回經緯度', () => {
 });
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run: `node --test tests/basemap-dem.test.mjs`
 Expected: FAIL，`ERR_MODULE_NOT_FOUND`
 
-- [ ] **Step 3: 實作 `tools/basemap/dem.mjs`**
+- [x] **Step 3: 實作 `tools/basemap/dem.mjs`**
 
 ```js
 // 高程圖磚：範圍計算、解碼成高程網格。
@@ -689,12 +689,12 @@ export function gridToLngLat(col, row, range) {
 }
 ```
 
-- [ ] **Step 4: 執行測試確認通過**
+- [x] **Step 4: 執行測試確認通過**
 
 Run: `node --test tests/basemap-dem.test.mjs`
 Expected: PASS，9 個測試全過
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/basemap/dem.mjs tests/basemap-dem.test.mjs
@@ -719,7 +719,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `autoLevels(maxElev: number): number[]`
   - `buildContours(grid, w, h, range, opts?: { levels?: number[], minPoints?: number, eps?: number }): { contour: Record<string, [number, number][][]>, levels: number[] }`
 
-- [ ] **Step 1: 寫失敗的測試 `tests/basemap-contours.test.mjs`**
+- [x] **Step 1: 寫失敗的測試 `tests/basemap-contours.test.mjs`**
 
 ```js
 import test from 'node:test';
@@ -811,12 +811,12 @@ test('buildContours 丟掉太短的碎片', () => {
 });
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run: `node --test tests/basemap-contours.test.mjs`
 Expected: FAIL，`ERR_MODULE_NOT_FOUND`
 
-- [ ] **Step 3: 實作 `tools/basemap/contours.mjs`**
+- [x] **Step 3: 實作 `tools/basemap/contours.mjs`**
 
 ```js
 // 等高線：平滑 → marching squares → 串接 → 簡化。
@@ -934,12 +934,12 @@ export function buildContours(grid, w, h, range, opts = {}) {
 }
 ```
 
-- [ ] **Step 4: 執行測試確認通過**
+- [x] **Step 4: 執行測試確認通過**
 
 Run: `node --test tests/basemap-contours.test.mjs`
 Expected: PASS，9 個測試全過
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/basemap/contours.mjs tests/basemap-contours.test.mjs
@@ -963,7 +963,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `buildQuery(bbox): string` — 單一查詢抓齊所有圖層
   - `fetchOverpass(bbox, opts: { cacheDir: string, fetchImpl?: fn, sleep?: fn, log?: fn }): Promise<object>`
 
-- [ ] **Step 1: 寫失敗的測試 `tests/basemap-overpass.test.mjs`**
+- [x] **Step 1: 寫失敗的測試 `tests/basemap-overpass.test.mjs`**
 
 ```js
 import test from 'node:test';
@@ -1041,12 +1041,12 @@ test('至少要有兩個鏡像可以輪替', () => {
 });
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run: `node --test tests/basemap-overpass.test.mjs`
 Expected: FAIL，`ERR_MODULE_NOT_FOUND`
 
-- [ ] **Step 3: 實作 `tools/basemap/overpass.mjs`**
+- [x] **Step 3: 實作 `tools/basemap/overpass.mjs`**
 
 ```js
 // Overpass：一次查詢抓齊所有圖層，原始回應快取在 trips/<slug>/.cache/。
@@ -1129,12 +1129,12 @@ export async function fetchOverpass(bbox, opts = {}) {
 }
 ```
 
-- [ ] **Step 4: 執行測試確認通過**
+- [x] **Step 4: 執行測試確認通過**
 
 Run: `node --test tests/basemap-overpass.test.mjs`
 Expected: PASS，8 個測試全過
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/basemap/overpass.mjs tests/basemap-overpass.test.mjs
@@ -1156,7 +1156,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `assemble.mjs` 匯出 `classify(elements): object`、`townName(tags, lang): string`、`pickTowns(nodes, lang): object[]`、`DETAIL_SCALE`、`sizeWarnKB`、`assemble({ elements, contour, levels, bbox, config, demId, demCredit }): object`
   - `index.mjs` 是 CLI，無匯出
 
-- [ ] **Step 1: 寫失敗的測試 `tests/basemap-assemble.test.mjs`**
+- [x] **Step 1: 寫失敗的測試 `tests/basemap-assemble.test.mjs`**
 
 ```js
 import test from 'node:test';
@@ -1249,12 +1249,12 @@ test('assemble 在沒有海岸線時輸出空的 sea 與 islands', () => {
 });
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run: `node --test tests/basemap-assemble.test.mjs`
 Expected: FAIL，`ERR_MODULE_NOT_FOUND`
 
-- [ ] **Step 3: 實作 `tools/basemap/assemble.mjs`**
+- [x] **Step 3: 實作 `tools/basemap/assemble.mjs`**
 
 ```js
 // 組裝最終底圖：分類、簡化、海域、城鎮標籤。
@@ -1351,12 +1351,12 @@ export function assemble({ elements, contour, levels, bbox, config, demId, demCr
 }
 ```
 
-- [ ] **Step 4: 執行測試確認通過**
+- [x] **Step 4: 執行測試確認通過**
 
 Run: `node --test tests/basemap-assemble.test.mjs`
 Expected: PASS，8 個測試全過
 
-- [ ] **Step 5: 實作 CLI `tools/basemap/index.mjs`**
+- [x] **Step 5: 實作 CLI `tools/basemap/index.mjs`**
 
 ```js
 #!/usr/bin/env node
@@ -1454,17 +1454,17 @@ async function main() {
 main().catch((e) => { console.error('✗ ' + e.message); process.exit(1); });
 ```
 
-- [ ] **Step 6: 執行全部測試**
+- [x] **Step 6: 執行全部測試**
 
 Run: `npm test`
 Expected: PASS，總數約 104（第 1 階段 59 + 本階段 45）
 
-- [ ] **Step 7: 確認檔案大小都在上限內**
+- [x] **Step 7: 確認檔案大小都在上限內**
 
 Run: `wc -l tools/basemap/*.mjs`
 Expected: 每個檔案 < 800 行
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add tools/basemap/assemble.mjs tools/basemap/index.mjs tests/basemap-assemble.test.mjs
@@ -1487,7 +1487,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: Task 6 的 CLI
 - Produces: 真實的 `trips/_example/basemap.json` 與一份比對報告
 
-- [ ] **Step 1: 用明確層級跑一次，好跟 SENTAI 比對幾何**
+- [x] **Step 1: 用明確層級跑一次，好跟 SENTAI 比對幾何**
 
 先把 `trips/_example/trip.config.json` 的 `basemap` 那行暫時改成：
 
@@ -1498,7 +1498,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 Run: `npm run basemap -- _example`
 Expected: 成功產出，印出海域點數、島數、各層級線數
 
-- [ ] **Step 2: 比對數字**
+- [x] **Step 2: 比對數字**
 
 Run:
 
@@ -1521,7 +1521,7 @@ Expected：
 - `sea` 點數**會**不同且應該不同：SENTAI 是硬接兩個外海點，新版沿 bbox 周界閉合。這是預期的改善。
 - 道路與河湖線數相差在 ±10% 內即可（Overpass 資料本身隨時間變動）。
 
-- [ ] **Step 3: 在瀏覽器肉眼確認松島灣**
+- [x] **Step 3: 在瀏覽器肉眼確認松島灣**
 
 Run: `npm run preview -- _example`
 
@@ -1533,7 +1533,7 @@ Run: `npm run preview -- _example`
 
 看完 Ctrl+C 結束。
 
-- [ ] **Step 4: 改回自動選層級並重跑**
+- [x] **Step 4: 改回自動選層級並重跑**
 
 把 `contourLevels` 改回 `null`：
 
@@ -1544,15 +1544,15 @@ Run: `npm run preview -- _example`
 Run: `npm run basemap -- _example && npm run check -- _example`
 Expected: 成功，且 `check` 通過（`meta.bbox` 與 config 一致）。記下自動選到的間距與層數。
 
-- [ ] **Step 5: 寫比對報告 `docs/superpowers/notes/2026-09-18-basemap-parity.md`**
+- [x] **Step 5: 寫比對報告 `docs/superpowers/notes/2026-09-18-basemap-parity.md`**
 
 固定四節：**怎麼跑的**（兩次執行的指令與設定）→ **數字對照表**（Step 2 的輸出，照抄）→ **肉眼確認**（Step 3 看到什麼）→ **已知差異與原因**（至少涵蓋：海域閉合方式改變、自動選層級與手選層級不同、Overpass 資料隨時間變動）。
 
-- [ ] **Step 6: 更新 `trips/_example/docs/status.md`**
+- [x] **Step 6: 更新 `trips/_example/docs/status.md`**
 
 把 basemap 那一行從「佔位檔，待產生」改成實際狀態，寫明產生日期、高程來源與等高線層級。
 
-- [ ] **Step 7: 更新 `CHANGELOG.md` 與 `README.md`**
+- [x] **Step 7: 更新 `CHANGELOG.md` 與 `README.md`**
 
 `CHANGELOG.md` 最上面加一節：
 
@@ -1575,14 +1575,14 @@ Expected: 成功，且 `check` 通過（`meta.bbox` 與 config 一致）。記�
 | `npm run basemap -- <slug>` | 從 OpenStreetMap 與公開高程資料產生地形底圖 |
 ```
 
-- [ ] **Step 8: 把 `package.json` 的 `version` 改成 `0.2.0`**
+- [x] **Step 8: 把 `package.json` 的 `version` 改成 `0.2.0`**
 
-- [ ] **Step 9: 全部測試與完整流程最後跑一次**
+- [x] **Step 9: 全部測試與完整流程最後跑一次**
 
 Run: `npm test && npm run check -- _example && npm run build -- _example`
 Expected: 全部 PASS
 
-- [ ] **Step 10: Commit 並打 tag**
+- [x] **Step 10: Commit 並打 tag**
 
 ```bash
 git add trips/_example package.json CHANGELOG.md README.md docs/superpowers/notes

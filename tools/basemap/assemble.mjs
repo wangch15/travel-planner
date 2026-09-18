@@ -75,10 +75,12 @@ export function pickTowns(nodes, lang) {
 export function assemble({ elements, contour, levels, bbox, config, demId, demCredit }) {
   const scale = DETAIL_SCALE[(config.basemap && config.basemap.detail) || 'normal'] ?? 1;
   const g = classify(elements);
-  const { sea, islands } = buildSea(join(g.coast), bbox);
+  // 海岸線要先簡化再閉合：OSM 的海岸線被切成上千段，不濾掉碎環的話
+  // 每個岩礁都會變成一座島。這一步對應 SENTAI 版 simplify.py 的 coast 設定。
+  const { sea, islands } = buildSea(prep(g.coast, 'coast', scale), bbox);
   return {
     sea: sea.length ? round2(sea, 5) : [],
-    islands: islands.map((r) => round2(r, 5)),
+    islands,
     contour,
     motorway: prep(g.motorway, 'motorway', scale),
     trunk: prep(g.trunk, 'trunk', scale),

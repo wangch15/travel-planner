@@ -3,7 +3,7 @@
 - brief：不適用（這是模板附的範例）
 - plan：不適用
 - research：places ✓ routes ✓ parking ✓ dining ✓
-- basemap：佔位檔，待 `npm run basemap -- _example` 產生
+- basemap：✓ 2026/09/18 產生（国土地理院 z10；等高線自動選 250 m 間距、8 層；325 KB）
 - photos：無
 - shipped：未部署
 

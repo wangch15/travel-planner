@@ -86,3 +86,15 @@ test('assemble 在沒有海岸線時輸出空的 sea 與 islands', () => {
   assert.deepEqual(out.islands, []);
   assert.deepEqual(out.towns, []);
 });
+
+test('海岸線先簡化再閉合：太小的碎環不會變成島', () => {
+  // 周長 0.002 度的岩礁，小於 coast 的最短保留長度 0.004
+  const speck = [[140.5, 38.5], [140.5005, 38.5], [140.5005, 38.5005], [140.5, 38.5005], [140.5, 38.5]];
+  const big = Array.from({ length: 20 }, (_, i) => [140.2 + i * 0.02, 38.2 + (i % 2) * 0.01]);
+  const island = [...big, big[0]];
+  const out = assemble({
+    elements: [way({ natural: 'coastline' }, speck), way({ natural: 'coastline' }, island)],
+    contour: {}, levels: [], bbox: BBOX, config: CONFIG, demId: 'gsi', demCredit: 'x',
+  });
+  assert.equal(out.islands.length, 1, '只有夠大的環才算島');
+});
