@@ -1,0 +1,22 @@
+{
+  "meta": {
+    "bbox": [
+      139.95,
+      37.85,
+      141.45,
+      39
+    ],
+    "dem": "placeholder",
+    "generatedAt": "2026-09-18"
+  },
+  "sea": [],
+  "islands": [],
+  "contour": {},
+  "motorway": [],
+  "trunk": [],
+  "primary": [],
+  "river": [],
+  "lake": [],
+  "border": [],
+  "towns": []
+}

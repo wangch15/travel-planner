@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "title": "範例行程手帳",
+  "heading": "山寺・銀山・松島",
+  "subtitle": "三天兩夜　自駕＋電車",
+  "description": "travel-planner 的去識別化範例行程：三天兩夜，含地形圖、逐段交通與行前清單。",
+  "lang": "zh-Hant",
+  "dates": { "start": "2026-10-11", "end": "2026-10-13" },
+  "region": { "country": "JP", "bbox": [139.95, 37.85, 141.45, 39.0] },
+  "transport": ["drive", "transit"],
+  "party": 2,
+  "currency": "¥",
+  "sections": { "overview": true, "dining": true, "mapLists": false, "checklist": true },
+  "theme": { "accent": "#B0552D", "favicon": "🗾" },
+  "basemap": { "dem": "auto", "detail": "normal", "contourLevels": null },
+  "deploy": { "name": "example-trip", "target": "workers" }
+}
