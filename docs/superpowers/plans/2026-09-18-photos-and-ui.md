@@ -72,7 +72,7 @@
   - `fetch-file.js` 匯出 `IMAGE_TYPES: Set<string>`、`downloadTo(url: string, dest: string, opts?: { fetchImpl?, headers? }): Promise<{ bytes: number, type: string }>`。非 2xx 或 content-type 不是圖片時 `throw`，且**不留下半個檔案**。
   - `photos.js` 匯出 `commonsUrl(title: string): string`、`photoJobs(manifest: object, dir: string, opts?: { force?: boolean }): { key, index, file, url, label }[]`、`runPhotos(slug: string, opts?: { force?, fetchImpl?, log? }): Promise<{ ok: number, skipped: number, failed: { file, reason }[] }>`，並在直接執行時當 CLI 用。
 
-- [ ] **Step 1: 在 `package.json` 加 photos 指令**
+- [x] **Step 1: 在 `package.json` 加 photos 指令**
 
 在 `"basemap"` 那行下面加一行：
 
@@ -80,7 +80,7 @@
     "photos": "node scripts/photos.js",
 ```
 
-- [ ] **Step 2: 寫失敗的測試 `tests/photos.test.js`**
+- [x] **Step 2: 寫失敗的測試 `tests/photos.test.js`**
 
 ```js
 const test = require('node:test');
@@ -182,12 +182,12 @@ test('photoJobs 對空 manifest 回傳空陣列', () => {
 });
 ```
 
-- [ ] **Step 3: 執行測試確認失敗**
+- [x] **Step 3: 執行測試確認失敗**
 
 Run: `npm test`
 Expected: FAIL，`Cannot find module '../scripts/lib/fetch-file.js'`
 
-- [ ] **Step 4: 實作 `scripts/lib/fetch-file.js`**
+- [x] **Step 4: 實作 `scripts/lib/fetch-file.js`**
 
 ```js
 // 下載單一檔案到磁碟。測試會注入 fetchImpl，所以這裡不直接綁全域 fetch。
@@ -212,7 +212,7 @@ async function downloadTo(url, dest, opts = {}) {
 module.exports = { downloadTo, IMAGE_TYPES };
 ```
 
-- [ ] **Step 5: 實作 `scripts/photos.js`**
+- [x] **Step 5: 實作 `scripts/photos.js`**
 
 ```js
 #!/usr/bin/env node
@@ -292,12 +292,12 @@ if (require.main === module) {
 }
 ```
 
-- [ ] **Step 6: 執行測試確認通過**
+- [x] **Step 6: 執行測試確認通過**
 
 Run: `npm test`
 Expected: PASS，photos 的 9 個測試全過
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add package.json scripts/lib/fetch-file.js scripts/photos.js tests/photos.test.js
@@ -320,7 +320,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: 無
 - Produces: `src/map-modes.js` 定義全域 `MODE_LINE: { [mode]: { dash: string | null, width: number } }` 與 `legStyle(mode): { dash, width }`（未知 mode 回傳 `drive` 的樣式）。`src/index.html` 多一個 `<script src="map-modes.js">`，`build.js` 多內嵌這一個檔。
 
-- [ ] **Step 1: 寫失敗的測試 `tests/map-modes.test.js`**
+- [x] **Step 1: 寫失敗的測試 `tests/map-modes.test.js`**
 
 ```js
 const test = require('node:test');
@@ -360,12 +360,12 @@ test('計程車沿用自駕線型，渡輪有自己的線型', () => {
 });
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run: `node --test tests/map-modes.test.js`
 Expected: FAIL，`ENOENT`（`src/map-modes.js` 不存在）
 
-- [ ] **Step 3: 建立 `src/map-modes.js`**
+- [x] **Step 3: 建立 `src/map-modes.js`**
 
 ```js
 'use strict';
@@ -381,12 +381,12 @@ const MODE_LINE = {
 const legStyle = (mode) => MODE_LINE[mode] || MODE_LINE.drive;
 ```
 
-- [ ] **Step 4: 執行測試確認通過**
+- [x] **Step 4: 執行測試確認通過**
 
 Run: `node --test tests/map-modes.test.js`
 Expected: PASS，4 個測試全過
 
-- [ ] **Step 5: 把 `map-modes.js` 接進頁面**
+- [x] **Step 5: 把 `map-modes.js` 接進頁面**
 
 `src/index.html`：在 `<script src="util.js"></script>` **之前**加一行
 
@@ -400,7 +400,7 @@ Expected: PASS，4 個測試全過
     .replace('<script src="map-modes.js"></script>', `<script>\n${readEngine('src', 'map-modes.js')}\n</script>`)
 ```
 
-- [ ] **Step 6: 改寫 `renderMap` 的路線繪製**
+- [x] **Step 6: 改寫 `renderMap` 的路線繪製**
 
 把 `src/app.js` 裡這一段：
 
@@ -447,12 +447,12 @@ function drawRoute(day, pts, color) {
 }
 ```
 
-- [ ] **Step 7: 全部測試通過**
+- [x] **Step 7: 全部測試通過**
 
 Run: `npm test`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/map-modes.js src/index.html src/app.js scripts/build.js tests/map-modes.test.js
@@ -475,7 +475,7 @@ spec §3：「每日頁尾自動列該日所有有 `parking` 的停留點（有�
 - Consumes: `tests/helpers/render-ctx.js` 的 `renderContext`、`tests/fixtures/make-trip.js` 的 `makeTrip`
 - Produces: `render.js` 新增 `dayParkingHTML(day): string`，沒有任何停留點帶 `parking` 時回傳空字串。`dayHTML` 在 `extraHTML('day', …)` **之前**呼叫它。
 
-- [ ] **Step 1: 寫失敗的測試 `tests/render-parking.test.js`**
+- [x] **Step 1: 寫失敗的測試 `tests/render-parking.test.js`**
 
 ```js
 const test = require('node:test');
@@ -545,12 +545,12 @@ test('parking 只有座標、沒有名稱時用地點名稱代替', () => {
 });
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run: `node --test tests/render-parking.test.js`
 Expected: FAIL，`dayParkingHTML is not a function`
 
-- [ ] **Step 3: 在 `src/render.js` 新增 `dayParkingHTML`**
+- [x] **Step 3: 在 `src/render.js` 新增 `dayParkingHTML`**
 
 放在 `dayHTML` 前面：
 
@@ -595,7 +595,7 @@ function dayParkingHTML(day) {
 
 並把 `'dayParkingHTML'` 加進 `tests/helpers/render-ctx.js` 的 `EXPORTS` 陣列。
 
-- [ ] **Step 4: 在 `src/styles.css` 末尾加樣式**
+- [x] **Step 4: 在 `src/styles.css` 末尾加樣式**
 
 先確認可用的 CSS 變數名稱：
 
@@ -614,12 +614,12 @@ Run: `grep -n '\-\-line\|\-\-surface\|\-\-card' src/styles.css | head`
 .day-parking .pk-note{opacity:.75}
 ```
 
-- [ ] **Step 5: 執行測試確認通過**
+- [x] **Step 5: 執行測試確認通過**
 
 Run: `node --test tests/render-parking.test.js && npm test`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/render.js src/styles.css tests/helpers/render-ctx.js tests/render-parking.test.js
@@ -648,7 +648,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 | `ginzan` | `Ginzan Onsen Ashiyu.jpg` | さかおり | CC BY-SA 4.0 |
 | `matsushima` | `Zuiganji Hondo.JPG` | アラツク | CC BY-SA 4.0 |
 
-- [ ] **Step 1: 寫 `trips/_example/photos.json`**
+- [x] **Step 1: 寫 `trips/_example/photos.json`**
 
 ```json
 {
@@ -679,22 +679,22 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 }
 ```
 
-- [ ] **Step 2: 抓照片**
+- [x] **Step 2: 抓照片**
 
 Run: `npm run photos -- _example`
 Expected: 三張都成功，每張 250–450 KB
 
-- [ ] **Step 3: 確認 check 與 build 都收得到**
+- [x] **Step 3: 確認 check 與 build 都收得到**
 
 Run: `npm run check -- _example && npm run build -- _example`
 Expected: `check` 印出「3 張照片」；`build` 印出「照片 3 張」且 `dist/_example/site/img/` 有三個檔
 
-- [ ] **Step 4: 確認 `.gitignore` 沒有把照片擋掉**
+- [x] **Step 4: 確認 `.gitignore` 沒有把照片擋掉**
 
 Run: `git check-ignore -v trips/_example/photos/yamadera-1.jpg || echo "沒有被 ignore，可以進 git"`
 Expected: 印出「沒有被 ignore，可以進 git」
 
-- [ ] **Step 5: 用 ego-browser 驗收四件事**
+- [x] **Step 5: 用 ego-browser 驗收四件事**
 
 Run: `npm run preview -- _example`
 
@@ -707,7 +707,7 @@ Run: `npm run preview -- _example`
 
 看完 Ctrl+C 結束。
 
-- [ ] **Step 6: 更新 `status.md`、`CHANGELOG.md`、`README.md`、版本**
+- [x] **Step 6: 更新 `status.md`、`CHANGELOG.md`、`README.md`、版本**
 
 `trips/_example/docs/status.md`：把 photos 那行改成「✓ 3 張（Commons，CC BY-SA）」。
 
@@ -733,12 +733,12 @@ Run: `npm run preview -- _example`
 
 `package.json` 的 `version` 改成 `0.3.0`。
 
-- [ ] **Step 7: 全部測試與完整流程最後跑一次**
+- [x] **Step 7: 全部測試與完整流程最後跑一次**
 
 Run: `npm test && npm run check -- _example && npm run build -- _example`
 Expected: 全部 PASS
 
-- [ ] **Step 8: Commit 並打 tag**
+- [x] **Step 8: Commit 並打 tag**
 
 ```bash
 git add trips/_example package.json CHANGELOG.md README.md

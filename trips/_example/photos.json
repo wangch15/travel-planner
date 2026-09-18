@@ -1,1 +1,26 @@
-{}
+{
+  "yamadera": [
+    {
+      "title": "View of Yamadera.jpg",
+      "artist": "Japanexperterna.se",
+      "license": "CC BY-SA 3.0",
+      "page": "https://commons.wikimedia.org/wiki/File:View_of_Yamadera.jpg"
+    }
+  ],
+  "ginzan": [
+    {
+      "title": "Ginzan Onsen Ashiyu.jpg",
+      "artist": "さかおり",
+      "license": "CC BY-SA 4.0",
+      "page": "https://commons.wikimedia.org/wiki/File:Ginzan_Onsen_Ashiyu.jpg"
+    }
+  ],
+  "matsushima": [
+    {
+      "title": "Zuiganji Hondo.JPG",
+      "artist": "アラツク",
+      "license": "CC BY-SA 4.0",
+      "page": "https://commons.wikimedia.org/wiki/File:Zuiganji_Hondo.JPG"
+    }
+  ]
+}
