@@ -97,3 +97,18 @@ test('extra.js 的自訂區塊會被渲染到指定位置', () => {
   assert.ok(!ctx.dayHTML(trip.DAYS[0]).includes('停車提醒'));
   assert.ok(ctx.dayHTML(trip.DAYS[1]).includes('停車提醒'));
 });
+
+test('自煮的食材預算不會重複前綴（money 本身就含「每人約」）', () => {
+  const trip = makeTrip();
+  trip.config.sections.dining = true;
+  trip.DINING = {
+    checked: '2026/09/18',
+    places: {}, venues: {},
+    cooking: { total: [1200, 1800], plan: '自己煮' },
+    days: { 1: [{ slot: '晚餐', time: '18:00', plan: '自煮', fallback: '超市熟食', places: [], cooking: true }] },
+  };
+  trip.DAYS[0].meals = trip.DINING.days[1];
+  const html = ctxFor(trip).mealsHTML(trip.DAYS[0]);
+  assert.ok(html.includes('自煮食材 每人約 ¥1,200–1,800／2 人約 ¥2,400–3,600'), html.match(/自煮[^<；]*/));
+  assert.ok(!/人食材約 每人約/.test(html), '不該出現「N 人食材約 每人約」這種重複前綴');
+});

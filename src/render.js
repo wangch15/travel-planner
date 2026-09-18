@@ -59,7 +59,7 @@ function mealsHTML(day) {
     const total = DINING.cooking && DINING.cooking.total;
     return '<section class="meal-row"><h4>' + esc(meal.slot) + '<time>' + esc(meal.time) + '</time></h4>'
       + '<p>' + esc(meal.plan) + '</p>'
-      + (meal.cooking && total ? '<p class="meal-facts"><strong>自煮 ' + CONFIG.party + ' 人食材約 ' + esc(money(total)) + '</strong>；下列熟食／餐廳為替代預算，不重複相加。</p>' : '')
+      + (meal.cooking && total ? '<p class="meal-facts"><strong>自煮食材 ' + esc(money(total)) + '</strong>；下列熟食／餐廳為替代預算，不重複相加。</p>' : '')
       + (venues ? '<ul class="meal-venues">' + venues + '</ul>' : '')
       + '<p class="meal-fallback"><strong>備案：</strong>' + esc(meal.fallback) + '</p></section>';
   }).join('');
