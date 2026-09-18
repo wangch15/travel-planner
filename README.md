@@ -17,8 +17,10 @@ https://github.com/wangch15/travel-planner
 我的環境已經準備好了（Node、git、gh 都裝好，GitHub 也登入了）。
 我不懂程式，所以接下來也請你全部幫我處理。
 
-請先把這個專案抓到我電腦上，讀裡面的 AGENTS.md，
-然後照 tp-setup 這個 skill 開始。
+請照 tp-setup 這個 skill 的步驟做，從頭開始。
+取得專案那一步要用 `gh repo fork`（先 fork 到我自己的帳號再下載），
+不要用 clone——我只是這個 repo 的協作者，clone 會讓我的東西跑進別人的專案裡。
+拿到專案之後先讀裡面的 AGENTS.md。
 
 需要我本人操作的步驟（在瀏覽器上按同意授權、註冊 Cloudflare 帳號），
 請停下來用白話告訴我該點哪裡，等我做完再繼續。

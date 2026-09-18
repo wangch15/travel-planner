@@ -41,9 +41,15 @@ travel-planner 是一個**可 fork 的旅程網頁模板**。使用者給你一�
 每次開始工作前：
 
 ```
+git remote -v
 git fetch upstream
 git log --oneline HEAD..upstream/main
 ```
+
+`origin` 必須是**使用者自己的** fork、`upstream` 才是 `wangch15/travel-planner`。
+**`origin` 指向 `wangch15/travel-planner` 就立刻停下來**——那代表當初是 clone 不是
+fork，之後每次 commit 都會推進模板作者的 repo，而且不會報錯。修法見
+`.ai/rules/repo-ownership.md`。
 
 **回報落後幾個 commit，並問使用者要不要先更新**（要更新的話走 `tp-update`）。
 不要自己決定更新——更新有風險，而且他可能正在趕出發前的準備。
@@ -54,6 +60,7 @@ git log --oneline HEAD..upstream/main
 
 不管在做什麼都適用，先讀過再動手：
 
+- `.ai/rules/repo-ownership.md` —— 在自己的 fork 上工作，永遠不 push 到模板
 - `.ai/rules/engine-content-boundary.md` —— 哪些檔案能改、哪些不能
 - `.ai/rules/data-schema-reference.md` —— 改資料前先讀 `docs/schema/`
 - `.ai/rules/research-integrity.md` —— 每個事實附來源與查核日期，查不到就標待確認

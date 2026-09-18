@@ -59,8 +59,24 @@ wrangler 不用另外裝，它是專案的 devDependency，`npm install` 就有�
 gh repo fork wangch15/travel-planner --clone
 ```
 
-fork 是**你幫他做**的，他不需要知道 fork 是什麼。跑完用 `git remote -v` 確認：
-`origin` 是他自己的、`upstream` 是模板。兩個都對才往下走——`upstream` 沒接好，以後就拿不到引擎更新。
+fork 是**你幫他做**的，他不需要知道 fork 是什麼。
+
+**一定要用 `gh repo fork`，不可以用 `gh repo clone` 或 `git clone`。**
+使用者是被加為協作者才看得到這個私有 repo，而協作者**有寫入權限**——
+clone 下來的話 `origin` 會是模板作者的 repo，之後每一次 commit 都會推進
+作者的 repo，而且**不會報任何錯**。
+
+跑完一定要驗：
+
+```
+git remote -v
+```
+
+- `origin` 是**使用者自己的** `<他的帳號>/travel-planner`
+- `upstream` 是 `wangch15/travel-planner`
+
+兩個都對才往下走。`origin` 指向 `wangch15` 就是走錯路了，照
+`.ai/rules/repo-ownership.md` 修好再繼續；`upstream` 沒接好，以後就拿不到引擎更新。
 
 **如果這一步失敗：**
 
