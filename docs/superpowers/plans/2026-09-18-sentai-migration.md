@@ -76,7 +76,7 @@ SENTAI2026/
 - Consumes: travel-planner v1.0.0 的引擎檔案
 - Produces: 一個結構正確但資料還沒 migrate 的 `dev` 分支
 
-- [ ] **Step 1: 確認 SENTAI2026 乾淨，然後開分支**
+- [x] **Step 1: 確認 SENTAI2026 乾淨，然後開分支**
 
 ```bash
 cd /Users/wangch/GitHub/SENTAI2026
@@ -87,7 +87,7 @@ git branch                  # 確認在 dev 上
 
 工作區不乾淨就**停下來問人**，不要自己 stash 或 commit 別人未完成的工作。
 
-- [ ] **Step 2: 把舊資料搬進 `trips/sendai-2026/`**
+- [x] **Step 2: 把舊資料搬進 `trips/sendai-2026/`**
 
 ```bash
 mkdir -p trips/sendai-2026/docs
@@ -107,7 +107,7 @@ git mv docs/dining-research.md docs/plan-v4.md docs/plan-v4-route-check.md docs/
 `docs/plan-v3.md`、`docs/changelog.md`、`docs/plans/` 是舊專案的歷史，一併搬進
 `trips/sendai-2026/docs/` 或留在原地都可以，**但要一致，並在 commit 訊息說明**。
 
-- [ ] **Step 3: 刪掉舊引擎**
+- [x] **Step 3: 刪掉舊引擎**
 
 ```bash
 git rm src/template.html
@@ -119,7 +119,7 @@ git rm pnpm-lock.yaml
 
 這些全都還在 `main` 上。刪之前再確認一次 `git branch` 顯示在 `dev`。
 
-- [ ] **Step 4: 複製引擎進來**
+- [x] **Step 4: 複製引擎進來**
 
 從 travel-planner 複製（**不要用 symlink**，這是一份獨立的 fork）：
 
@@ -137,20 +137,20 @@ cp $TP/package.json $TP/package-lock.json .
 注意 `cp -R $TP/src .` 會與剛剛清空的 `src/` 合併——確認 `src/` 底下最後只有引擎的
 `index.html`、`styles.css`、`util.js`、`map-modes.js`、`render.js`、`app.js`，沒有殘留的行程檔。
 
-- [ ] **Step 5: 改 `package.json` 的識別欄位**
+- [x] **Step 5: 改 `package.json` 的識別欄位**
 
 `name` 改回 `sentai2026`、`description` 改成這趟行程的描述、`version` 設 `1.0.0`。
 **`scripts` 與 `dependencies` 一字不改**——那是引擎的一部分。
 把舊的 `packageManager`、`engines.pnpm`、`pnpm` 三個欄位拿掉（改用 npm 了）。
 
-- [ ] **Step 6: 接上 upstream**
+- [x] **Step 6: 接上 upstream**
 
 ```bash
 git remote add upstream https://github.com/wangch15/travel-planner.git
 git remote -v        # origin = SENTAI2026、upstream = travel-planner
 ```
 
-- [ ] **Step 7: 安裝並確認引擎測試通過**
+- [x] **Step 7: 安裝並確認引擎測試通過**
 
 ```bash
 npm install
@@ -159,7 +159,7 @@ npm test
 
 Expected: 145 個測試全過。這證明引擎完整搬過來了。
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A
@@ -183,7 +183,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `scripts/migrate.js`
 - Produces: 一份 `npm run check -- sendai-2026` 通過的行程
 
-- [ ] **Step 1: 寫 `trip.config.json`**
+- [x] **Step 1: 寫 `trip.config.json`**
 
 從舊 `template.html` 與 `scripts/build.js` 抄出這些值（用
 `git show main:src/template.html` 與 `git show main:scripts/build.js` 取得）：
@@ -206,7 +206,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 `schemaVersion` 先**不要寫**（或寫 0），讓 migrate 自己補成 1。
 
-- [ ] **Step 2: 跑 migrate**
+- [x] **Step 2: 跑 migrate**
 
 ```bash
 npm run migrate -- sendai-2026
@@ -218,7 +218,7 @@ npm run migrate -- sendai-2026
 **仔細讀它印出的人工待辦**，特別是「`details.info` 裡的停車資訊要不要轉成 `parking`」那幾條。
 原檔會備份成 `<檔名>.bak`。
 
-- [ ] **Step 3: 把備份檔排除在 git 之外**
+- [x] **Step 3: 把備份檔排除在 git 之外**
 
 `.bak` 不要進 git。跑完確認 `git status` 沒有它們，有的話加進 `.gitignore`：
 
@@ -226,7 +226,7 @@ npm run migrate -- sendai-2026
 trips/*/*.bak
 ```
 
-- [ ] **Step 4: 填 `OVERVIEW`**
+- [x] **Step 4: 填 `OVERVIEW`**
 
 migrate 只會建一個空殼。從舊 `template.html` 的 `overviewHTML()` 把寫死的文字搬進來
 （在 `main` 分支的 `src/template.html` 第 921–972 行，用
@@ -241,7 +241,7 @@ migrate 只會建一個空殼。從舊 `template.html` 的 `overviewHTML()` 把�
 **航班那一段含真實航班資訊**——它本來就在線上版上，搬過來是對的（這是使用者自己的私人頁面）。
 但**不要**把它複製回 travel-planner 的任何地方。
 
-- [ ] **Step 5: 補 `parking` 欄位**
+- [x] **Step 5: 補 `parking` 欄位**
 
 migrate 會列出哪些地點的 `details.info` 有「停車」列。逐一判斷要不要轉成
 `PLACES[key].parking`（需要停車場的**座標**，`info` 裡通常只有文字）。
@@ -249,7 +249,7 @@ migrate 會列出哪些地點的 `details.info` 有「停車」列。逐一判�
 查不到座標的就**留在 `info` 不要硬轉**，並在 `CHECKLIST` 加一條待確認。
 這一步寧可少做也不要編座標——編錯的停車場座標會把人導到別的地方。
 
-- [ ] **Step 6: 補三個插槽檔與 status**
+- [x] **Step 6: 補三個插槽檔與 status**
 
 ```bash
 printf '/* 沿用引擎預設配色。 */\n' > trips/sendai-2026/theme.css
@@ -258,7 +258,7 @@ printf '// 沒有額外區塊。\nmodule.exports = { sections: [] };\n' > trips/
 
 `docs/status.md` 記錄：這是從 v4 搬過來的、搬移日期、目前狀態。
 
-- [ ] **Step 7: 重新產生底圖**
+- [x] **Step 7: 重新產生底圖**
 
 舊的 `basemap.json` 沒有 `meta.bbox`，`check` 會擋。重跑：
 
@@ -269,7 +269,7 @@ npm run basemap -- sendai-2026
 `contourLevels` 已在 config 指定成舊的七個值，所以等高線會與線上版一致。
 Overpass 失敗就等幾分鐘重試，**不要縮小 bbox**。
 
-- [ ] **Step 8: check 過關**
+- [x] **Step 8: check 過關**
 
 ```bash
 npm run check -- sendai-2026
@@ -277,7 +277,7 @@ npm run check -- sendai-2026
 
 反覆修到通過。錯誤訊息就是待辦清單。
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add -A
@@ -297,7 +297,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: Task 2 的產出
 - Produces: 一份比對報告與截圖，給使用者驗收用
 
-- [ ] **Step 1: 用 worktree 把舊版 build 出來**
+- [x] **Step 1: 用 worktree 把舊版 build 出來**
 
 **不要 `git stash` 或切分支**，用 worktree 把 `main` 檢出到暫存目錄：
 
@@ -310,7 +310,7 @@ cd $SCRATCH/sentai-main && node scripts/build.js
 舊 build 沒有執行期相依，`node scripts/build.js` 應該直接可跑。
 產物在 `$SCRATCH/sentai-main/dist/index.html`。
 
-- [ ] **Step 2: 把新版 build 出來**
+- [x] **Step 2: 把新版 build 出來**
 
 ```bash
 cd /Users/wangch/GitHub/SENTAI2026
@@ -319,12 +319,12 @@ npm run build -- sendai-2026
 
 產物在 `dist/sendai-2026/site/index.html`。
 
-- [ ] **Step 3: 先用文字比對抓大差異**
+- [x] **Step 3: 先用文字比對抓大差異**
 
 不要一開始就用眼睛看。先比數字——停留點數、餐食區塊數、詳細按鈕數、照片數、
 地圖清單連結數、檔案大小。數量對不上就先查原因，再進到肉眼比對。
 
-- [ ] **Step 4: 用 ego-browser 逐頁比對**
+- [x] **Step 4: 用 ego-browser 逐頁比對**
 
 兩份都開起來，**逐項截圖對照** HANDOFF 指定的六個地方：
 
@@ -335,7 +335,7 @@ npm run build -- sendai-2026
 5. **地圖**：海岸線、等高線、松島灣島嶼、當日動線與標記
 6. **手機寬度**：390px，總覽表格的分隔式資訊卡、地圖 FAB
 
-- [ ] **Step 5: 寫比對報告**
+- [x] **Step 5: 寫比對報告**
 
 `trips/sendai-2026/docs/migration-parity.md`，固定四節：
 **怎麼比的** → **數字對照表** → **逐頁肉眼比對**（六項，每項寫結論與截圖檔名）→
@@ -347,14 +347,14 @@ npm run build -- sendai-2026
 - 地點的「地圖為街區概略位置」note：舊版是接線時統一塞的，新版要看 migrate 有沒有保留
 - 燈箱底部的註記文字：新版改成中性的「照片來源標於各張下方」
 
-- [ ] **Step 6: 清掉 worktree**
+- [x] **Step 6: 清掉 worktree**
 
 ```bash
 git worktree remove $SCRATCH/sentai-main
 git worktree list        # 確認乾淨
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add trips/sendai-2026/docs/migration-parity.md
@@ -369,7 +369,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **這一階段到此為止。不要 merge、不要 push main、不要部署。**
 
-- [ ] **Step 1: 最後確認**
+- [x] **Step 1: 最後確認**
 
 ```bash
 cd /Users/wangch/GitHub/SENTAI2026
@@ -379,7 +379,7 @@ git status --short            # 乾淨
 npm test && npm run check -- sendai-2026 && npm run build -- sendai-2026
 ```
 
-- [ ] **Step 2: 問使用者要不要把 `dev` 推上 GitHub**
+- [x] **Step 2: 問使用者要不要把 `dev` 推上 GitHub**
 
 推分支是對外的動作，**要先問**。他說要的話：
 
@@ -390,7 +390,7 @@ git push -u origin dev
 若 Pages 專案有接 GitHub 整合，推 `dev` 可能會觸發一個 preview 部署
 （不會蓋掉 production）。先跟使用者說明這件事再推。
 
-- [ ] **Step 3: 回報**
+- [x] **Step 3: 回報**
 
 給使用者：
 
