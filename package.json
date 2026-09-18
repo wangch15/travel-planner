@@ -11,8 +11,9 @@
     "ship": "node scripts/ship.js",
     "new": "node scripts/new-trip.js",
     "migrate": "node scripts/migrate.js",
-    "test": "node --test \"tests/**/*.test.js\""
+    "basemap": "node tools/basemap/index.mjs",
+    "test": "node --test \"tests/**/*.test.js\" \"tests/**/*.test.mjs\""
   },
-  "dependencies": {},
+  "dependencies": { "pngjs": "^7.0.0" },
   "devDependencies": { "wrangler": "^4.133.0" }
 }
