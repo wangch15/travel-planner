@@ -7,9 +7,13 @@ description: 把人在 Google Maps 建好的每日私人清單對帳進 map-list
 
 ## 什麼時候用
 
-使用者想要「每天一個 Google Maps 清單，出門時手機打開就能導航」。
-這是**選用功能**——`trip.config` 的 `sections.mapLists` 為 `false` 時整個跳過，
+**使用者主動說**他想要「每天一個 Google Maps 清單，出門時手機打開就能導航」。
+
+這是**選用功能，預設關閉**。`trip.config` 的 `sections.mapLists` 為 `false` 時整個跳過，
 `map-lists.js` 留成 `module.exports = {};` 就好。
+
+**不要主動推銷這個功能。** 它需要人自己先在 Google Maps 建清單、把地點一個一個加進去，
+是額外的手工；沒有這份清單的行程一樣完整可用。使用者沒開口就不要開。
 
 ## 順序很重要
 
