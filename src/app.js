@@ -505,7 +505,20 @@ $('#theme').onclick = () => {
 };
 try { const t = localStorage.getItem(CONFIG.deploy.name + '.theme'); if (t) applyTheme(t); } catch (e) {}
 
+/* ── 頁首與地圖註記：全部由 trip.config 與 basemap 的 meta 決定 ── */
+function applyChrome() {
+  $('#brandTitle').textContent = CONFIG.heading || CONFIG.title;
+  $('#brandSub').textContent = CONFIG.subtitle || '';
+  const meta = BASEMAP && BASEMAP.meta ? BASEMAP.meta : {};
+  const levels = Object.keys(BASEMAP && BASEMAP.contour ? BASEMAP.contour : {}).map(Number).sort((a, b) => a - b);
+  const step = levels.length > 1 ? levels[1] - levels[0] : levels[0];
+  $('#contourNote').textContent = step ? '等高線 ' + step + ' m' : '';
+  // 高程資料來源的標示由 basemap 產出時寫入，引擎不寫死任何地區的機構名稱
+  $('#mapCredit').textContent = '© OpenStreetMap' + (meta.demCredit ? '・地形 © ' + meta.demCredit : '');
+}
+
 /* ── 啟動 ── */
+applyChrome();
 drawBase();
 buildTabs();
 let start = 0;

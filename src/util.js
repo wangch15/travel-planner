@@ -11,3 +11,10 @@ const mapsUrl = (p) => p.gurl
 /* 路線連結：起訖都用實際停留點的座標，而不是參考地標 */
 const routeUrl = (from, to, mode) => 'https://www.google.com/maps/dir/?api=1&origin=' + ll(from)
   + '&destination=' + ll(to) + '&travelmode=' + (mode === 'walk' ? 'walking' : 'driving');
+/* 每人／全團金額。幣別與人數取自 trip.config。 */
+const money = (range) => {
+  const c = CONFIG.currency, n = CONFIG.party;
+  const fmt = (v) => c + v.toLocaleString('en-US');
+  return '每人約 ' + fmt(range[0]) + '–' + range[1].toLocaleString('en-US')
+    + '／' + n + ' 人約 ' + fmt(range[0] * n) + '–' + (range[1] * n).toLocaleString('en-US');
+};

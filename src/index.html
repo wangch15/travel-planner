@@ -15,6 +15,8 @@
 <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9.5 12 15.5 18 9.5"/></symbol>
 <symbol id="i-car" viewBox="0 0 24 24"><path d="M4 16.5v2M20 16.5v2M3 16.5v-4l1.9-4.6A1.5 1.5 0 0 1 6.3 7h11.4a1.5 1.5 0 0 1 1.4.9L21 12.5v4Z"/><path d="M3.4 12.5h17.2"/><path d="M6.5 14.8h.01M17.5 14.8h.01"/></symbol>
 <symbol id="i-walk" viewBox="0 0 24 24"><circle cx="13" cy="4.6" r="1.8"/><path d="M11 21l1.6-5.2-2.4-2.3.9-4.6 2.6.9 1.4 2.6 2.4.9M10.1 9.9 7.6 11l-1 3M12.6 15.8 9.8 21"/></symbol>
+<symbol id="i-train" viewBox="0 0 24 24"><rect x="5.5" y="4" width="13" height="12" rx="2.5"/><path d="M5.5 10.5h13M8.5 19.5l-1.5 1.5M15.5 19.5l1.5 1.5M9 13.3h.01M15 13.3h.01M8.5 16h7"/></symbol>
+<symbol id="i-ship" viewBox="0 0 24 24"><path d="M4 14.5 12 12l8 2.5-1.6 5H5.6Z"/><path d="M6.5 12V7.5h11V12M12 4v3.5"/></symbol>
 <symbol id="i-note" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 8.2v4.6M12 15.8h.01"/></symbol>
 <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h13l-3.2-3.2M20 16H7l3.2 3.2"/></symbol>
 <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 7.4V12l3 1.8"/></symbol>
@@ -27,8 +29,8 @@
 <header class="top">
   <div class="top-in">
     <div class="brand">
-      <h1>仙台・山形・鳴子・松島</h1>
-      <span class="sub">2026/10/11–17　7天6夜自駕　V4</span>
+      <h1 id="brandTitle"></h1>
+      <span class="sub" id="brandSub"></span>
       <span class="spacer"></span>
       <button class="iconbtn" id="theme">
         <svg class="ico icon-sun"><use href="#i-sun"/></svg>
@@ -54,9 +56,9 @@
       </figure>
       <div class="mapfoot">
         <span class="scalebar"><span class="scaleline" id="scaleline"></span><span class="num" id="scaletext">10 km</span></span>
-        <span>等高線 200 m</span>
+        <span id="contourNote"></span>
         <span class="sp"></span>
-        <span>© OpenStreetMap・地形 © 国土地理院</span>
+        <span id="mapCredit"></span>
       </div>
     </div>
     <main id="panel"></main>
