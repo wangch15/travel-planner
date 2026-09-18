@@ -12,6 +12,7 @@
     "new": "node scripts/new-trip.js",
     "migrate": "node scripts/migrate.js",
     "basemap": "node tools/basemap/index.mjs",
+    "photos": "node scripts/photos.js",
     "test": "node --test \"tests/**/*.test.js\" \"tests/**/*.test.mjs\""
   },
   "dependencies": { "pngjs": "^7.0.0" },
