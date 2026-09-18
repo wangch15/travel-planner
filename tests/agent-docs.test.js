@@ -86,16 +86,27 @@ test('README 只有一段 prompt，且假設環境已就緒', () => {
   assert.ok(!r.includes('dash.cloudflare.com/sign-up'), '註冊連結屬於 HELPER.md，不該在 README');
 });
 
-test('HELPER.md 是給作者的前置說明，且不需要 repo 權限就能跑', () => {
+test('HELPER.md 的 prompt 只做環境準備，辦帳號是給人看的白話說明', () => {
   assert.ok(exists('HELPER.md'), '缺 HELPER.md');
   const h = read('HELPER.md');
   const blocks = [...h.matchAll(/```text\n([\s\S]*?)```/g)].map((m) => m[1]);
   assert.equal(blocks.length, 1, `HELPER 應該只有一段 prompt，實際 ${blocks.length}`);
   const boot = blocks[0];
-  for (const w of ['github.com', 'dash.cloudflare.com/sign-up', 'Node.js', 'git', 'gh auth login']) {
-    assert.ok(boot.includes(w), `前置 prompt 缺 ${w}`);
+
+  // 環境準備該做的都要在 prompt 裡
+  for (const w of ['Node.js', 'git', 'gh auth login', 'gh auth status']) {
+    assert.ok(boot.includes(w), `環境 prompt 缺 ${w}`);
   }
-  assert.ok(!boot.includes('wangch15/travel-planner'), '前置 prompt 不該需要 repo 權限');
+  // 辦帳號不該在 prompt 裡——那是人自己先做完的事
+  for (const w of ['github.com/signup', 'dash.cloudflare.com', '辦兩個', '註冊']) {
+    assert.ok(!boot.includes(w), `prompt 不該要 AI 帶著辦帳號：出現了「${w}」`);
+  }
+  assert.ok(/已經辦好 GitHub 帳號/.test(boot), 'prompt 要說明帳號已經辦好了');
+  // 但整份文件要有給人看的註冊說明
+  assert.ok(h.includes('https://github.com'), 'HELPER 要有 GitHub 註冊連結');
+  assert.ok(h.includes('https://dash.cloudflare.com/sign-up'), 'HELPER 要有 Cloudflare 註冊連結');
+
+  assert.ok(!boot.includes('wangch15/travel-planner'), '環境 prompt 不該需要 repo 權限');
   assert.ok(/不要.*猜|卡在哪/.test(boot), '要有「卡住就說、不要猜」');
   assert.ok(read('README.md').includes('HELPER.md'), 'README 要連到 HELPER.md');
 });
@@ -103,7 +114,8 @@ test('HELPER.md 是給作者的前置說明，且不需要 repo 權限就能跑'
 test('辦帳號的說明有講到 Cloudflare 會影響公開網址', () => {
   const h = read('HELPER.md');
   assert.ok(h.includes('workers.dev'), 'HELPER 要說明網址的形式');
-  assert.ok(/不要直接用預設值|讓我自己決定/.test(h), '要提醒使用者自己選那段代號');
+  assert.ok(/你自己選|自己改掉|自己決定/.test(h), '要提醒使用者那段代號可以自己選');
+  assert.ok(/舊網址.*失效|失效/.test(h), '要講明改掉之後舊網址會失效');
   // tp-setup 要教 agent 停下來問，而不是直接採用預設
   const setup = read('.ai/skills/tp-setup/SKILL.md');
   assert.ok(setup.includes('workers.dev'), 'tp-setup 要說明網址組成');
