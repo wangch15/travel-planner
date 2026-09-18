@@ -73,26 +73,29 @@ test('skills 與 rules 不含特定行程的專有名詞', () => {
   }
 });
 
-test('README 有兩段可複製的 prompt：環境準備與開始做行程', () => {
+test('README 只有一段 prompt，且假設環境已就緒', () => {
   const r = read('README.md');
   const blocks = [...r.matchAll(/```text\n([\s\S]*?)```/g)].map((m) => m[1]);
-  assert.equal(blocks.length, 2, `應該有兩段 prompt，實際 ${blocks.length}`);
-  const [boot, start] = blocks;
-  // 第一段不需要碰 repo，所以不該要求 clone
-  assert.ok(/Node\.js/.test(boot) && /git/.test(boot) && /gh auth login/.test(boot), '環境準備那段要涵蓋 Node、git、gh 登入');
-  assert.ok(!boot.includes('github.com/wangch15'), '環境準備那段不該需要 repo 權限');
-  // 第二段要自帶 repo 網址與入口
-  assert.ok(start.includes('https://github.com/wangch15/travel-planner'), '第二段要帶 repo 網址');
-  assert.ok(start.includes('AGENTS.md') && start.includes('tp-setup'), '第二段要指名 AGENTS.md 與 tp-setup');
-  // 兩段都要有「卡住就說」
-  [boot, start].forEach((b, i) => assert.ok(/不要.*猜|卡在哪/.test(b), `第 ${i + 1} 段缺少「卡住就說、不要猜」`));
+  assert.equal(blocks.length, 1, `README 應該只有一段 prompt，實際 ${blocks.length}`);
+  const start = blocks[0];
+  assert.ok(start.includes('https://github.com/wangch15/travel-planner'), '要帶 repo 網址');
+  assert.ok(start.includes('AGENTS.md') && start.includes('tp-setup'), '要指名 AGENTS.md 與 tp-setup');
+  assert.ok(/不要.*猜|卡在哪/.test(start), '要有「卡住就說、不要猜」');
+  // 前置階段不該出現在 README（那是 agent 讀的檔案，會干擾它）
+  assert.ok(!/gh auth login/.test(start), '環境準備不該混進這段');
+  assert.ok(!r.includes('dash.cloudflare.com/sign-up'), '註冊連結屬於 HELPER.md，不該在 README');
 });
 
-test('有一份可以直接傳給朋友的邀請訊息', () => {
-  assert.ok(exists('docs/invite.md'), '缺 docs/invite.md');
-  const inv = read('docs/invite.md');
-  for (const w of ['GitHub', 'Cloudflare', '協作者']) {
-    assert.ok(inv.includes(w), `invite.md 缺 ${w}`);
+test('HELPER.md 是給作者的前置說明，且不需要 repo 權限就能跑', () => {
+  assert.ok(exists('HELPER.md'), '缺 HELPER.md');
+  const h = read('HELPER.md');
+  const blocks = [...h.matchAll(/```text\n([\s\S]*?)```/g)].map((m) => m[1]);
+  assert.equal(blocks.length, 1, `HELPER 應該只有一段 prompt，實際 ${blocks.length}`);
+  const boot = blocks[0];
+  for (const w of ['github.com', 'dash.cloudflare.com/sign-up', 'Node.js', 'git', 'gh auth login']) {
+    assert.ok(boot.includes(w), `前置 prompt 缺 ${w}`);
   }
-  assert.ok(read('README.md').includes('docs/invite.md'), 'README 要連到邀請訊息');
+  assert.ok(!boot.includes('wangch15/travel-planner'), '前置 prompt 不該需要 repo 權限');
+  assert.ok(/不要.*猜|卡在哪/.test(boot), '要有「卡住就說、不要猜」');
+  assert.ok(read('README.md').includes('HELPER.md'), 'README 要連到 HELPER.md');
 });
