@@ -122,3 +122,11 @@ test('辦帳號的說明有講到 Cloudflare 會影響公開網址', () => {
   assert.ok(/不要直接採用.*預設值/.test(setup), 'tp-setup 要禁止直接採用預設子網域');
   assert.ok(setup.includes('deploy.name'), 'tp-setup 要提到行程名稱那一段也會公開');
 });
+
+test('網址說明有完整的實際範例，看得出 email 與代號的關聯', () => {
+  const h = read('HELPER.md');
+  assert.ok(/[a-z0-9-]+\.[a-z0-9]+\.workers\.dev/.test(h), 'HELPER 要有一個完整的範例網址');
+  assert.ok(h.includes('@'), '要有 email 範例，才看得出代號是從哪來的');
+  const setup = read('.ai/skills/tp-setup/SKILL.md');
+  assert.ok(/[a-z0-9-]+\.[a-z0-9]+\.workers\.dev/.test(setup), 'tp-setup 也要有完整範例供 agent 照唸');
+});
