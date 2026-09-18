@@ -120,6 +120,19 @@ function checkPhotosAndBasemap(trip, fail) {
   }
 }
 
+// Cloudflare 的 Worker／Pages 專案名稱：小寫英數與連字號，不能以連字號開頭或結尾
+const DEPLOY_NAME = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+const TARGETS = new Set(['workers', 'pages']);
+
+function checkDeploy(trip, fail) {
+  const d = trip.config.deploy;
+  if (!d || !d.name) { fail('trip.config 缺 deploy.name（部署用的 Worker／Pages 專案名稱）'); return; }
+  if (!DEPLOY_NAME.test(d.name)) {
+    fail(`deploy.name 不合法：${d.name}（只能用小寫英數與連字號，不能以連字號開頭或結尾）`);
+  }
+  if (!TARGETS.has(d.target || 'workers')) fail(`deploy.target 不合法：${d.target}（可用 workers、pages）`);
+}
+
 function validate(trip) {
   const errs = [];
   const fail = (m) => errs.push(m);
@@ -131,8 +144,9 @@ function validate(trip) {
   checkRefsAndLists(trip, fail);
   if (trip.config.sections.mapLists) checkMapLists(trip, fail);
   checkPhotosAndBasemap(trip, fail);
+  checkDeploy(trip, fail);
   if (trip.config.sections.checklist && !(trip.CHECKLIST || []).length) fail('CHECKLIST 為空');
   return errs;
 }
 
-module.exports = { SCHEMA_VERSION, validate, KINDS, MODES, CATS };
+module.exports = { SCHEMA_VERSION, validate, KINDS, MODES, CATS, DEPLOY_NAME };

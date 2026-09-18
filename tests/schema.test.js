@@ -113,3 +113,25 @@ test('照片授權不明會被抓到', () => {
   trip.PHOTOS = { sightA: [{ title: 'a.jpg', artist: '某人', license: '未知', page: 'https://example.com/a' }] };
   assert.ok(has(validate(trip), /授權/));
 });
+
+test('deploy.name 必填且只能用小寫英數與連字號', () => {
+  const trip = makeTrip();
+  delete trip.config.deploy.name;
+  assert.ok(has(validate(trip), /deploy\.name/));
+  for (const bad of ['Has Upper', 'has_underscore', '-leading', 'trailing-', '有中文']) {
+    const t = makeTrip();
+    t.config.deploy.name = bad;
+    assert.ok(has(validate(t), /deploy\.name 不合法/), `應該擋掉：${bad}`);
+  }
+  for (const good of ['sentai2026', 'kyoto-2027', 'a']) {
+    const t = makeTrip();
+    t.config.deploy.name = good;
+    assert.ok(!has(validate(t), /deploy\.name 不合法/), `應該放行：${good}`);
+  }
+});
+
+test('deploy.target 只能是 workers 或 pages', () => {
+  const trip = makeTrip();
+  trip.config.deploy.target = 'netlify';
+  assert.ok(has(validate(trip), /deploy\.target 不合法/));
+});

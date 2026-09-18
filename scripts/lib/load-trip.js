@@ -8,6 +8,31 @@ const readJSON = (p, fallback) => (fs.existsSync(p) ? JSON.parse(fs.readFileSync
 // 測試會重複寫入同一路徑，require 快取必須清掉才會拿到新內容。
 const readJS = (p, fallback) => { if (!fs.existsSync(p)) return fallback; delete require.cache[require.resolve(p)]; return require(p); };
 
+
+// 兩個行程用同一個 deploy.name，第二次 ship 會靜默覆蓋掉第一個行程的線上網站。
+// 這種錯只有在「累積多個行程」之後才會踩到，所以每次載入都順手檢查。
+function checkDeployNameClash(slug, config) {
+  const name = config.deploy && config.deploy.name;
+  if (!name) return;
+  const root = path.dirname(tripDir(slug));
+  if (!fs.existsSync(root)) return;
+  const clash = fs.readdirSync(root, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && e.name !== slug)
+    .map((e) => {
+      const p = path.join(root, e.name, 'trip.config.json');
+      if (!fs.existsSync(p)) return null;
+      try {
+        const c = JSON.parse(fs.readFileSync(p, 'utf8'));
+        return c.deploy && c.deploy.name === name ? e.name : null;
+      } catch { return null; }
+    })
+    .filter(Boolean);
+  if (clash.length) {
+    throw new Error(`deploy.name「${name}」與其他行程重複：${clash.join('、')}\n`
+      + '兩個行程共用同一個部署名稱時，後 ship 的會覆蓋掉先 ship 的網站。請改掉其中一個。');
+  }
+}
+
 function loadTrip(slug, opts = {}) {
   const dir = tripDir(slug);
   if (!fs.existsSync(dir)) throw new Error(`找不到行程資料夾：trips/${slug}`);
@@ -43,6 +68,7 @@ function loadTrip(slug, opts = {}) {
   if (opts.validate !== false) {
     const errs = validate(trip);
     if (errs.length) throw new Error(`資料檢查失敗（${errs.length} 個問題）：\n  - ${errs.join('\n  - ')}`);
+    checkDeployNameClash(slug, config);
   }
   return trip;
 }

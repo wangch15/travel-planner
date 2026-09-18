@@ -64,3 +64,30 @@ test('validate:false 時略過驗證', () => {
 test('資料夾不存在時給明確訊息', () => {
   assert.throws(() => loadTrip('_nope'), /找不到行程資料夾/);
 });
+
+test('兩個行程共用同一個 deploy.name 會被擋下來', () => {
+  writeTrip();
+  const other = path.join(ROOT, 'trips', '_clashtest');
+  try {
+    fs.mkdirSync(other, { recursive: true });
+    const cfg = JSON.parse(fs.readFileSync(path.join(dir, 'trip.config.json'), 'utf8'));
+    fs.writeFileSync(path.join(other, 'trip.config.json'), JSON.stringify(cfg));
+    assert.throws(() => loadTrip(SLUG), /deploy\.name.*重複|重複.*deploy\.name/s);
+  } finally {
+    fs.rmSync(other, { recursive: true, force: true });
+  }
+});
+
+test('deploy.name 不同的行程不受影響', () => {
+  writeTrip();
+  const other = path.join(ROOT, 'trips', '_clashtest');
+  try {
+    fs.mkdirSync(other, { recursive: true });
+    const cfg = JSON.parse(fs.readFileSync(path.join(dir, 'trip.config.json'), 'utf8'));
+    cfg.deploy.name = 'another-trip';
+    fs.writeFileSync(path.join(other, 'trip.config.json'), JSON.stringify(cfg));
+    assert.ok(loadTrip(SLUG).config.title);
+  } finally {
+    fs.rmSync(other, { recursive: true, force: true });
+  }
+});
