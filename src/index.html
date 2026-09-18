@@ -1,0 +1,100 @@
+<title>/*__TITLE__*/</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css">
+
+<svg class="sprite" aria-hidden="true"><defs>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5.5 12h13"/></symbol>
+<symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.6v2.1M12 19.3v2.1M4.36 4.36l1.48 1.48M18.16 18.16l1.48 1.48M2.6 12h2.1M19.3 12h2.1M4.36 19.64l1.48-1.48M18.16 5.84l1.48-1.48"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 13.4A8.2 8.2 0 0 1 10.6 4a8.2 8.2 0 1 0 9.4 9.4Z"/></symbol>
+<symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8.5 8.5"/><path d="M18 14.5v4A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6h4"/></symbol>
+<symbol id="i-bed" viewBox="0 0 24 24"><path d="M3.4 10.8 12 4.2l8.6 6.6M5.9 9.3V19.8h12.2V9.3"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9.5 12 15.5 18 9.5"/></symbol>
+<symbol id="i-car" viewBox="0 0 24 24"><path d="M4 16.5v2M20 16.5v2M3 16.5v-4l1.9-4.6A1.5 1.5 0 0 1 6.3 7h11.4a1.5 1.5 0 0 1 1.4.9L21 12.5v4Z"/><path d="M3.4 12.5h17.2"/><path d="M6.5 14.8h.01M17.5 14.8h.01"/></symbol>
+<symbol id="i-walk" viewBox="0 0 24 24"><circle cx="13" cy="4.6" r="1.8"/><path d="M11 21l1.6-5.2-2.4-2.3.9-4.6 2.6.9 1.4 2.6 2.4.9M10.1 9.9 7.6 11l-1 3M12.6 15.8 9.8 21"/></symbol>
+<symbol id="i-note" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 8.2v4.6M12 15.8h.01"/></symbol>
+<symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h13l-3.2-3.2M20 16H7l3.2 3.2"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 7.4V12l3 1.8"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+<symbol id="i-open" viewBox="0 0 24 24"><path d="M9.5 6 15.5 12 9.5 18"/></symbol>
+<symbol id="i-map" viewBox="0 0 24 24"><path d="M3.5 6.5v13l5.5-2.5 6 2.5 5.5-2.5v-13L15 6.5 9 4z"/><path d="M9 4v13M15 6.5v13"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="1.6"/><path d="M4 10h16M8.5 3.5v3.5M15.5 3.5v3.5"/></symbol>
+</defs></svg>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <h1>仙台・山形・鳴子・松島</h1>
+      <span class="sub">2026/10/11–17　7天6夜自駕　V4</span>
+      <span class="spacer"></span>
+      <button class="iconbtn" id="theme">
+        <svg class="ico icon-sun"><use href="#i-sun"/></svg>
+        <svg class="ico icon-moon"><use href="#i-moon"/></svg>
+        <span class="sr">切換深色或淺色外觀</span>
+      </button>
+    </div>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="行程日期"></nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="split">
+    <div class="mapwrap">
+      <figure class="map" id="map">
+        <svg id="svg" role="img" aria-label="行程各點的相對位置地形圖"></svg>
+        <div class="pins" id="pins"></div>
+        <div class="mapbar">
+          <button id="zin"><svg class="ico"><use href="#i-plus"/></svg><span class="sr">放大</span></button>
+          <button id="zout"><svg class="ico"><use href="#i-minus"/></svg><span class="sr">縮小</span></button>
+          <button id="zfit"><svg class="ico"><use href="#i-fit"/></svg><span class="sr">回到當日全景</span></button>
+        </div>
+      </figure>
+      <div class="mapfoot">
+        <span class="scalebar"><span class="scaleline" id="scaleline"></span><span class="num" id="scaletext">10 km</span></span>
+        <span>等高線 200 m</span>
+        <span class="sp"></span>
+        <span>© OpenStreetMap・地形 © 国土地理院</span>
+      </div>
+    </div>
+    <main id="panel"></main>
+  </div>
+</div>
+
+<button type="button" class="fab" id="fab"><svg class="ico"><use href="#i-map"/></svg><span class="sr">打開地圖</span></button>
+
+<dialog class="mapdlg" id="mapdlg" aria-labelledby="mapdlgTitle">
+  <div class="mapdlg-in">
+    <div class="mapdlg-head">
+      <h2 id="mapdlgTitle"><span class="bar"></span><span id="mapdlgLabel">地圖</span></h2>
+      <span class="hint">點標記會關閉地圖並跳到該行程；可雙指縮放</span>
+      <button type="button" class="mapdlg-x" id="mapdlgClose"><svg class="ico"><use href="#i-x"/></svg><span class="sr">關閉地圖</span></button>
+    </div>
+    <div class="mapdlg-body" id="mapdlgBody"></div>
+  </div>
+</dialog>
+
+<dialog class="lb" id="lb" aria-labelledby="lbTitle">
+  <div class="lb-in">
+    <button type="button" class="lb-x" id="lbClose"><svg class="ico"><use href="#i-x"/></svg><span class="sr">關閉</span></button>
+    <div class="lb-slider">
+      <div class="lb-track" id="lbTrack"></div>
+      <button type="button" class="lb-nav prev" id="lbPrev"><svg class="ico"><use href="#i-chev"/></svg><span class="sr">上一張</span></button>
+      <button type="button" class="lb-nav next" id="lbNext"><svg class="ico"><use href="#i-chev"/></svg><span class="sr">下一張</span></button>
+      <div class="lb-dots" id="lbDots"></div>
+    </div>
+    <div class="lb-body" id="lbBody"></div>
+  </div>
+</dialog>
+
+<script>
+const CONFIG = /*__CONFIG__*/null;
+const BASEMAP = /*__BASEMAP__*/null;
+const PHOTOS = /*__PHOTOS__*/null;
+/*__DATA__*/
+</script>
+<script src="util.js"></script>
+<script src="render.js"></script>
+<script src="app.js"></script>
