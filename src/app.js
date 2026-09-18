@@ -33,7 +33,9 @@ function drawBase() {
     'stroke-linejoin':'round', 'stroke-linecap':'round', 'vector-effect':'non-scaling-stroke',
   })));
 
-  g.appendChild(shape('path', { d: d(BASEMAP.sea) + 'Z', fill:'var(--sea)' }));
+  // sea 是環的陣列；舊版 basemap.json 是單一環，這裡一併相容
+  const seaRings = (BASEMAP.sea.length && typeof BASEMAP.sea[0][0] === 'number') ? [BASEMAP.sea] : BASEMAP.sea;
+  seaRings.forEach((ring) => g.appendChild(shape('path', { d: d(ring) + 'Z', fill:'var(--sea)' })));
   // 等高線：越高畫得越實，山勢自然浮現
   Object.keys(BASEMAP.contour).sort((a, b) => a - b).forEach((lv) => {
     const n = +lv;
@@ -44,7 +46,9 @@ function drawBase() {
   BASEMAP.islands.forEach((l) => g.appendChild(shape('path', {
     d: d(l) + 'Z', fill:'var(--land)', stroke:'var(--sea-line)', 'stroke-width':.7, 'vector-effect':'non-scaling-stroke',
   })));
-  g.appendChild(shape('path', { d: d(BASEMAP.sea), fill:'none', stroke:'var(--sea-line)', 'stroke-width':1.1, 'vector-effect':'non-scaling-stroke' }));
+  seaRings.forEach((ring) => g.appendChild(shape('path', {
+    d: d(ring), fill:'none', stroke:'var(--sea-line)', 'stroke-width':1.1, 'vector-effect':'non-scaling-stroke',
+  })));
   BASEMAP.border.forEach((l) => g.appendChild(shape('path', {
     d: d(l), fill:'none', stroke:'var(--border-line)', 'stroke-width':1, opacity:.5,
     'stroke-dasharray':'5 4', 'vector-effect':'non-scaling-stroke',

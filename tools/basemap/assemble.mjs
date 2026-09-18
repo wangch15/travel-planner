@@ -79,7 +79,7 @@ export function assemble({ elements, contour, levels, bbox, config, demId, demCr
   // 每個岩礁都會變成一座島。這一步對應 SENTAI 版 simplify.py 的 coast 設定。
   const { sea, islands } = buildSea(prep(g.coast, 'coast', scale), bbox);
   return {
-    sea: sea.length ? round2(sea, 5) : [],
+    sea: sea.map((ring) => round2(ring, 5)),
     islands,
     contour,
     motorway: prep(g.motorway, 'motorway', scale),

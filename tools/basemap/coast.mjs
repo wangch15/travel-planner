@@ -71,18 +71,44 @@ export function clipToBbox(line, bbox) {
   return out;
 }
 
-// 順時針方向上，離目前位置最近、還沒用過的入口
-function pickNext(open, used, t) {
+// 順時針方向上，離目前位置最近的入口。候選是 pool 裡的索引。
+function pickNext(open, pool, fromT) {
   let best = -1, bestD = Infinity;
-  open.forEach((o, i) => {
-    if (used.has(i)) return;
-    let d = (o.tIn - t + 4) % 4;
+  pool.forEach((i) => {
+    let d = (open[i].tIn - fromT + 4) % 4;
     if (d < EPS) d = 4;
     if (d < bestD) { bestD = d; best = i; }
   });
   return best;
 }
 
+// 把開放的海岸線段接成封閉環：沿海岸線走到出口，再順時針沿周界走到下一段的入口，
+// 回到本環起點就閉合。剩下的段落另起新環——bbox 邊上常有「同一條邊進、同一條邊出」
+// 的小碎片（半島、被邊界切到的島），硬串成一個環會讓海域繞遍整個周界而淹掉整張圖。
+function buildRings(open, bbox) {
+  const used = new Set();
+  const rings = [];
+  for (let s = 0; s < open.length; s += 1) {
+    if (used.has(s)) continue;
+    const ring = [];
+    let cur = s;
+    for (let guard = 0; guard <= open.length; guard += 1) {
+      ring.push(...open[cur].seg);
+      used.add(cur);
+      const pool = open.map((_, i) => i).filter((i) => !used.has(i));
+      pool.push(s);                                   // 本環起點永遠是候選，用來閉合
+      const next = pickNext(open, pool, open[cur].tOut);
+      ring.push(...cornersBetween(open[cur].tOut, open[next].tIn, bbox));
+      if (next === s) break;
+      cur = next;
+    }
+    if (!same(ring[ring.length - 1], ring[0])) ring.push([...ring[0]]);
+    rings.push(ring);
+  }
+  return rings;
+}
+
+// sea 是「環的陣列」：一個 bbox 內可能有數塊不相連的海域。
 export function buildSea(coastWays, bbox) {
   const islands = [];
   const open = [];
@@ -99,21 +125,5 @@ export function buildSea(coastWays, bbox) {
     });
   });
   if (!open.length) return { sea: [], islands };
-
-  // 沿海岸線走到出口，再順時針沿周界走到下一條線的入口
-  const used = new Set([0]);
-  const start = open[0];
-  const sea = [...start.seg];
-  let t = start.tOut;
-  for (let guard = 0; guard < open.length; guard += 1) {
-    const next = pickNext(open, used, t);
-    if (next === -1) break;
-    sea.push(...cornersBetween(t, open[next].tIn, bbox));
-    sea.push(...open[next].seg);
-    used.add(next);
-    t = open[next].tOut;
-  }
-  sea.push(...cornersBetween(t, start.tIn, bbox));
-  if (!same(sea[sea.length - 1], sea[0])) sea.push([...sea[0]]);
-  return { sea, islands };
+  return { sea: buildRings(open, bbox), islands };
 }

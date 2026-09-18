@@ -84,7 +84,8 @@ async function main() {
   const kb = fs.statSync(file).size / 1024;
 
   log(`\n✓ trips/${slug}/basemap.json ${kb.toFixed(1)} KB`);
-  log(`  海域 ${out.sea.length} 點、島 ${out.islands.length} 個、等高線 ${levels.join('／')} m`);
+  const seaPts = out.sea.reduce((n, r) => n + r.length, 0);
+  log(`  海域 ${out.sea.length} 塊共 ${seaPts} 點、島 ${out.islands.length} 個、等高線 ${levels.join('／')} m`);
   log(`  高速 ${out.motorway.length}／快速 ${out.trunk.length}／國道 ${out.primary.length}／河 ${out.river.length}／湖 ${out.lake.length}／界 ${out.border.length}／城鎮 ${out.towns.length}`);
   if (kb > sizeWarnKB) log(`⚠ 超過 ${sizeWarnKB} KB，考慮把 trip.config 的 basemap.detail 改成 low`);
   log(`  接著跑 npm run check -- ${slug} 確認 bbox 一致`);
