@@ -1,7 +1,8 @@
-// 最後一道「目的地」檢查；不看 diff、不掃歷史、不快取可見度。
+// 最後一道檢查：PRIVATE 可備份行程；PUBLIC 必須逐 ref 驗完整新增歷史。
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { inspectPublicPush } = require('./push-history.js');
 const TEMPLATE = 'wangch15/travel-planner';
 const GH_TIMEOUT_MS = 10000;
 const WARNING = '目前只有本機備份，尚未異地備份';
@@ -30,7 +31,7 @@ function hasRealTrip(root) {
 
 function checkPush({ remoteUrl, remoteName, updates, root = process.cwd() }, { run = spawnSync } = {}) {
   // Git 給的 URL 才是目的地。remoteName 只是標籤；刪除／空 refs 也不能略過。
-  // 刻意不依 remoteName 或 updates 決定是否查核，更不重新讀 origin。
+  // 不依 remoteName 或 refs 決定是否查可見度，更不重新讀 origin；PUBLIC 才用 refs 決定掃描範圍。
   const repo = destinationRepo(remoteUrl);
   if (!repo) return reject('無法明確辨識這次推送的 GitHub 目的地網址。',
     '請確認推送目的地使用標準 github.com HTTPS 或 git SSH URL；不要在網址放憑證，也不要猜 SSH 別名。請讓 AI 協助檢查設定後再試。');
@@ -75,8 +76,19 @@ function checkPush({ remoteUrl, remoteName, updates, root = process.cwd() }, { r
     return reject('GitHub 可見度輸出格式無法判讀，不能確認是私有 repo。', '請讓 AI 檢查 gh 版本與查核結果，再重新嘗試；不要直接推送。');
   }
   if (visibility === 'PUBLIC') {
-    return reject(`目的地 ${repo} 現在是 PUBLIC。已在該 repo 的內容已經公開，可能包含 docs/ 的訂房確認碼或門鎖密碼；擋這次推送不會撤回舊資料。`,
-      '請先檢查 GitHub 的可見度與已公開內容，處理可能外洩的密碼；確認自己的行程 repo 恢復 PRIVATE 後才重試。');
+    const notice = `目的地 ${repo} 是 PUBLIC；已在該 repo 的內容已經公開，可能包含訂房資訊。這次檢查不會撤回舊資料。`;
+    try {
+      const audit = inspectPublicPush(updates, { root });
+      if (audit.violations.length) {
+        const details = audit.violations.map((v) => `  ${v.path}　commit ${v.commit}`).join('\n');
+        return reject(`${notice}\n本次推送或其基準的歷史含禁止路徑：\n${details}`,
+          '請保留私人行程在私有 repo，另從乾淨上游建立引擎分支並跑 contrib-check；不要只刪檔或停用 hook。');
+      }
+      return { allowed: true, repo, notice: `${notice}\n本次推送範圍的路徑歷史檢查通過（不代表內容已去識別化）。` };
+    } catch {
+      return reject(`${notice}\n無法確認可信推送範圍或完整歷史，不能把掃不到當成乾淨。`,
+        '請先取得缺少的遠端起點與完整 upstream/main 歷史，再重跑 contrib-check；不要繞過查核。');
+    }
   }
   if (visibility !== 'PRIVATE') {
     return reject('目的地不是可確認的 PRIVATE repo（INTERNAL 或未知值也不算私有）。',

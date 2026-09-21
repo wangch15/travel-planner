@@ -65,11 +65,10 @@ test('私有目的地放行，gh 明確查 argv URL 的 repo 而不是 remote �
   assert.equal(c.options.stdio[0], 'ignore');
 });
 
-for (const visibility of ['PUBLIC', 'INTERNAL', 'private', null, 'UNKNOWN']) {
+for (const visibility of ['INTERNAL', 'private', null, 'UNKNOWN']) {
   test(`不是精確 PRIVATE 就拒絕：${visibility}`, (t) => {
     const h = harness(t); h.response = result(visibility);
     refused(h.run(), /私有|PRIVATE|PUBLIC|判讀/);
-    if (visibility === 'PUBLIC') assert.match(h.run().message, /已經公開|已公開/, '不只擋本次推送，也警告既有資料可能已外洩');
   });
 }
 
@@ -86,9 +85,20 @@ for (const [name, response, message] of [
   test(`gh ${name} fail closed`, (t) => { const h = harness(t); h.response = response; refused(h.run(), message); });
 }
 
+test('PUBLIC 無法確定範圍時仍拒絕，並警告舊資料已公開', (t) => {
+  const h = harness(t); h.response = result('PUBLIC');
+  const r = h.run();
+  refused(r, /範圍|歷史/);
+  assert.match(r.message, /已經公開|已公開/);
+});
+
 test('分支刪除、空 refs、新分支與多 refs 都每次查，不能因資料範圍省略', (t) => {
   const h = harness(t); h.response = result('PUBLIC');
-  for (const updates of [deletion, '', update, update + deletion]) refused(h.run({ updates }), /PUBLIC/);
+  for (const updates of [deletion, '', update, update + deletion]) {
+    const r = h.run({ updates });
+    if (updates === deletion) assert.equal(r.allowed, true, '刪除無新增歷史，但仍需目的地查核');
+    else refused(r, /PUBLIC/); // 這個 fixture 沒有可供查核的 Git 歷史。
+  }
   assert.equal(h.calls.length, 4);
 });
 

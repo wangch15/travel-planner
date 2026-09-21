@@ -211,13 +211,18 @@ Git hooks 本身不會隨 clone 複製，這一步不能假設已做過；用 `g
 修好環境後可跑 `npm run prepare` 重試。引擎更新會帶來 hook 檔案，仍須完成 npm install 並確認安裝結果。
 
 hook 使用 Git 提供的實際推送 URL，不重新猜 origin；目的地若是公開模板，只有 trips/ 沒有非底線目錄才放行。
-其他 GitHub 目的地**每次都要查到 PRIVATE**，包括只改 README 或刪除分支；PUBLIC、未登入、查不到、格式錯誤或 10 秒逾時都會拒絕。
-如果 repo 已改公開，既有內容可能已外洩，攔住這次不會撤回舊資料；請先檢查可見度與可能外洩的密碼。
+其他 GitHub 目的地**每次都查可見度**，包括只改 README 或刪除分支。
+PRIVATE 可備份行程，不掃歷史；PUBLIC 只允許實際推送範圍中沒有私人路徑的歷史，與 contrib-check 共用掃描。
+多 ref 任一不乾淨就整批拒絕，錯誤會列路徑與 commit。新分支須有可信基準（完整乾淨的 upstream/main，
+或本次 stdin 已知的目的地既有 ref）；缺基準、缺物件或 shallow 就拒絕，不把掃不到當乾淨。
+INTERNAL、未知值、未登入、查不到、格式錯誤或 10 秒逾時仍一律拒絕。
+PUBLIC／PRIVATE 查核成功可刪除分支，因為沒有新增歷史；刪除也不是免查核。
+如果 repo 已改公開，既有內容可能已外洩，本次放行不代表舊資料乾淨，也不會撤回舊資料；請先檢查可見度與可能外洩的密碼。
 
 **它防不小心，不防刻意：`--no-verify` 就能繞過。** 只有會執行 Git hooks 的工具才受這道保護；
 直接用 API、不執行 hook、尚未安裝或改掉 hooksPath 都不保證被攔。沒有額外的環境變數或旗標豁免。
 執行推送的工具必須能找到 Node 與 gh；查核支援標準 github.com HTTPS／git SSH URL，未知主機或 SSH 別名會停止，不猜目的地。
-AI 原本的階段備份與每次私有查核規則仍保留，hook 不能取代它們；公開 contrib fork 也不會被自動豁免。
+AI 原本的階段備份與每次私有查核規則仍保留，私人行程的 origin 仍須私有；公開貢獻則以乾淨引擎分支走兩道歷史查核，沒有 fork 命名豁免。
 
 ## 部署檢查與本機紀錄
 
@@ -321,8 +326,8 @@ travel-planner/
 
 推之前一定要跑 `npm run contrib-check`——模板的 fork 一定是公開的，
 分支裡夾帶一個 `trips/` 檔案就等於公開你的行程與訂房資訊，而且刪不掉。
-新的 pre-push 也會擋公開 contrib fork；不要自行繞過，先停止與使用者討論，必要時只回報 issue。
-完整限制與參考流程見 [`.ai/rules/contributing-upstream.md`](.ai/rules/contributing-upstream.md)。
+pre-push 會依實際 refs 再驗一次歷史：乾淨引擎分支可通過，夾帶行程資料或無法算出可信範圍仍拒絕；不要自行繞過。
+完整限制與流程見 [`.ai/rules/contributing-upstream.md`](.ai/rules/contributing-upstream.md)。
 
 ---
 

@@ -8,7 +8,7 @@ const { spawnSync } = require('node:child_process');
 const ROOT = path.join(__dirname, '..');
 const quote = (s) => `'${s.replace(/'/g, `'\\''`)}'`;
 
-test('clone → npm install → .githooks 生效；PUBLIC 的真正 push 被擋且 refs 不變', { timeout: 60000 }, (t) => {
+test('clone → npm install → hook 生效；PUBLIC 只放乾淨歷史，PRIVATE 可備份私人歷史', { timeout: 60000 }, (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tp-hook-e2e-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const seed = path.join(root, 'seed'), bare = path.join(root, 'remote.git'), clone = path.join(root, 'clone');
@@ -30,7 +30,7 @@ test('clone → npm install → .githooks 生效；PUBLIC 的真正 push 被擋�
   assert.equal(pkg.scripts.prepare, 'node scripts/install-hooks.js');
   write(path.join(seed, 'package.json'), JSON.stringify({ name: 'hook-integration-fixture', version: '1.0.0', private: true,
     scripts: { prepare: pkg.scripts.prepare } }));
-  for (const file of ['.githooks/pre-push', 'scripts/pre-push.js', 'scripts/lib/pre-push.js', 'scripts/install-hooks.js']) {
+  for (const file of ['.githooks/pre-push', 'scripts/pre-push.js', 'scripts/lib/pre-push.js', 'scripts/lib/push-history.js', 'scripts/lib/contribution-history.js', 'scripts/install-hooks.js']) {
     const destination = path.join(seed, file);
     fs.mkdirSync(path.dirname(destination), { recursive: true });
     fs.copyFileSync(path.join(ROOT, file), destination);
@@ -72,13 +72,23 @@ test('clone → npm install → .githooks 生效；PUBLIC 的真正 push 被擋�
   write(path.join(clone, 'README.md'), 'README-only update\n');
   success('git', ['add', 'README.md'], clone);
   success('git', ['-c', 'commit.gpgsign=false', 'commit', '-qm', 'README only'], clone);
+  write(fixture, '{"visibility":"PUBLIC"}');
+  success('git', ['push', 'origin', 'HEAD:refs/heads/main'], clone);
+  assert.equal(success('git', ['rev-parse', 'refs/heads/main'], bare), success('git', ['rev-parse', 'HEAD'], clone));
   const before = success('git', ['rev-parse', 'refs/heads/main'], bare);
 
-  write(fixture, '{"visibility":"PUBLIC"}');
+  // 私人檔新增後又刪除，工作目錄已乾淨，歷史仍不能公開。
+  write(path.join(clone, 'trips/synthetic/docs/brief.md'), 'synthetic private fixture');
+  success('git', ['add', 'trips/synthetic/docs/brief.md'], clone);
+  success('git', ['-c', 'commit.gpgsign=false', 'commit', '-qm', 'private fixture'], clone);
+  success('git', ['rm', 'trips/synthetic/docs/brief.md'], clone);
+  success('git', ['-c', 'commit.gpgsign=false', 'commit', '-qm', 'remove fixture'], clone);
   const blocked = command('git', ['push', 'origin', 'HEAD:refs/heads/main'], clone);
   assert.notEqual(blocked.status, 0);
   assert.match(blocked.stderr, /目前只有本機備份，尚未異地備份/);
   assert.match(blocked.stderr, /PUBLIC/);
+  assert.match(blocked.stderr, /trips\/synthetic\/docs\/brief\.md/);
+  assert.match(blocked.stderr, /commit [a-f0-9]{40}/);
   assert.equal(success('git', ['rev-parse', 'refs/heads/main'], bare), before);
 
   // 正向對照：同一條本機 transport 在 PRIVATE 時確實可推，證明不是網路失敗造成假綠。
@@ -86,14 +96,17 @@ test('clone → npm install → .githooks 生效；PUBLIC 的真正 push 被擋�
   success('git', ['push', 'origin', 'HEAD:refs/heads/main'], clone);
   assert.equal(success('git', ['rev-parse', 'refs/heads/main'], bare), success('git', ['rev-parse', 'HEAD'], clone));
 
-  // 刪除 refs 全零一樣必須查；使用非預設分支避免 receive.denyDeleteCurrent 誤擋測試。
+  // 刪除 refs 全零仍需目的地查核。INTERNAL 拒絕，PUBLIC 沒有新增歷史可允許刪除。
   success('git', ['branch', 'old', 'HEAD'], bare);
-  write(fixture, '{"visibility":"PUBLIC"}');
+  write(fixture, '{"visibility":"INTERNAL"}');
   const deletion = command('git', ['push', 'origin', ':refs/heads/old'], clone);
   assert.notEqual(deletion.status, 0);
-  assert.match(deletion.stderr, /PUBLIC/);
+  assert.match(deletion.stderr, /INTERNAL/);
   assert.equal(success('git', ['rev-parse', 'refs/heads/old'], bare), success('git', ['rev-parse', 'HEAD'], clone));
+  write(fixture, '{"visibility":"PUBLIC"}');
+  success('git', ['push', 'origin', ':refs/heads/old'], clone);
+  assert.notEqual(command('git', ['rev-parse', '--verify', 'refs/heads/old'], bare).status, 0);
   const calls = fs.readFileSync(trace, 'utf8').trim().split('\n').map(JSON.parse);
-  assert.equal(calls.length, 3, '每次都查，不快取、不因刪除或 README-only 略過');
+  assert.equal(calls.length, 5, '每次都查，不快取、不因刪除或 README-only 略過');
   for (const args of calls) assert.deepEqual(args, ['repo', 'view', 'synthetic-owner/public-trip', '--json', 'visibility']);
 });

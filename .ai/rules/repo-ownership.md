@@ -80,17 +80,30 @@ gh repo create travel-planner --private --source=. --remote=origin
 
 hook 直接使用 Git argv 給的 remote URL，不會重新查 remote 設定。只有明確可解析的 github.com
 HTTPS／git SSH URL 才能查核；不支援的 SSH alias、其他主機或含憑證的 URL 會拒絕，不猜目的地。
-它每次都查，不管只改 README、新增／強推分支，或刪除分支的全零 refs；不掃 commit 範圍、不快取可見度。
+它每次都查可見度，不管只改 README、新增／強推分支，或刪除分支的全零 refs；不快取許可。
+PUBLIC 才依 stdin 掃描完整新增歷史，PRIVATE 不掃，因為私人行程本來就應備份到私有 repo。
 
 - 目的地是 `wangch15/travel-planner`：只有工作目錄 trips/ 沒有非底線開頭的資料夾才允許。
   這個例外只判斷目錄，不是歷史資料掃描，也不是模板帳號所有權驗證；模板仍只能放 `_example`。
-- 其他目的地：對 URL 指定的 owner/repo 執行 gh 私有查核，10 秒逾時即拒絕。
-  PUBLIC 時提醒既有 repo 內容已公開，可能含訂房資訊；擋本次不會撤回已外洩資料。
+- 其他目的地：對 URL 指定的 owner/repo 執行 gh 可見度查核，10 秒逾時即拒絕。
+  PUBLIC 時仍提醒既有 repo 內容已公開，可能含訂房資訊；本次放行不代表舊資料乾淨，也不會撤回外洩資料。
+
+PUBLIC 對每個更新使用 `remote-sha..local-sha`，不是工作目錄 HEAD 或最終 diff；多 ref 任一失敗就整批拒絕。
+新分支的 remote-sha 全零時，優先使用 `refs/remotes/upstream/main`，先驗其完整歷史沒有禁止路徑，
+避免誤把私人基準排除；沒有該 ref 時，只考慮本次 stdin 已知的目的地既有非零 remote SHA。
+不猜其他 remote-tracking ref，也不因名稱像 contrib 就放行。基準／tip 物件缺漏、shallow 或無法讀取完整範圍就拒絕。
+刪除分支沒有新增歷史，但仍查目的地：PUBLIC／PRIVATE 查核成功可刪，INTERNAL／未知／查核失敗仍拒絕。
+
+歷史掃描與禁止路徑政策直接共用 contrib-check：非 `_example` 的 trips/、trips/_profile.md、dist/、各層 .cache/ 都擋，
+包含新增後刪除、改名搬走及合併歷史。訊息列違規路徑與至少一個涉入 commit，不是只說「PUBLIC 不行」。
 
 | 條件 | hook 動作 | 結果 |
 |---|---|---|
-| 其他目的地為 PUBLIC、INTERNAL 或查核失敗 | 拒絕，說明原因及下一步 | 目前只有本機備份，尚未異地備份 |
+| 其他目的地為 INTERNAL、未知或查核失敗 | 拒絕，說明原因及下一步 | 目前只有本機備份，尚未異地備份 |
 | 其他目的地本次查核為 PRIVATE | 允許這次推送，之後仍須核對備份結果 | 不快取許可 |
+| PUBLIC 且推送範圍可信、歷史乾淨 | 允許乾淨引擎歷史，不依 repo 名稱豁免 | 提醒舊資料仍可能已公開 |
+| PUBLIC 且含禁止路徑 | 整批拒絕，列出路徑與 commit | 目前只有本機備份，尚未異地備份 |
+| PUBLIC 但範圍或完整歷史無法確認 | 拒絕，不把掃不到當成乾淨 | 取得可信基準後再查核 |
 
 `.ai/rules/stage-backup.md` 仍是第一道，不能因有 hook 就省略 agent 的每次查核。
 **hook 不是萬無一失，`--no-verify` 就能繞過；它防不小心，不防刻意。** agent 不得自行繞過或停用。

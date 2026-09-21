@@ -25,8 +25,8 @@ test('trips/_example 是引擎的一部分，可以改', () => {
 });
 
 test('產物與快取不該出現在 PR 裡', () => {
-  const r = classifyPaths(['dist/x/site/index.html', 'trips/a/.cache/y.json']);
-  assert.equal(r.blocked.length, 2);
+  const r = classifyPaths(['dist/x/site/index.html', 'trips/a/.cache/y.json', '.cache/root.json']);
+  assert.equal(r.blocked.length, 3);
 });
 
 test('乾淨的引擎改動放行', () => {
@@ -51,6 +51,8 @@ function blocked(repo, file) {
   const r = repo.cli('contrib-check.js', 'base');
   assert.ok(r.stdout.includes(file), `必須指出歷史中的禁止路徑：${file}\n${r.stdout}${r.stderr}`);
   assert.equal(r.status, 1, `禁止公開時必須非零退出，不能讓 && push 繼續：\n${r.stdout}${r.stderr}`);
+  const commits = repo.git('rev-list', 'base..HEAD').split('\n');
+  assert.ok(commits.some((id) => r.stdout.includes(id)), '要指出本次範圍中觸及禁止路徑的 commit');
 }
 
 test('CLI：私人檔案仍在分支時以非零退出', (t) => {

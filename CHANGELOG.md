@@ -2,10 +2,16 @@
 
 ## 1.1.0（2026-09-21）
 
+- **修正 PUBLIC 貢獻流程被 hook 封死。** 現在 PUBLIC 逐 ref 查核 remote-sha..local-sha 的完整新增歷史，
+  與 contrib-check 共用政策；乾淨引擎歷史放行，私人路徑列出 path／commit 後拒絕。新分支必須有可信基準，
+  缺物件、shallow 或無法判斷就拒絕，多 ref 任一不乾淨整批拒絕。沒有 fork／remote 名稱白名單。
+  PRIVATE 不掃歷史；INTERNAL、未知與查核錯誤仍拒絕。刪除仍查目的地，但不掃不存在的新增歷史。
+  `--fork-name` 的 fork → push → PR 仍未端到端驗證。
+
 - **新增 pre-push 最後一道目的地檢查。** npm install 的 prepare 設定 repo-local `core.hooksPath` 指向 `.githooks`，
   不覆蓋已有其他設定；非 Git 環境靜默跳過。hook 只認 Git 傳入的實際 URL，除模板目錄條件例外外，
-  每次查核目的地 PRIVATE，包含 README-only 與刪除分支；未登入、格式錯誤或 10 秒逾時都拒絕。
-  公開 contrib fork 也會被拒絕，不能因 contrib-check 通過就自動推送。
+  每次查核目的地可見度，包含 README-only 與刪除分支；未登入、格式錯誤或 10 秒逾時都拒絕。
+  初版曾一律擋公開 contrib fork；已由上述 PUBLIC 歷史查核修正，不能把本機通過當成人類授權。
   原本 agent 規則保留作第一道；`--no-verify`、未安裝或不執行 Git hooks 的工具仍能繞過，不是萬無一失。
 
 - **補記 wrangler 固定版本的理由與代價（9ad6658）。** 從 `^4.133.0` 固定為 `4.135.0`，

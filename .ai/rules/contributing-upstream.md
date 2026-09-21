@@ -70,12 +70,19 @@ npm run contrib-check
 仍須人工審查；也不要換成包含私人歷史的 base 來讓檢查過關。
 檢查後若新增 commit、合併或改寫歷史，推送前必須重跑。
 
-## pre-push 對公開貢獻的限制
+## pre-push 會再驗一次歷史
 
-公開的 contrib fork 也會被新 hook 拒絕，即使 `contrib-check` 全綠；本次沒有新增公開貢獻豁免。
-到這裡先停止，與使用者討論回報方式，優先用已去識別化的 issue；不要把下面的歷史參考流程整段執行。
+公開目的地不是一律禁止：**乾淨的引擎分支**在目的地與本次推送範圍查核通過後，兩道都會放行。
+夾帶 `trips/`（`_example` 除外）的分支，`contrib-check` 與 pre-push **兩道都會擋**，新增後刪除或改名也一樣。
+這不是 contrib fork 豁免；remote／repo 取任何名字都套用同一份路徑政策與掃描程式。
+
+`contrib-check` 預先查 base..HEAD；hook 依 Git stdin 的每個 remote-sha..local-sha 再查，
+所以推送其他 ref 或檢查後新增 commit，不能沿用先前許可。新分支優先用完整且乾淨的 `upstream/main`，
+否則只考慮本次 stdin 已知屬於目的地的既有 ref；缺物件、shallow 或沒有可信基準就拒絕。
+禁止路徑會列出路徑與至少一個涉入 commit。詳細邊界見 repo-ownership。
+
 **agent 不得自行加 `--no-verify`、改 hooksPath 或停用 hook** 來開 PR。
-刻意公開引擎分支需要人另行決定操作安排，不是「測試通過」就自動獲准。
+測試與歷史查核通過仍不是對外送出的授權，還是要使用者看過並同意。
 
 ## 為什麼要另外 fork
 
@@ -106,10 +113,11 @@ git cherry-pick <commit>
 npm run contrib-check
 npm test
 
-# 4. 到此停止：pre-push 會拒絕這個公開 fork，先向使用者說明並討論。
-# 下列只保留作歷史參考，不是 agent 可以自動執行的步驟：
-# git push contrib contrib-<主題>
-# gh pr create -R wangch15/travel-planner --head <他的帳號>:contrib-<主題>
+# 4. 使用者確認後推到公開 fork；pre-push 會再驗實際 refs 的歷史
+git push contrib contrib-<主題>
+
+# 5. 成功後建立 PR（內容仍須經使用者確認）
+gh pr create -R wangch15/travel-planner --head <他的帳號>:contrib-<主題>
 ```
 
 `.github/PULL_REQUEST_TEMPLATE.md` 會問你四件事，照實填。

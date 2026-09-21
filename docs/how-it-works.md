@@ -114,7 +114,9 @@ Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`
 **「要私有」跟「有備份」不是互斥的，是同一個設計的兩面。**
 
 另外，npm install 的 prepare 會將本機 core.hooksPath 指向被追蹤的 `.githooks`。
-pre-push 依 Git 提供的實際目的地 URL 做最後查核，不論是否改到行程檔；也會擋公開 contrib fork。
+pre-push 依 Git 提供的實際目的地 URL 做最後查核，不論是否改到行程檔。PRIVATE 允許備份行程；
+PUBLIC 與 contrib-check 共用歷史掃描，只放行乾淨的實際 ref 範圍，缺基準／物件或 shallow 就拒絕。
+沒有依 contrib 名稱放行的豁免，多 ref 任一不乾淨就整批擋；刪除仍查可見度但沒有新增歷史。
 原本 stage-backup 規則保留作第一道。hook 可被 `--no-verify` 繞過，未安裝或不執行 Git hooks 的工具也不受保護；
 它不是持續監控，不能撤回已公開的資料。
 

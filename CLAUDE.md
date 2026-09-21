@@ -274,12 +274,19 @@ npm run contrib-check
 仍須人工審查；也不要換成包含私人歷史的 base 來讓檢查過關。
 檢查後若新增 commit、合併或改寫歷史，推送前必須重跑。
 
-## pre-push 對公開貢獻的限制
+## pre-push 會再驗一次歷史
 
-公開的 contrib fork 也會被新 hook 拒絕，即使 `contrib-check` 全綠；本次沒有新增公開貢獻豁免。
-到這裡先停止，與使用者討論回報方式，優先用已去識別化的 issue；不要把下面的歷史參考流程整段執行。
+公開目的地不是一律禁止：**乾淨的引擎分支**在目的地與本次推送範圍查核通過後，兩道都會放行。
+夾帶 `trips/`（`_example` 除外）的分支，`contrib-check` 與 pre-push **兩道都會擋**，新增後刪除或改名也一樣。
+這不是 contrib fork 豁免；remote／repo 取任何名字都套用同一份路徑政策與掃描程式。
+
+`contrib-check` 預先查 base..HEAD；hook 依 Git stdin 的每個 remote-sha..local-sha 再查，
+所以推送其他 ref 或檢查後新增 commit，不能沿用先前許可。新分支優先用完整且乾淨的 `upstream/main`，
+否則只考慮本次 stdin 已知屬於目的地的既有 ref；缺物件、shallow 或沒有可信基準就拒絕。
+禁止路徑會列出路徑與至少一個涉入 commit。詳細邊界見 repo-ownership。
+
 **agent 不得自行加 `--no-verify`、改 hooksPath 或停用 hook** 來開 PR。
-刻意公開引擎分支需要人另行決定操作安排，不是「測試通過」就自動獲准。
+測試與歷史查核通過仍不是對外送出的授權，還是要使用者看過並同意。
 
 ## 為什麼要另外 fork
 
@@ -310,10 +317,11 @@ git cherry-pick <commit>
 npm run contrib-check
 npm test
 
-# 4. 到此停止：pre-push 會拒絕這個公開 fork，先向使用者說明並討論。
-# 下列只保留作歷史參考，不是 agent 可以自動執行的步驟：
-# git push contrib contrib-<主題>
-# gh pr create -R wangch15/travel-planner --head <他的帳號>:contrib-<主題>
+# 4. 使用者確認後推到公開 fork；pre-push 會再驗實際 refs 的歷史
+git push contrib contrib-<主題>
+
+# 5. 成功後建立 PR（內容仍須經使用者確認）
+gh pr create -R wangch15/travel-planner --head <他的帳號>:contrib-<主題>
 ```
 
 `.github/PULL_REQUEST_TEMPLATE.md` 會問你四件事，照實填。
@@ -630,17 +638,30 @@ gh repo create travel-planner --private --source=. --remote=origin
 
 hook 直接使用 Git argv 給的 remote URL，不會重新查 remote 設定。只有明確可解析的 github.com
 HTTPS／git SSH URL 才能查核；不支援的 SSH alias、其他主機或含憑證的 URL 會拒絕，不猜目的地。
-它每次都查，不管只改 README、新增／強推分支，或刪除分支的全零 refs；不掃 commit 範圍、不快取可見度。
+它每次都查可見度，不管只改 README、新增／強推分支，或刪除分支的全零 refs；不快取許可。
+PUBLIC 才依 stdin 掃描完整新增歷史，PRIVATE 不掃，因為私人行程本來就應備份到私有 repo。
 
 - 目的地是 `wangch15/travel-planner`：只有工作目錄 trips/ 沒有非底線開頭的資料夾才允許。
   這個例外只判斷目錄，不是歷史資料掃描，也不是模板帳號所有權驗證；模板仍只能放 `_example`。
-- 其他目的地：對 URL 指定的 owner/repo 執行 gh 私有查核，10 秒逾時即拒絕。
-  PUBLIC 時提醒既有 repo 內容已公開，可能含訂房資訊；擋本次不會撤回已外洩資料。
+- 其他目的地：對 URL 指定的 owner/repo 執行 gh 可見度查核，10 秒逾時即拒絕。
+  PUBLIC 時仍提醒既有 repo 內容已公開，可能含訂房資訊；本次放行不代表舊資料乾淨，也不會撤回外洩資料。
+
+PUBLIC 對每個更新使用 `remote-sha..local-sha`，不是工作目錄 HEAD 或最終 diff；多 ref 任一失敗就整批拒絕。
+新分支的 remote-sha 全零時，優先使用 `refs/remotes/upstream/main`，先驗其完整歷史沒有禁止路徑，
+避免誤把私人基準排除；沒有該 ref 時，只考慮本次 stdin 已知的目的地既有非零 remote SHA。
+不猜其他 remote-tracking ref，也不因名稱像 contrib 就放行。基準／tip 物件缺漏、shallow 或無法讀取完整範圍就拒絕。
+刪除分支沒有新增歷史，但仍查目的地：PUBLIC／PRIVATE 查核成功可刪，INTERNAL／未知／查核失敗仍拒絕。
+
+歷史掃描與禁止路徑政策直接共用 contrib-check：非 `_example` 的 trips/、trips/_profile.md、dist/、各層 .cache/ 都擋，
+包含新增後刪除、改名搬走及合併歷史。訊息列違規路徑與至少一個涉入 commit，不是只說「PUBLIC 不行」。
 
 | 條件 | hook 動作 | 結果 |
 |---|---|---|
-| 其他目的地為 PUBLIC、INTERNAL 或查核失敗 | 拒絕，說明原因及下一步 | 目前只有本機備份，尚未異地備份 |
+| 其他目的地為 INTERNAL、未知或查核失敗 | 拒絕，說明原因及下一步 | 目前只有本機備份，尚未異地備份 |
 | 其他目的地本次查核為 PRIVATE | 允許這次推送，之後仍須核對備份結果 | 不快取許可 |
+| PUBLIC 且推送範圍可信、歷史乾淨 | 允許乾淨引擎歷史，不依 repo 名稱豁免 | 提醒舊資料仍可能已公開 |
+| PUBLIC 且含禁止路徑 | 整批拒絕，列出路徑與 commit | 目前只有本機備份，尚未異地備份 |
+| PUBLIC 但範圍或完整歷史無法確認 | 拒絕，不把掃不到當成乾淨 | 取得可信基準後再查核 |
 
 `.ai/rules/stage-backup.md` 仍是第一道，不能因有 hook 就省略 agent 的每次查核。
 **hook 不是萬無一失，`--no-verify` 就能繞過；它防不小心，不防刻意。** agent 不得自行繞過或停用。
