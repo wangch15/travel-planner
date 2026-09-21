@@ -102,7 +102,7 @@ AI 會照這個順序帶你走，每一步都會跟你確認：
 
 **這個網站別人看得到嗎？**
 
-網站不會被搜尋引擎收錄，但**拿到網址的人就能打開**，不是密碼保護。所以不要把訂單號、門鎖密碼、電話寫進去——AI 也被規定不准把這些放進網頁，那些只會留在你自己電腦上的筆記裡。
+網站不會被搜尋引擎收錄，但**拿到網址的人就能打開**，不是密碼保護。所以不要把訂單號、門鎖密碼、電話寫進去——AI 也被規定不准把這些放進網頁，那些只放在私人筆記（`docs/`／`_profile.md`），不會進入網站；筆記會保存在你的電腦，commit 並 push 後也會備份到你的私有 GitHub repo。
 
 **要花錢嗎？**
 
@@ -125,11 +125,12 @@ AI 會照這個順序帶你走，每一步都會跟你確認：
 > 但日期、地區、標題跟網址名稱都要重新問我。
 
 兩趟會各自有一個網址，**可以同時掛在線上**，互不影響。
-從第二趟開始，AI 每個指令都要指定是哪一趟——它會自己處理，你不用管。
+從第二趟開始，AI 執行行程級指令時都要指定是哪一趟；repo 級指令不帶行程名稱——它會自己處理，你不用管。
 
 **模板有更新的話？**
 
-跟 AI 說「模板有更新，幫我更新一下」。它會把新功能合併進來，你的行程資料不會被動到。
+跟 AI 說「模板有更新，幫我更新一下」。它會先說明變更，再合併引擎更新並保留你的行程內容。
+如果資料格式需要升版，`migrate` 可能改寫行程資料檔，也可能留下需要人工處理的項目；更新後仍要驗證並預覽。
 
 ---
 
@@ -154,15 +155,15 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 
 ## 指令
 
-所有指令都吃一個 `<slug>` 參數（行程資料夾名稱）。`trips/` 底下只有一個行程時可以省略；有多個而沒指定時會報錯並列出可選的。
+### 行程級指令
+
+這些指令使用 `<slug>`（行程資料夾名稱）。`new` 必須指定新 slug；其餘指令只有一趟自己的行程時可省略，有多趟而沒指定時會報錯並列出可選的。
 
 | 指令 | 做什麼 |
 |---|---|
-| `npm run trips` | 列出所有行程、資料是否通過驗證、各自的部署網址（`--all` 連內建範例一起列） |
-| `npm run update-check` | 比對上游，回報引擎落後幾版、哪幾版需要 `migrate`。**只回報，不會自己更新** |
 | `npm run new -- <slug>` | 建立一個新行程的骨架 |
 | `npm run new -- <slug> --from <舊slug>` | 同上，但沿用舊行程的偏好設定與 `theme.css`（日期、bbox、標題、`deploy.name` 不沿用） |
-| `npm run check -- <slug>` | 驗證資料：座標、交通方式、詳細說明、照片授權、清單一致性 |
+| `npm run check -- <slug>` | 驗證資料：座標、交通方式、詳細說明、照片授權欄位、清單一致性；不保證實際照片使用許可 |
 | `npm run build -- <slug>` | 產出 `dist/<slug>/site/index.html`（單一檔案）與 `wrangler.json` |
 | `npm run preview -- <slug>` | build 後在 `localhost:4173` 開一個本機伺服器 |
 | `npm run preview -- <slug> --lan` | 同上，但同一個 wifi 的手機也打得開 |
@@ -171,8 +172,17 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 | `npm run basemap -- <slug>` | 從 OpenStreetMap 與公開高程資料產生地形底圖 |
 | `npm run photos -- <slug>` | 依 `photos.json` 把照片抓進行程資料夾 |
 | `npm run migrate -- <slug>` | 引擎更新後，把舊格式的資料升版 |
-| `npm run contrib-check` | 開 PR 回模板之前的閘門：擋掉夾帶的行程資料 |
-| `npm run sync:agent-assets` | 改過 `.ai/` 之後，重新產生 `AGENTS.md` 與 `CLAUDE.md` |
+
+### Repo 級指令
+
+這些指令不吃行程 slug；各自的選項如下，不要把行程名稱套上去。
+
+| 指令 | 做什麼 |
+|---|---|
+| `npm run trips` | 列出所有行程、資料是否通過驗證、各自的部署網址（`--all` 連內建範例一起列） |
+| `npm run update-check` | 比對上游，回報引擎落後幾版、哪幾版需要 `migrate`。**只回報，不會自己更新** |
+| `npm run contrib-check` | 檢查完整新增歷史的禁止路徑；可用 `npm run contrib-check -- <base>` 指定比較基準，預設 `upstream/main` |
+| `npm run sync:agent-assets` | 改過 `.ai/` 之後，重新產生 `AGENTS.md`、`CLAUDE.md` 與工具用 skills |
 | `npm test` | 引擎自己的測試 |
 
 `ship` 第一次跑之前要先 `npx wrangler login`（會開瀏覽器授權）。
@@ -224,11 +234,12 @@ travel-planner/
 
 - 網站帶 `noindex` 與 `robots.txt` 的 `Disallow: /`，不會被搜尋引擎收錄；但**拿到網址的人就能打開**，不是密碼保護。
 - 飲食限制、訂位資訊、門鎖密碼、聯絡方式這類東西只放 `trips/<slug>/docs/`，那個資料夾不會進入網站產物（有測試把關）。
+- `sections` 關閉只停用區塊顯示與對應檢查；build 仍會把全部資料物件內嵌進 HTML，**不是隱私保護**。不顯示的欄位也不能放私人資訊。
 - 勾選清單的狀態只存在瀏覽器的 localStorage，不會同步、不會上傳。
 
 ## 授權與資料來源
 
-地圖使用 OpenStreetMap 圖資（© OpenStreetMap 貢獻者，ODbL）與公開高程資料（日本為国土地理院，其他地區為 Terrain Tiles）。照片只收 CC／Public domain 授權，或官網照片並標明來源——授權不明的一律不收，`npm run check` 會擋。
+地圖使用 OpenStreetMap 圖資（© OpenStreetMap 貢獻者，ODbL）與公開高程資料（日本為国土地理院，其他地區為 Terrain Tiles）。照片只收已核對條款的 CC／Public domain 授權，或官網照片有明確再利用許可的情況；署名不是授權，許可不明就不用。`npm run check` 只驗證授權相關欄位，不保證實際使用許可；AI 必須核對條款並記錄來源與查核日期。
 
 </details>
 

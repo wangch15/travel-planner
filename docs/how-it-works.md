@@ -75,7 +75,9 @@ A 和 B 的 `main` 共用 clone 那一刻之前的全部歷史，之後各走各
     └── norway-2028/     ← 第二趟（npm run new -- norway-2028 --from iceland-2027）
 ```
 
-**從這裡開始每個指令都要帶 slug**（`npm run check -- norway-2028`）。
+**從這裡開始行程級指令都要帶 slug**（`npm run check -- norway-2028`）。
+Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`test` 不帶行程 slug；
+`contrib-check` 可選的參數是 Git 比較基準。
 帶錯的話最糟是 `ship` 把另一趟的線上網站覆蓋掉——`npm run trips` 就是拿來
 先看一眼有哪些行程的。
 

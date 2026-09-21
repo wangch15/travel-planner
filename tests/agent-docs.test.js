@@ -209,6 +209,76 @@ test('更新衝突先停止再看歸屬與紀錄，不以路徑一律選邊', ()
   assert.match(policy, /npm run check -- <slug>/);
 });
 
+test('README 更新說明承認 migrate 可能改寫資料檔', () => {
+  const r = read('README.md');
+  const section = r.split('**模板有更新的話？**')[1].split('---')[0];
+  assert.match(section, /migrate[\s\S]*改寫.*資料檔/);
+  assert.ok(!section.includes('你的行程資料不會被動到'));
+});
+
+test('README 私人筆記說明包含私有 GitHub 備份，不宣稱只在本機', () => {
+  const r = read('README.md');
+  const section = r.split('**這個網站別人看得到嗎？**')[1].split('**要花錢嗎？**')[0];
+  assert.match(section, /私人.*筆記|筆記/);
+  assert.match(section, /私有 GitHub/);
+  assert.match(section, /不會進入網站/);
+  assert.ok(!section.includes('只會留在你自己電腦'));
+});
+
+test('README 指令分成行程級與 repo 級，不能一概帶 slug', () => {
+  const r = read('README.md');
+  assert.ok(!r.includes('所有指令都吃一個'));
+  assert.ok(r.includes('### 行程級指令'), '缺行程級指令分類');
+  assert.ok(r.includes('### Repo 級指令'), '缺 repo 級指令分類');
+  const trip = r.split('### 行程級指令')[1].split('### Repo 級指令')[0];
+  const repo = r.split('### Repo 級指令')[1].split('## ')[0];
+  const repoCommands = ['trips', 'update-check', 'contrib-check', 'sync:agent-assets', 'test'];
+  for (const c of Object.keys(JSON.parse(read('package.json')).scripts)) {
+    const command = c === 'test' ? 'npm test' : `npm run ${c}`;
+    assert.ok((repoCommands.includes(c) ? repo : trip).includes(command), `${command} 分類錯誤或缺漏`);
+  }
+  assert.ok(!repo.includes('<slug>'), 'repo 級指令不能套用行程 slug');
+  assert.match(repo, /contrib-check.*base/);
+  assert.match(trip, /new.*必須.*slug/);
+});
+
+test('共同入口與機制文件也限定行程級指令才帶 slug', () => {
+  for (const file of ['.ai/entrypoints/project-context.md', 'docs/how-it-works.md', 'README.md']) {
+    const doc = read(file);
+    assert.ok(doc.includes('行程級指令'), `${file} 缺行程級分類`);
+    assert.ok(!/每個指令都要|每個指令都指定/.test(doc), `${file} 仍把 repo 級指令包含進去`);
+  }
+});
+
+for (const file of ['README.md', '.ai/rules/privacy.md', '.ai/skills/tp-plan/SKILL.md', 'docs/schema/trip-config.md']) {
+  test(`${file}：sections 關閉不代表資料不進 HTML`, () => {
+    const doc = read(file);
+    assert.match(doc, /sections[\s\S]*關閉[\s\S]*仍[\s\S]*HTML/);
+    assert.match(doc, /不是隱私保護/);
+  });
+}
+
+for (const file of ['.ai/skills/tp-research/references/photos.md', '.ai/skills/tp-photos/SKILL.md', 'docs/schema/photos.md']) {
+  test(`${file}：官網照片也要再利用許可，check 不保證授權`, () => {
+    const doc = read(file);
+    assert.match(doc, /官網照片[\s\S]*再利用/);
+    assert.match(doc, /credit.*不是授權/);
+    assert.match(doc, /sources\.md/);
+    assert.match(doc, /查核日期/);
+    assert.match(doc, /check.*只.*欄位/);
+    assert.match(doc, /不.*保證.*授權/);
+  });
+}
+
+test('README 照片宣告不能把署名當作官網再利用許可', () => {
+  const r = read('README.md');
+  const section = r.split('## 授權與資料來源')[1].split('</details>')[0];
+  assert.match(section, /官網照片.*再利用許可/);
+  assert.match(section, /署名不是授權/);
+  assert.match(section, /check.*只.*欄位/);
+  assert.ok(!section.includes('官網照片並標明來源——授權不明的一律不收，`npm run check` 會擋'));
+});
+
 test('多趟行程時不准猜是哪一趟', () => {
   const r = read('.ai/rules/which-trip.md');
   assert.ok(/不要猜|問他/.test(r), '要明講不能猜');

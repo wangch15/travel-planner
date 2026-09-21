@@ -6,9 +6,14 @@
 
 檔名規則：`<placeKey>-<n>.jpg`，`n` 從 1 開始，對應陣列順序。
 
-**授權規則（`check` 會擋）：**
+**`check` 只驗證欄位與授權字串格式，不保證實際授權成立：**
 - Commons 來源：`license` 必須符合 `/CC|Public domain/i`，而且要有 `page`。
-- 直接網址：必須有 `credit`。官網照片請標明來源，授權不明的不要收。
+- 直接網址：必須有 `credit`。
+
+**官網照片也必須有明確再利用許可，credit 不是授權。**
+下載前先核對條款是否允許下載、處理及在網站公開；把圖片來源、授權條款／許可來源、
+允許用途、使用條件與查核日期記進 `trips/<slug>/docs/sources.md`。許可不明就不用。
+這是 agent 的查核責任，不是新增 schema 欄位，也不能用 check 通過代替查核。
 
 ## 欄位表
 
@@ -31,13 +36,16 @@
 
 ## 完整範例
 
+以下為虛構格式範例；直接網址那筆假設已核對 CC BY 4.0 再利用許可並記入 sources.md，
+不是看到官網圖片或署名就可以下載。
+
 ```json
 {
   "yamadera": [
     { "title": "Yamadera_Risshakuji.jpg", "artist": "Example Author", "license": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Yamadera_Risshakuji.jpg" }
   ],
   "innA": [
-    { "url": "https://example.com/photo.jpg", "credit": "© 範例民宿 A 官方網站", "page": "https://example.com/" }
+    { "url": "https://example.com/photo.jpg", "credit": "範例作者・CC BY 4.0", "page": "https://example.com/photo-license" }
   ]
 }
 ```

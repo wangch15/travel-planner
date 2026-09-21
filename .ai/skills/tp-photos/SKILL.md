@@ -10,6 +10,19 @@ description: 把 photos.json 列的照片抓進行程資料夾。照片來源查
 `photos.json` 已經填好（怎麼找照片與授權規則見
 `tp-research/references/photos.md`），要把實際檔案抓下來。
 
+## 下載前：授權是硬規則
+
+**官網照片也要有明確再利用許可，credit 不是授權。**
+先核對 `trips/<slug>/docs/sources.md` 的圖片來源、授權條款／許可來源、允許用途、使用條件與查核日期。
+缺少證據就回 `tp-research/references/photos.md` 查核；查不到就不用，不能先下載再補 credit。
+
+`npm run check` 只驗證欄位與授權字串格式，不保證實際授權成立：
+
+- Commons 來源的 `license` 必須含 `CC` 或 `Public domain`，而且要有 `page`
+- 直接網址必須有 `credit`
+
+這些欄位通過不代表取得許可。**授權不明的照片不要收**，不能為了「頁面看起來比較豐富」而放寬。
+
 ## 跑
 
 ```
@@ -20,15 +33,6 @@ npm run photos -- <slug>
 - `--force` 才會全部重新下載。
 
 檔名規則是 `<placeKey>-<n>.jpg`，`n` 對應 `photos.json` 陣列裡的順序。
-
-## 授權是硬規則
-
-**授權不明的照片不要收。** `npm run check` 會擋：
-
-- Commons 來源的 `license` 必須含 `CC` 或 `Public domain`，而且要有 `page`
-- 直接網址必須有 `credit`
-
-這條規則不能為了「頁面看起來比較豐富」而放寬。
 
 ## 單張失敗怎麼辦
 

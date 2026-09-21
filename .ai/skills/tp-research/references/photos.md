@@ -3,19 +3,27 @@
 目標：填好 `photos.json`，然後交給 `tp-photos` 抓檔。
 欄位定義見 `docs/schema/photos.md`。
 
-## 授權規則（`npm run check` 會擋）
+## 授權規則：先核對許可，再填資料
 
 **只收兩種：**
 
 1. **Wikimedia Commons 的 CC 或 Public domain 授權**
    填 `title`（Commons 檔名）、`artist`、`license`、`page`（檔案頁面連結）。
-   `license` 必須含 `CC` 或 `Public domain`，否則 check 不過。
+   `license` 必須含 `CC` 或 `Public domain`，否則 check 不過；仍須核對實際條款與署名等使用條件。
 
-2. **官網照片，並標明來源**
-   填 `url`（圖片網址）與 `credit`（例如「© 某某官方網站」），`page` 選填。
+2. **官網照片也必須有明確再利用許可**
+   找到允許下載、處理並在此網站公開的授權條款或權利人許可，確認使用條件符合用途。
+   `credit` 不是授權，官網刊登與「© 官方網站」不能當成再利用許可。
+   填 `url`（圖片網址）與 `credit`（依條款署名），`page` 可放公開的來源或授權頁。
+
+下載前，把圖片來源、授權條款／許可來源、允許用途、應遵守條件與查核日期，
+寫進 `trips/<slug>/docs/sources.md`。私人許可信件留在 docs/，不要整封放進資料檔。
+許可查不到就不用，不能只補 credit 讓 check 通過。
+
+**`npm run check` 只驗證欄位與授權字串格式，不會查核條款，也不保證實際授權成立。**
 
 **授權不明的一律不要收。** 這不是可以通融的地方——
-這個網站雖然不被搜尋引擎收錄，但拿到網址的人都看得到。
+拿到這個網站網址的人都看得到照片。
 
 ## 怎麼在 Commons 找
 

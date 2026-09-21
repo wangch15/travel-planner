@@ -138,7 +138,8 @@ npm run new -- <slug> --from <上一趟的 slug>
 - `region.bbox` 是 `[lngMin, latMin, lngMax, latMax]`。把所有目的地包進去，
   四周再留一點邊。太小的話底圖會缺角、座標驗證會擋掉合法的地點。
 - `party` 只用來算「N 人約 …」的餐費，`currency` 是金額前綴。
-- `sections` 用不到的區塊就關掉，關掉的不渲染也不驗證。
+- `sections` 關閉只停用區塊顯示與對應檢查，其他共用資料驗證仍適用。
+  build 仍會把全部資料物件內嵌進 HTML，**不是隱私保護**；私人資訊不能留在關閉的區塊。
   **`mapLists` 預設關閉，使用者沒有主動說要做每日 Google Maps 清單就不要開。**
   那是額外的手工（人要先在 Maps 建清單、逐一加地點），不該由你替他決定要做。
 - 欄位細節見 `docs/schema/trip-config.md`。
