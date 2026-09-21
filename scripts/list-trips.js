@@ -6,6 +6,7 @@
 // 不用人維護，所以不會跟現況脫節。
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const { ROOT, tripDir, listTrips } = require('./lib/paths.js');
 const { loadTrip } = require('./lib/load-trip.js');
 
@@ -16,6 +17,46 @@ function allSlugs(includeBuiltin) {
     .map((e) => e.name);
   return includeBuiltin ? names.sort() : listTrips().sort();
 }
+
+const TEMPLATE_REPO = 'wangch15/travel-planner';
+
+// origin 指向模板本身的時候，「trips/ 是空的」不代表該開一趟——模板 repo 裡
+// 不放任何真實行程（見 .ai/rules/repo-ownership.md）。拿不到 origin 就當不是，
+// 誤判成模板會擋住一個本來該往下走的人。
+function isTemplateOrigin(url) {
+  if (!url) return false;
+  return new RegExp(`[/:]${TEMPLATE_REPO}(\\.git)?/?$`).test(String(url).trim());
+}
+
+function originUrl() {
+  try {
+    return execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch {
+    return null; // 沒裝 git、不是 git repo、或沒有 origin
+  }
+}
+
+// 這兩段是「trips/ 空的」時候唯一的下一步指示，兩種 repo 的正確答案不一樣。
+const EMPTY_OWN = [
+  'trips/ 底下沒有行程。先跑 npm run new -- <slug>',
+  '',
+  '（模板附了一份範例可以先看：npm run trips -- --all，或 npm run preview -- _example）',
+].join('\n');
+
+const EMPTY_TEMPLATE = [
+  `trips/ 底下沒有自己的行程，只有模板內建的範例（npm run trips -- --all 可以看）。`,
+  '',
+  `origin 是 ${TEMPLATE_REPO} 本身，所以**先分清楚現在是哪一種情況**：`,
+  '',
+  '  (a) 在維護引擎（模板作者本人）→ 正常。模板 repo 裡不放任何真實行程，',
+  '      **不要**在這裡跑 npm run new。自己的行程另外開一份私有 repo。',
+  '',
+  '  (b) 要做自己的行程 → 走錯路了。還沒開自己的私有 repo，',
+  '      先照 .ai/rules/repo-ownership.md 的「取得專案的正確方式」做完，',
+  '      再跑 npm run new -- <slug>。',
+  '',
+  '分不出來就問使用者一句。規則見 .ai/rules/repo-ownership.md',
+].join('\n');
 
 function describe(slug) {
   const dir = tripDir(slug);
@@ -45,9 +86,9 @@ function describe(slug) {
 
 // `own` 是「不是模板內建的」那些行程——resolveSlug 只認得它們，
 // 所以能不能省略 slug 要看它的數量，不是看列出了幾行。
-function render(rows, own = listTrips()) {
+function render(rows, own = listTrips(), onTemplate = isTemplateOrigin(originUrl())) {
   if (!rows.length) {
-    return 'trips/ 底下沒有行程。先跑 npm run new -- <slug>';
+    return onTemplate ? EMPTY_TEMPLATE : EMPTY_OWN;
   }
   const out = [];
   for (const r of rows) {
@@ -67,7 +108,7 @@ function render(rows, own = listTrips()) {
   return out.join('\n');
 }
 
-module.exports = { allSlugs, describe, render };
+module.exports = { allSlugs, describe, render, isTemplateOrigin };
 
 if (require.main === module) {
   const includeBuiltin = process.argv.includes('--all');

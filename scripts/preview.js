@@ -13,6 +13,7 @@ const { resolveSlug } = require('./lib/paths.js');
 const { buildTrip } = require('./build.js');
 
 const PORT = 4173;
+const LAN_WATCH_MS = 3000;
 const TYPES = { '.html':'text/html; charset=utf-8', '.jpg':'image/jpeg', '.png':'image/png', '.txt':'text/plain; charset=utf-8' };
 
 // cloudflared 把網址印在 stderr 的一個框框裡，只有這一段是我們要的。
@@ -41,6 +42,37 @@ function lanAddresses() {
   return Object.values(os.networkInterfaces()).flat()
     .filter((i) => i && i.family === 'IPv4' && !i.internal)
     .map((i) => i.address);
+}
+
+// 區網位址會變——換 wifi、拔網路線、VPN 連上或斷開都會。`--lan` 只在啟動時印一次
+// 的話，使用者手上那個網址就默默失效了，而畫面上還留著舊的，他只會覺得是頁面壞了。
+function lanChanged(prev, next) {
+  if (prev.length !== next.length) return true;
+  const sorted = (a) => [...a].sort();
+  return sorted(prev).some((a, i) => a !== sorted(next)[i]);
+}
+
+// 每隔一段時間重掃，只有在真的變了的時候才回報。回傳 timer，測試與關機時清掉。
+function watchLan(onChange, { read = lanAddresses, every = LAN_WATCH_MS } = {}) {
+  let last = read();
+  const timer = setInterval(() => {
+    const now = read();
+    if (!lanChanged(last, now)) return;
+    last = now;
+    onChange(now);
+  }, every);
+  if (timer.unref) timer.unref();
+  return timer;
+}
+
+function printLan(addrs) {
+  if (!addrs.length) {
+    console.log('\n找不到區網位址——這台電腦可能沒連上網路，或只有虛擬網卡。');
+    return;
+  }
+  console.log('\n同一個 wifi 的手機可以開：');
+  addrs.forEach((a) => console.log(`  http://${a}:${PORT}`));
+  console.log('（同一個網路內的人都打得開，公共 wifi 請避免使用）');
 }
 
 function serve(root) {
@@ -94,14 +126,12 @@ function main(argv) {
     console.log(`預覽：http://localhost:${PORT}　（Ctrl+C 結束）`);
 
     if (flags.lan) {
-      const addrs = lanAddresses();
-      if (addrs.length) {
-        console.log('\n同一個 wifi 的手機可以開：');
-        addrs.forEach((a) => console.log(`  http://${a}:${PORT}`));
-        console.log('（同一個網路內的人都打得開，公共 wifi 請避免使用）');
-      } else {
-        console.log('\n找不到區網位址——這台電腦可能沒連上網路，或只有虛擬網卡。');
-      }
+      printLan(lanAddresses());
+      watchLan((addrs) => {
+        console.log('\n⚠ 區網位址變了（換了 wifi？）——上面那個網址已經失效。');
+        printLan(addrs);
+        console.log('把這個新的網址給使用者，舊的不用再試。');
+      });
     }
 
     if (flags.tunnel) {
@@ -123,6 +153,6 @@ function main(argv) {
   });
 }
 
-module.exports = { parseFlags, lanAddresses, CLOUDFLARED_INSTALL, TUNNEL_URL };
+module.exports = { parseFlags, lanAddresses, lanChanged, watchLan, CLOUDFLARED_INSTALL, TUNNEL_URL };
 
 if (require.main === module) main(process.argv.slice(2));

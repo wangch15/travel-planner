@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { allSlugs, describe: describeTrip, render } = require('../scripts/list-trips.js');
+const { allSlugs, describe: describeTrip, render, isTemplateOrigin } = require('../scripts/list-trips.js');
 const { newTrip } = require('../scripts/new-trip.js');
 const { ROOT } = require('../scripts/lib/paths.js');
 
@@ -48,5 +48,30 @@ test('能不能省略 slug 是看自己的行程數，不是看列了幾行', ()
 });
 
 test('沒有任何行程時給出下一步', () => {
-  assert.match(render([], []), /npm run new/);
+  assert.match(render([], [], false), /npm run new/);
+});
+
+test('在自己的 repo 裡沒有行程：叫他開一趟，順便指出附了範例', () => {
+  const out = render([], [], false);
+  assert.match(out, /npm run new -- <slug>/);
+  assert.match(out, /_example/, '要讓人知道模板附了範例可以先看');
+});
+
+test('在模板 repo 裡沒有行程：不能叫人 npm run new', () => {
+  const out = render([], [], true);
+  // 模板 repo 裡不放真實行程——無條件叫人開一趟正好違反那條硬規則
+  assert.ok(!/^\s*先跑 npm run new/m.test(out), `不該無條件叫人開行程：\n${out}`);
+  assert.match(out, /repo-ownership/, '要指向那條規則');
+  assert.match(out, /維護引擎|模板作者/, '要涵蓋「在維護引擎」這種正常情況');
+  assert.match(out, /私有/, '要涵蓋「還沒開自己的私有 repo」這種走錯路的情況');
+});
+
+test('認得出 origin 是不是模板', () => {
+  assert.equal(isTemplateOrigin('https://github.com/wangch15/travel-planner.git'), true);
+  assert.equal(isTemplateOrigin('git@github.com:wangch15/travel-planner.git'), true);
+  assert.equal(isTemplateOrigin('https://github.com/wangch15/travel-planner'), true);
+  assert.equal(isTemplateOrigin('https://github.com/someone/travel-planner.git'), false);
+  assert.equal(isTemplateOrigin('https://github.com/wangch15/travel-planner-2.git'), false);
+  assert.equal(isTemplateOrigin(null), false, '沒有 git／沒有 origin 時不要誤判成模板');
+  assert.equal(isTemplateOrigin(''), false);
 });

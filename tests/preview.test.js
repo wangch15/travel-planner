@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseFlags, lanAddresses, CLOUDFLARED_INSTALL, TUNNEL_URL } = require('../scripts/preview.js');
+const { parseFlags, lanAddresses, lanChanged, watchLan, CLOUDFLARED_INSTALL, TUNNEL_URL } = require('../scripts/preview.js');
 
 test('旗標解析', () => {
   assert.deepEqual(parseFlags(['_example']), { lan: false, tunnel: false });
@@ -38,4 +38,27 @@ test('認得出 cloudflared 印的網址', () => {
   const line = '2026-09-21T05:00:00Z INF |  https://abc-def-123.trycloudflare.com  |';
   assert.equal(line.match(TUNNEL_URL)[0], 'https://abc-def-123.trycloudflare.com');
   assert.equal(TUNNEL_URL.test('https://example.com'), false);
+});
+
+test('區網位址換了才算變——順序不同不算', () => {
+  assert.equal(lanChanged(['192.168.0.192'], ['192.168.0.192']), false);
+  assert.equal(lanChanged(['10.0.0.2', '10.0.0.3'], ['10.0.0.3', '10.0.0.2']), false);
+  assert.equal(lanChanged(['192.168.0.192'], ['192.168.0.157']), true, '換 wifi 後 IP 變了要算變');
+  assert.equal(lanChanged(['192.168.0.192'], []), true, '斷線也要算變');
+  assert.equal(lanChanged([], ['192.168.0.1']), true);
+});
+
+test('換 wifi 之後會重印新網址，不會讓人守著失效的那個', async () => {
+  // 啟動時印一次之後就不再更新的話，使用者手上那個網址會默默失效，
+  // 而畫面上還留著舊的——他只會覺得是頁面壞了。
+  const seq = [['192.168.0.192'], ['192.168.0.192'], ['192.168.0.157']];
+  let i = 0;
+  const seen = [];
+  const timer = watchLan((addrs) => seen.push(addrs), {
+    read: () => seq[Math.min(i++, seq.length - 1)],
+    every: 5,
+  });
+  await new Promise((r) => setTimeout(r, 60));
+  clearInterval(timer);
+  assert.deepEqual(seen[0], ['192.168.0.157'], `應該只在變動時回報一次：${JSON.stringify(seen)}`);
 });
