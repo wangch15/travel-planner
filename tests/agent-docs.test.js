@@ -287,3 +287,25 @@ test('多趟行程時不准猜是哪一趟', () => {
   const ship = read('.ai/skills/tp-ship/SKILL.md');
   assert.ok(ship.includes('which-trip'), 'tp-ship 的維護流程要指向這條規則');
 });
+
+test('閘門二用影響範圍分層，不是用「改了什麼東西」分類', () => {
+  const ship = read('.ai/skills/tp-ship/SKILL.md');
+  // 舊表格把「換一家餐廳」無條件列為免確認——新餐廳在城市另一頭的話，
+  // 那天的車程與抵達時間全錯了，而沒有人看過就上線。
+  assert.ok(!/換一家餐廳.*\|\s*不用/.test(ship), '不該再無條件豁免「換一家餐廳」');
+  for (const w of ['純呈現', '事實更新', '結構']) {
+    assert.ok(ship.includes(w), `閘門二缺「${w}」這一層`);
+  }
+  assert.ok(/走不走得通|可行性/.test(ship), '事實更新要有升級判準');
+  assert.ok(/最高|升級/.test(ship), '混合改動要採最高層級');
+  assert.ok(/不確定/.test(ship), '要有「不確定就當結構性」的退路');
+});
+
+test('三處講閘門二範圍的文件不能各講各的', () => {
+  const ctx = read('.ai/entrypoints/project-context.md');
+  const readme = read('README.md');
+  // 進入點與 README 都曾把「換一家店」寫成免確認，跟 tp-ship 的新分層打架
+  assert.ok(!/換一家店這類小修改.*直接 ship/.test(ctx), '進入點還留著舊說法');
+  assert.ok(!/小修改（換一家店/.test(readme), 'README 還留著舊說法');
+  assert.ok(/影響|走得通|可行性/.test(ctx), '進入點要指向影響範圍的判準');
+});
