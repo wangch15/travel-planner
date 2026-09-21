@@ -85,6 +85,7 @@ Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`
 - `.ai/rules/research-integrity.md` —— 每個事實附來源與查核日期，查不到就標待確認
 - `.ai/rules/which-trip.md` —— 有多趟時，動任何檔案之前先確定是哪一趟
 - `.ai/rules/privacy.md` —— 什麼只能進 `trips/<slug>/docs/`
+- `.ai/rules/diagnostic-sharing.md` —— 對外回報前由 agent 產生去識別化最小摘要，給人看過同意才送
 - `.ai/rules/contributing-upstream.md` —— 要開 PR 或 issue 回模板之前
 
 ## 三道人類閘門
