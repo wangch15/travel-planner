@@ -134,6 +134,7 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 |---|---|
 | `npm run trips` | 列出所有行程、資料是否通過驗證、各自的部署網址（`--all` 連內建範例一起列） |
 | `npm run new -- <slug>` | 建立一個新行程的骨架 |
+| `npm run new -- <slug> --from <舊slug>` | 同上，但沿用舊行程的偏好設定與 `theme.css`（日期、bbox、標題、`deploy.name` 不沿用） |
 | `npm run check -- <slug>` | 驗證資料：座標、交通方式、詳細說明、照片授權、清單一致性 |
 | `npm run build -- <slug>` | 產出 `dist/<slug>/site/index.html`（單一檔案）與 `wrangler.json` |
 | `npm run preview -- <slug>` | build 後在 `localhost:4173` 開一個本機伺服器 |
@@ -162,6 +163,7 @@ travel-planner/
 ├── docs/schema/ 六個資料檔的欄位文件 ← 改資料前先讀這裡
 ├── public/      _headers 與 robots.txt
 └── trips/
+    ├── _profile.md   跨行程不變的條件（同行的人、飲食、節奏偏好），不會進網站
     ├── _example/     模板附的範例行程
     └── <你的行程>/
         ├── trip.config.json     標題、日期、範圍、人數、部署設定

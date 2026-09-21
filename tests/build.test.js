@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildTrip } = require('../scripts/build.js');
 const { loadTrip } = require('../scripts/lib/load-trip.js');
+const { ROOT } = require('../scripts/lib/paths.js');
 
 const built = buildTrip('_example');
 const read = (p) => fs.readFileSync(path.join(built.outDir, p), 'utf8');
@@ -46,4 +47,19 @@ test('trips/<slug>/docs 不進產物', () => {
 test('theme.css 接在引擎 CSS 之後', () => {
   const html = read('site/index.html');
   assert.ok(html.indexOf('覆寫引擎 CSS 變數') > html.indexOf(':root{'));
+});
+
+test('trips/_profile.md 不進產物', () => {
+  const p = path.join(ROOT, 'trips', '_profile.md');
+  const sentinel = '某人不吃牛肉還有花生過敏';
+  const existed = fs.existsSync(p);
+  const backup = existed ? fs.readFileSync(p, 'utf8') : null;
+  fs.writeFileSync(p, `# 旅伴與偏好\n\n## 飲食\n${sentinel}\n`);
+  try {
+    const { outDir } = buildTrip('_example');
+    const html = fs.readFileSync(path.join(outDir, 'site', 'index.html'), 'utf8');
+    assert.ok(!html.includes(sentinel), '_profile.md 的內容不該出現在網站裡');
+  } finally {
+    if (existed) fs.writeFileSync(p, backup); else fs.unlinkSync(p);
+  }
 });
