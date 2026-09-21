@@ -212,6 +212,21 @@ AI 先詢問是否同意唯讀查核，再把帳號名稱／ID、Worker 名稱�
 沒有自動認領或 force 功能，查核編號不是人已同意的證明。
 **Pages 不提供這道 Worker 遠端防撞保護**，只保存成功網址。這也不是防止同時部署的遠端原子鎖。
 
+### Wrangler 版本維護
+
+wrangler 固定為 **4.135.0**（不是浮動版本）：ship／adopt 解析它的 JSON 形狀、錯誤碼及 stdout 網址／版本。
+因此使用者**不會自動取得 wrangler 的安全更新**；模板維護者需主動追蹤安全修補，核對相容性後升版。
+
+**更新 wrangler 前**先核對新版本的輸出格式，必要時更新替身 fixtures，並重跑以下 ship／adopt 相關測試與全套測試：
+
+```bash
+node --test tests/ship.test.js tests/adopt-deploy.test.js tests/deployment-docs.test.js tests/deploy-names.test.js
+npm test
+```
+
+**替身測試不能單獨證明新版本與 Cloudflare 實際輸出相容**；還需要介面查核。
+真實部署或認領驗證須另取得使用者授權，不能為了升版測試自行操作線上網站。
+
 ## 這個專案是怎麼運作的
 
 一個公開模板扇出成很多份私有複本，中間只有一條單向的 `git merge`。

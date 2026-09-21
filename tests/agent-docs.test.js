@@ -324,6 +324,14 @@ function assertGateOrder(ship) {
   const fixedBlock = scope.slice(fixed, questions);
   assert.match(fixedBlock, /命中.*第三層[\s\S]*人看過才 ship/);
   assert.match(fixedBlock, /未命中.*才.*三個問題/);
+  const fixedRows = fixedBlock.split('\n').filter((line) => line.startsWith('- '));
+  assert.deepEqual(fixedRows, [
+    '- 第一次上線',
+    '- 改 `trip.config.json`（日期、bbox、`deploy`、`sections`、主題）',
+    '- 加減天數、加減地點、改一天的順序',
+    '- 重產底圖或換照片',
+    '- 改 `theme.css` 或 `extra.js`（版面結構會變）',
+  ], '固定第三層條件不能只留在後面的例子裡');
   const q1 = scope.split('**1. ')[1].split('**2. ')[0];
   const q2 = scope.split('**2. ')[1].split('**3. ')[0];
   const q3 = scope.split('**3. ')[1].split('#### ')[0];
@@ -368,6 +376,7 @@ test('守門測試會抓到固定例外後移、混合最高層刪除及不確�
   const block = ship.slice(start, end);
   const moved = ship.replace(block, '').replace('#### 兩條總則', block + '#### 兩條總則');
   assert.throws(() => assertGateOrder(moved), /固定第三層必須先於/);
+  assert.throws(() => assertGateOrder(ship.replace('- 重產底圖或換照片\n', '')), /固定第三層條件/);
   assert.throws(() => assertGateOrder(ship.replace(/.*一次改了好幾樣.*\n/, '')));
   assert.throws(() => assertGateOrder(ship.replace('不確定算哪一層 → 當第三層', '不確定算哪一層 → 直接 ship')));
 });

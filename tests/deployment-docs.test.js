@@ -48,6 +48,27 @@ test('認領相關文件不再宣稱完全無恢復方式，仍禁止自動認�
   assert.match(skill, /不.*force/);
 });
 
+test('固定 wrangler 的理由與安全更新代價都有公開說明', () => {
+  for (const file of ['CHANGELOG.md', 'README.md']) {
+    const doc = read(file);
+    assert.match(doc, /4\.135\.0/);
+    assert.match(doc, /JSON[\s\S]*錯誤碼[\s\S]*stdout/);
+    assert.match(doc, /不會自動.*安全更新/);
+  }
+});
+
+test('升級 wrangler 必須核對輸出並跑 ship/adopt 相關測試與全套測試', () => {
+  const doc = read('README.md');
+  const section = doc.split('### Wrangler 版本維護')[1]?.split('\n## ')[0];
+  assert.ok(section, '缺少版本維護說明');
+  assert.match(section, /更新 wrangler 前[\s\S]*核對[\s\S]*輸出/);
+  for (const file of ['tests/ship.test.js', 'tests/adopt-deploy.test.js', 'tests/deployment-docs.test.js', 'tests/deploy-names.test.js']) {
+    assert.ok(section.includes(file), `升版驗證缺 ${file}`);
+  }
+  assert.match(section, /npm test/);
+  assert.match(section, /替身測試.*不.*證明/);
+});
+
 test('README 與機制說明揭露 cache 不進 Git，首次未知且跨 repo 保護僅限 Workers', () => {
   for (const file of ['README.md', 'docs/how-it-works.md']) {
     const doc = read(file);
