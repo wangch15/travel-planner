@@ -51,6 +51,8 @@ Files: README.md、docs/how-it-works.md、docs/schema/photos.md、.ai/entrypoint
 - 第一層 CLI RED：17 個測試中 8 個預期失敗（退出碼、刪除、改名、搬回、側支、merge、Unicode）；沒有網路或遠端操作。
 - 第一層 CLI GREEN：17/17 通過。恢復精確承諾的文件測試先 19 通過／1 失敗，再修文件。
 - 第一層完整 npm test：225/225 通過；同步 AGENTS.md／CLAUDE.md，git diff --check 通過。
+- 第二層 RED：完整 npm test 226 通過／5 失敗。文件順序的真實 CLI 測試報 trips/synthetic 已經存在；其餘為 profile 時點、歧義回退、最近修改推斷、衝突選邊的守門測試。
+- 第二層 GREEN：231/231 通過；另保留只有 brief 的既有目錄不可覆蓋之測試。new-trip 程式與 schema 未改。
 
 ## 交付
 

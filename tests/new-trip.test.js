@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { newTrip, parseArgs, CARRIED } = require('../scripts/new-trip.js');
 const { ROOT } = require('../scripts/lib/paths.js');
+const { gitSandbox } = require('./helpers/git-sandbox.js');
 
 const SLUG = '_newtest';
 const FROM = '_newtestfrom';
@@ -24,6 +25,37 @@ test('建立骨架並帶入 slug', () => {
   const cfg = readConfig(SLUG);
   assert.equal(cfg.schemaVersion, 1);
   assert.equal(cfg.deploy.name, SLUG);
+});
+
+test('照 tp-plan 的步驟先後建立骨架與 brief，不會撞到既有資料夾', (t) => {
+  const repo = gitSandbox(t);
+  const plan = fs.readFileSync(path.join(ROOT, '.ai/skills/tp-plan/SKILL.md'), 'utf8');
+  const steps = plan.split(/^### /m).slice(1);
+  const actions = steps.flatMap((step) => {
+    if (step.includes('npm run new -- <slug>')) return ['new'];
+    if (step.includes('trips/<slug>/docs/brief.md')) return ['brief'];
+    return [];
+  });
+  assert.equal(actions.filter((a) => a === 'new').length, 1, '文件須有唯一骨架建立步驟');
+  assert.equal(actions.filter((a) => a === 'brief').length, 1, '文件須有明確初稿寫入步驟');
+  for (const action of actions) {
+    if (action === 'brief') repo.write('trips/synthetic/docs/brief.md', '保留使用者的初稿\n');
+    else {
+      const r = repo.cli('new-trip.js', 'synthetic');
+      assert.equal(r.status, 0, `照文件順序執行 new 應成功：${r.stdout}${r.stderr}`);
+    }
+  }
+  assert.equal(fs.readFileSync(path.join(repo.dir, 'trips/synthetic/docs/brief.md'), 'utf8'), '保留使用者的初稿\n');
+  assert.ok(fs.existsSync(path.join(repo.dir, 'trips/synthetic/trip.config.json')));
+});
+
+test('只有 brief 的既有目錄也拒絕覆蓋，不能靠放寬 new 修文件順序', (t) => {
+  const repo = gitSandbox(t);
+  repo.write('trips/synthetic/docs/brief.md', '不能丟失\n');
+  const r = repo.cli('new-trip.js', 'synthetic');
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /已經存在/);
+  assert.equal(fs.readFileSync(path.join(repo.dir, 'trips/synthetic/docs/brief.md'), 'utf8'), '不能丟失\n');
 });
 
 test('已存在時拒絕覆蓋', () => {

@@ -67,18 +67,21 @@ npm run preview -- <slug> --lan
 
 ## 衝突策略
 
-| 衝突的檔案 | 怎麼解 |
-|---|---|
-| `src/`、`scripts/`、`tools/`、`docs/schema/`、`public/` | **取上游**（`git checkout --theirs`） |
-| `trips/` | **取本地**（`git checkout --ours`） |
-| 其他 | 對照 `trips/<slug>/docs/engine-changes.md` 逐一判斷 |
+**發現衝突先停止更新流程**，不要接著 install、migrate 或 ship，也不要按路徑整份選邊覆蓋。
+依下面順序處理：
 
-正常情況下引擎檔**不應該**衝突——作者只碰引擎、使用者只碰 `trips/`，
-兩邊不相交（見 `.ai/rules/engine-content-boundary.md`）。
+1. 列出衝突檔案，判斷歸屬：
+   - `trips/_example/` 是**引擎**，與 `src/`、`scripts/`、`tools/`、`.ai/`、根目錄 `docs/`、`public/` 等同類。
+   - `trips/<使用者行程>/` 與 `trips/_profile.md` 是使用者內容。
+   - 其他或歸屬不明的檔案，先問使用者，不推測。
+2. 引擎衝突：先讀已確認行程的 `trips/<slug>/docs/engine-changes.md`。
+   **有記錄**就依紀錄逐項判斷哪些本地修改要保留、哪些上游修正要合併；
+   **沒有記錄**、記錄不足或與檔案不符，就停下來問使用者，不能一律取上游。
+   若需讀另一趟的筆記，先依 `which-trip` 確認那一趟。
+3. 使用者內容衝突：保護既有內容，逐項比對差異；無法判斷就請使用者選擇。
+   不能一律取本地，否則可能丟掉已合併進來的必要資料修改。
+4. 解完衝突，確認沒有遺失刻意的修改，更新相關 `engine-changes.md`，完成 merge。
+   才回到第 3 步的 `npm install`，依序 migrate，並跑 `npm run check -- <slug>`、build 與 preview。
 
-**如果引擎檔衝突了，代表有人改過引擎。**
-看 `trips/<slug>/docs/engine-changes.md` 有沒有記錄：
-
-- **有記錄**：照那份筆記判斷要保留哪些修改，解完更新筆記
-- **沒有記錄**：有人改了引擎卻沒寫下來。**停下來問使用者**，
-  不要自己猜哪些修改是刻意的、哪些是誤改
+引擎／內容邊界讓正常更新不應衝突；一旦衝突，就是需要逐項判斷的例外，
+不是略過使用者意圖的理由。

@@ -168,6 +168,47 @@ test('contrib-check 的文件承諾限於本機完整新增歷史的路徑檢查
   assert.ok(!rule.includes('目前只檢查最終差異'), '修復後不能仍把舊行為當成現況');
 });
 
+test('plan 首次 profile 只在閘門一通過後建立，骨架不算填正式資料', () => {
+  const plan = read('.ai/skills/tp-plan/SKILL.md');
+  const beforeCollecting = plan.split(/^### 1\./m)[0];
+  assert.match(beforeCollecting, /檔案不存在[\s\S]*閘門一通過後.*建立/);
+  assert.ok(!/第 5 步之前把它建起來/.test(plan), '不能同時要求確認前建立 profile');
+  assert.match(plan, /確認前只允許.*建立空白骨架/);
+  assert.match(plan, /不得填入正式行程內容/);
+  assert.match(plan, /閘門一通過之後[\s\S]*第一趟.*建立檔案/);
+});
+
+test('明確指定零或多趟匹配時停止，不能沿用前文或唯一行程', () => {
+  const r = read('.ai/rules/which-trip.md');
+  const order = r.split('## 判斷順序')[1].split('## ')[0];
+  assert.match(order, /零.*多.*停下來問/);
+  assert.match(order, /不得.*沿用.*前文/);
+  assert.match(order, /完全沒有指定/);
+  assert.ok(order.indexOf('明確指定') < order.indexOf('只有一趟'), '明確指定的歧義處理必須優先');
+  assert.ok(!order.includes('對得上多趟就往下走'), '不能讓多重匹配回退到前文');
+  assert.match(read('.ai/entrypoints/project-context.md'), /指定.*不唯一.*先問/);
+});
+
+test('「上次在弄」的最後更新只能用來提出候選並等待確認', () => {
+  const r = read('.ai/rules/which-trip.md');
+  assert.match(r, /「我上次在弄的那個」.*候選.*確認/);
+  assert.ok(!r.includes('「我上次在弄的那個」用最後更新回答'));
+  assert.match(r, /不要用「最近改過的那個」當預設/);
+});
+
+test('更新衝突先停止再看歸屬與紀錄，不以路徑一律選邊', () => {
+  const update = read('.ai/skills/tp-update/SKILL.md');
+  const policy = update.split('## 衝突策略')[1];
+  assert.match(policy, /先停止/);
+  assert.match(policy, /trips\/_example\/[\s\S]*引擎/);
+  assert.match(policy, /engine-changes\.md/);
+  assert.match(policy, /沒有記錄[\s\S]*問使用者/);
+  assert.ok(!/git checkout --(?:ours|theirs)/.test(policy), '不能保留一律覆蓋某邊的指令');
+  assert.ok(!/\*\*取上游\*\*|\*\*取本地\*\*/.test(policy));
+  assert.match(policy, /逐項[\s\S]*保留/);
+  assert.match(policy, /npm run check -- <slug>/);
+});
+
 test('多趟行程時不准猜是哪一趟', () => {
   const r = read('.ai/rules/which-trip.md');
   assert.ok(/不要猜|問他/.test(r), '要明講不能猜');
