@@ -46,9 +46,15 @@ npm run update-check
 git remote -v
 ```
 
-`npm run trips` 會列出這份 repo 裡有哪些行程、資料有沒有通過驗證、各自的網址。
+`npm run trips` 會列出這份 repo 裡有哪些行程、標題與日期、最後更新、
+資料有沒有通過驗證、各自的網址。
+
 **有兩趟以上的時候，每個指令都要帶 `-- <slug>`**——帶錯的話最糟的情況是
 `ship` 覆蓋掉另一趟的線上網站，而且不會有任何警告。
+
+**更危險的是檔案編輯：它不經過任何指令，沒有東西會擋你。**
+使用者沒明講是哪一趟就**問他**，不要猜——判斷順序與怎麼問見
+`.ai/rules/which-trip.md`。
 
 **做行程的人**：`origin` 必須是他自己的**私有** repo、`upstream` 才是
 `wangch15/travel-planner`。`origin` 是公開的就停下來——行程資料與 `docs/` 裡的
@@ -74,6 +80,7 @@ git remote -v
 - `.ai/rules/engine-content-boundary.md` —— 哪些檔案能改、哪些不能
 - `.ai/rules/data-schema-reference.md` —— 改資料前先讀 `docs/schema/`
 - `.ai/rules/research-integrity.md` —— 每個事實附來源與查核日期，查不到就標待確認
+- `.ai/rules/which-trip.md` —— 有多趟時，動任何檔案之前先確定是哪一趟
 - `.ai/rules/privacy.md` —— 什麼只能進 `trips/<slug>/docs/`
 - `.ai/rules/contributing-upstream.md` —— 要開 PR 或 issue 回模板之前
 

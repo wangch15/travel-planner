@@ -58,9 +58,24 @@ const EMPTY_TEMPLATE = [
   '分不出來就問使用者一句。規則見 .ai/rules/repo-ownership.md',
 ].join('\n');
 
+// 「我上次在弄的那個」是使用者最常見的講法。沒有這個欄位，agent 只能猜。
+// 用最後一個碰到那個資料夾的 commit，不是檔案 mtime——新 clone 的 mtime 全都一樣。
+function gitRun(args) {
+  return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+}
+
+function lastTouched(slug, run = gitRun) {
+  try {
+    const out = run(['log', '-1', '--format=%cI', '--', `trips/${slug}`]).trim();
+    return out ? out.slice(0, 10) : null;
+  } catch {
+    return null; // 不是 git repo、或 git 不在
+  }
+}
+
 function describe(slug) {
   const dir = tripDir(slug);
-  const row = { slug, title: null, dates: null, deploy: null, ok: false, problem: null };
+  const row = { slug, title: null, dates: null, deploy: null, ok: false, problem: null, updated: lastTouched(slug) };
   try {
     const config = JSON.parse(fs.readFileSync(path.join(dir, 'trip.config.json'), 'utf8'));
     row.title = config.title || null;
@@ -94,6 +109,7 @@ function render(rows, own = listTrips(), onTemplate = isTemplateOrigin(originUrl
   for (const r of rows) {
     out.push(`${r.ok ? '✓' : '✗'} ${r.slug}${r.title ? `　${r.title}` : ''}`);
     if (r.dates) out.push(`    日期　${r.dates}`);
+    if (r.updated) out.push(`    最後更新　${r.updated}`);
     if (r.deploy) out.push(`    網址　${r.deploy}`);
     if (r.problem) out.push(`    問題　${r.problem}`);
   }
@@ -102,13 +118,17 @@ function render(rows, own = listTrips(), onTemplate = isTemplateOrigin(originUrl
     out.push('只有一趟行程，指令可以省略 slug。');
   } else if (own.length > 1) {
     out.push(`有 ${own.length} 趟行程，**每個指令都要指定 slug**，例如 npm run check -- ${own[0]}`);
+    out.push('');
+    out.push('**使用者沒明講是哪一趟就問他，不要猜。** 上面的標題、日期與最後更新');
+    out.push('就是拿來給他認的。猜錯的代價是改到、甚至覆蓋掉另一趟已經上線的網站，');
+    out.push('而且不會有任何警告——見 .ai/rules/which-trip.md。');
   } else {
     out.push('上面都是模板內建的範例，指令一定要指定 slug，例如 npm run preview -- _example');
   }
   return out.join('\n');
 }
 
-module.exports = { allSlugs, describe, render, isTemplateOrigin };
+module.exports = { allSlugs, describe, render, isTemplateOrigin, lastTouched };
 
 if (require.main === module) {
   const includeBuiltin = process.argv.includes('--all');

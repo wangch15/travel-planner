@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { allSlugs, describe: describeTrip, render, isTemplateOrigin } = require('../scripts/list-trips.js');
+const { allSlugs, describe: describeTrip, render, isTemplateOrigin, lastTouched } = require('../scripts/list-trips.js');
 const { newTrip } = require('../scripts/new-trip.js');
 const { ROOT } = require('../scripts/lib/paths.js');
 
@@ -74,4 +74,27 @@ test('認得出 origin 是不是模板', () => {
   assert.equal(isTemplateOrigin('https://github.com/wangch15/travel-planner-2.git'), false);
   assert.equal(isTemplateOrigin(null), false, '沒有 git／沒有 origin 時不要誤判成模板');
   assert.equal(isTemplateOrigin(''), false);
+});
+
+test('列出最後更新時間，讓「我上次在弄的那個」有答案', () => {
+  const fake = () => '2026-09-21T14:30:00+08:00\n';
+  assert.equal(lastTouched('_example', fake), '2026-09-21');
+  assert.equal(lastTouched('_example', () => { throw new Error('not a git repo'); }), null,
+    '不是 git repo 時要回 null，不是爆掉');
+  assert.equal(lastTouched('_example', () => '\n'), null, '沒有 commit 碰過就沒有時間');
+});
+
+test('有多趟時要叫 agent 問，不是叫它自己挑', () => {
+  const row = describeTrip('_example');
+  const out = render([row], ['iceland-2027', 'osaka-2028', 'jeju-2029'], false);
+  assert.match(out, /有 3 趟行程/);
+  assert.ok(/問他|不要猜|不要自己/.test(out), `要明講不能猜：\n${out}`);
+  assert.match(out, /上線/, '要講明猜錯的代價');
+});
+
+test('最後更新有值就要印出來', () => {
+  const out = render([{ slug: 'a', title: 'A', ok: true, updated: '2026-09-20' },
+    { slug: 'b', title: 'B', ok: true, updated: '2026-09-21' }], ['a', 'b'], false);
+  assert.match(out, /2026-09-20/);
+  assert.match(out, /2026-09-21/);
 });

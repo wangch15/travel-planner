@@ -135,6 +135,9 @@ npx wrangler login
 
 網站上線後，使用者會說「餐廳改成另一家」「第三天加一個點」。流程：
 
+0. **先確定是哪一趟**（有兩趟以上的時候）。`npm run trips` 看候選，
+   使用者沒明講就問他——判斷順序見 `.ai/rules/which-trip.md`。
+   **這一步不能跳**：改檔案不經過任何指令，猜錯會改到另一趟已經上線的網站。
 1. **對應到哪個資料檔**——用 `docs/schema/` 的對照表判斷要改哪一個
    （見 `.ai/rules/data-schema-reference.md`）
 2. 改。新增地點的話記得 `details.js` 也要補一筆（非 `hub` 一律要有）

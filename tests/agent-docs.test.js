@@ -8,7 +8,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const exists = (p) => fs.existsSync(path.join(ROOT, p));
 
 const SKILLS = ['tp-setup', 'tp-plan', 'tp-research', 'tp-basemap', 'tp-photos', 'tp-ship', 'tp-update', 'tp-maps-lists'];
-const RULES = ['engine-content-boundary', 'data-schema-reference', 'research-integrity', 'privacy', 'contributing-upstream'];
+const RULES = ['engine-content-boundary', 'data-schema-reference', 'research-integrity', 'privacy', 'contributing-upstream', 'which-trip'];
 const REFS = ['places', 'routes', 'parking', 'dining', 'alternatives', 'photos'];
 
 test('八個 tp-* skill 都在', () => {
@@ -156,4 +156,13 @@ test('回饋管道：PR 模板在，而且擋得住夾帶的行程資料', () =>
   assert.ok(/現在的行為是錯的/.test(rule), '要給出改進 vs 取捨的判準');
   assert.ok(/fork 一定是公開的/.test(rule), '要說明 fork 為什麼是公開的');
   assert.ok(rule.includes('npm run contrib-check'), '規則要指向那道閘門');
+});
+
+test('多趟行程時不准猜是哪一趟', () => {
+  const r = read('.ai/rules/which-trip.md');
+  assert.ok(/不要猜|問他/.test(r), '要明講不能猜');
+  assert.ok(r.includes('npm run trips'), '要指向可以看候選的指令');
+  assert.ok(/檔案編輯|改檔案/.test(r), '要點出危險的是檔案編輯不是指令');
+  const ship = read('.ai/skills/tp-ship/SKILL.md');
+  assert.ok(ship.includes('which-trip'), 'tp-ship 的維護流程要指向這條規則');
 });
