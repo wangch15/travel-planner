@@ -116,8 +116,14 @@ npm run new -- <slug> --from <上一趟的 slug>
 `--from` 會帶過來 `lang`、`currency`、`party`、`transport`、`sections`、`theme`、
 `basemap`、`region.country` 與 `theme.css`——也就是跨行程不變的那些。
 **日期、`region.bbox`、標題與 `deploy.name` 不會沿用**，那些每趟都不一樣，
-沿用只會讓人忘記改；兩趟共用同一個 `deploy.name` 會讓後部署的把先部署的
-線上網站覆蓋掉（`check` 會擋，但不要走到那一步）。
+沿用只會讓人忘記改。
+
+**`deploy.name` 要問使用者。** 骨架預設用 slug，但那一段會出現在他傳給家人的
+網址裡（`<deploy.name>.<他的帳號>.workers.dev`），所以填之前先問他想叫什麼。
+兩趟共用同一個名字會讓後部署的把先部署的線上網站整個換掉而網址不變——
+`check` 與 `ship` 兩道都會擋，但不要走到那一步。
+
+**兩趟可以同時掛在線上**，各自一個網址，互不影響。
 
 然後填 `trips/<slug>/trip.config.json`。幾個要注意的：
 

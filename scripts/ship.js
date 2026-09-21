@@ -5,8 +5,18 @@ const { spawnSync } = require('node:child_process');
 const { resolveSlug, listTrips } = require('./lib/paths.js');
 const { loadTrip } = require('./lib/load-trip.js');
 const { buildTrip } = require('./build.js');
+const { findConflict, conflictMessage } = require('./lib/deploy-names.js');
 
 const slug = resolveSlug(process.argv.slice(2));
+
+// check 擋過一次了，但它繞得過去（有人直接跑 ship）。這是最後一道，而且是
+// 唯一一道站在「真的要覆蓋線上內容」之前的閘門。
+const conflict = findConflict(slug);
+if (conflict) {
+  console.error(`✗ ${conflictMessage(slug, conflict.name, conflict.others)}`);
+  process.exit(1);
+}
+
 const { config } = loadTrip(slug);
 const { outDir } = buildTrip(slug);
 const target = (config.deploy && config.deploy.target) || 'workers';
