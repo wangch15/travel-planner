@@ -132,6 +132,7 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 
 | 指令 | 做什麼 |
 |---|---|
+| `npm run trips` | 列出所有行程、資料是否通過驗證、各自的部署網址（`--all` 連內建範例一起列） |
 | `npm run new -- <slug>` | 建立一個新行程的骨架 |
 | `npm run check -- <slug>` | 驗證資料：座標、交通方式、詳細說明、照片授權、清單一致性 |
 | `npm run build -- <slug>` | 產出 `dist/<slug>/site/index.html`（單一檔案）與 `wrangler.json` |

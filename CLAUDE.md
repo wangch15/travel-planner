@@ -49,10 +49,15 @@ travel-planner 是一個**公開的旅程網頁模板**。使用者給你一份�
 每次開始工作前：
 
 ```
+npm run trips
 git remote -v
 git fetch upstream
 git log --oneline HEAD..upstream/main
 ```
+
+`npm run trips` 會列出這份 repo 裡有哪些行程、資料有沒有通過驗證、各自的網址。
+**有兩趟以上的時候，每個指令都要帶 `-- <slug>`**——帶錯的話最糟的情況是
+`ship` 覆蓋掉另一趟的線上網站，而且不會有任何警告。
 
 `origin` 必須是**使用者自己的私有 repo**、`upstream` 才是 `wangch15/travel-planner`。
 **`origin` 指向 `wangch15/travel-planner` 就立刻停下來**——那代表當初是直接 clone

@@ -12,6 +12,7 @@
     "preview": "node scripts/preview.js",
     "ship": "node scripts/ship.js",
     "new": "node scripts/new-trip.js",
+    "trips": "node scripts/list-trips.js",
     "migrate": "node scripts/migrate.js",
     "basemap": "node tools/basemap/index.mjs",
     "photos": "node scripts/photos.js",
