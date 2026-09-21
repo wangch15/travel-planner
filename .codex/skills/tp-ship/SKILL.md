@@ -26,6 +26,11 @@ npm run ship -- <slug>
 
 把成功輸出的真實網址回報給使用者，不自己拼接帳號子網域；接著做階段保存，尚未備份不能說整個階段完成。
 
+## 進度交接（完成或暫停時）
+
+完成、暫停等人或遇到阻礙時，回覆前更新 `trips/<slug>/docs/status.md` 的目前階段、等待確認、阻礙、下一步。
+依 `.ai/rules/progress-tracking.md` 區分等待 preview／認領確認、部署結果與備份阻礙；先更新 status，再執行下節保存。
+
 ## 階段保存（完成條件）
 
 第一次部署與每次維護更新之後，都依 `.ai/rules/stage-backup.md` 保存這趟資料、照片及私人筆記；`.local/`、快取與 dist 不入 git。

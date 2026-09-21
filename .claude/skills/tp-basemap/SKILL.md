@@ -71,6 +71,11 @@ npm run preview -- <slug>
 
 有問題的話先確認 bbox，再看是不是高程來源選錯（非日本地區用了 `gsi` 會沒有資料）。
 
+## 進度交接（完成或暫停時）
+
+完成、暫停等人或遇到阻礙時，回覆前更新 `trips/<slug>/docs/status.md` 的目前階段、等待確認、阻礙、下一步。
+依 `.ai/rules/progress-tracking.md` 記錄產圖／預覽結果或重試條件；先更新 status，再執行下節保存。
+
 ## 階段保存（完成條件）
 
 底圖與上述預覽確認通過後，依 `.ai/rules/stage-backup.md` 保存 basemap 與本次設定改動，快取不入 git。

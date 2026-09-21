@@ -159,6 +159,12 @@ npm test
 （`deploy.target` 是 `pages` 的話網址是 `<deploy.name>.pages.dev`，
 不含帳號子網域，但 `deploy.name` 一樣會公開。）
 
+## 進度交接（完成或暫停時）
+
+完成、暫停等人或遇到阻礙時，回覆前更新已確認行程的 `trips/<slug>/docs/status.md`：目前階段、等待確認、阻礙、下一步。
+依 `.ai/rules/progress-tracking.md` 辦理。setup 尚無行程目錄時，不提前建立 trips/ 或借用 `_example`，
+改在回話交接這四欄及未寫入原因；交由 tp-plan 在 new 成功後補寫。
+
 ## 完成後
 
 環境好了，接著用 `tp-plan` 開始規劃第一趟行程。

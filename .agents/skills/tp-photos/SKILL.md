@@ -67,6 +67,11 @@ npm run preview -- <slug>
 抓下來的檔案是 1024px 寬的 JPEG，一張 200–500 KB，會 commit 進 repo。
 一個地點一到兩張就夠，不用貪多。
 
+## 進度交接（完成或暫停時）
+
+完成、暫停等人或遇到阻礙時，回覆前更新 `trips/<slug>/docs/status.md` 的目前階段、等待確認、阻礙、下一步。
+依 `.ai/rules/progress-tracking.md` 區分已驗證、無合適授權而不放、下載失敗待處理；先更新 status，再執行下節保存。
+
 ## 階段保存（完成條件）
 
 照片載入與授權標示確認後，依 `.ai/rules/stage-backup.md` 保存照片、photos.json 與查核紀錄。

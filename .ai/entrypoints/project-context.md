@@ -35,6 +35,8 @@ travel-planner 是一個**公開的旅程網頁模板**。使用者給你一份�
 | 「我在 Google Maps 建了清單」 | `tp-maps-lists` |
 
 不確定的時候，先問使用者現在做到哪了，再看 `trips/<slug>/docs/status.md`。
+各 skill 完成、暫停等人或遇到阻礙時，回覆前更新該檔；目標未確定或目錄未建立時先用回話交接。
+更新哪些欄位與如何避免把等待寫成完成，見 `.ai/rules/progress-tracking.md`。
 
 ## 開工先做
 
@@ -80,6 +82,7 @@ Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`
 
 - `.ai/rules/repo-ownership.md` —— 在自己的私有 repo 上工作，永遠不 push 到模板
 - `.ai/rules/stage-backup.md` —— 階段完成前保存；每次 push 前重新驗 origin 私有，失敗停止且不得說完成
+- `.ai/rules/progress-tracking.md` —— 完成、暫停與阻礙都更新既有 status.md，先更新再保存
 - `.ai/rules/engine-content-boundary.md` —— 哪些檔案能改、哪些不能
 - `.ai/rules/data-schema-reference.md` —— 改資料前先讀 `docs/schema/`
 - `.ai/rules/research-integrity.md` —— 每個事實附來源與查核日期，查不到就標待確認

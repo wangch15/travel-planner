@@ -19,7 +19,7 @@ git fetch upstream
 git log --oneline HEAD..upstream/main
 ```
 
-如果沒有落後，回報「已經是最新的」就結束。
+如果沒有落後，先做下方的進度交接，再回報「已經是最新的」並結束；沒有已確認行程時只用回話交接，不猜一趟來寫。
 
 ### 2. 看更新內容再問要不要更
 
@@ -64,6 +64,11 @@ npm run preview -- <slug> --lan
 
 **引擎更新一定算結構性變更**，所以「小修改自檢後直接 ship」那一條不適用——
 一定要把網址給使用者、讓他在手機上看過。
+
+## 進度交接（完成或暫停時）
+
+完成、暫停等人或遇到阻礙時，回覆前更新 `trips/<slug>/docs/status.md` 的目前階段、等待確認、阻礙、下一步。
+依 `.ai/rules/progress-tracking.md` 記錄更新選擇、merge／migrate 人工待辦、驗證與 preview 結果；先更新 status，再執行下節保存。
 
 ## 階段保存（完成條件）
 

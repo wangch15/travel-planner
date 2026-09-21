@@ -9,7 +9,8 @@ description: 把人在 Google Maps 建好的每日私人清單對帳進 map-list
 
 **使用者主動說**他想要「每天一個 Google Maps 清單，出門時手機打開就能導航」。
 
-這是**選用功能，預設關閉**。`trip.config` 的 `sections.mapLists` 為 `false` 時整個跳過，
+這是**選用功能，預設關閉**。`trip.config` 的 `sections.mapLists` 為 `false` 時跳過對帳，
+仍按下方「進度交接」記錄未啟用／略過，不寫成已對帳。
 `map-lists.js` 留成 `module.exports = {};` 就好。
 
 **不要主動推銷這個功能。** 它需要人自己先在 Google Maps 建清單、把地點一個一個加進去，
@@ -52,6 +53,11 @@ Day 2 的清單少了 cafeA：先更新實際 Maps 清單再改 map-lists.js
 
 私人清單需要登入有權限的 Google 帳號才打得開。
 同行的人如果也要用，記得把清單分享給他們。
+
+## 進度交接（完成或暫停時）
+
+完成、暫停等人或遇到阻礙時，回覆前更新 `trips/<slug>/docs/status.md` 的目前階段、等待確認、阻礙、下一步。
+依 `.ai/rules/progress-tracking.md` 區分等待人建清單、對帳結果與未啟用；先更新 status，再執行下節保存。
 
 ## 階段保存（完成條件）
 

@@ -53,6 +53,11 @@ description: 把確認過的逐日草案查核成五個資料檔。閘門一通�
 2. `trips/<slug>/docs/sources.md` 列得出每一條資料的來源與查核日期
 3. 下節的階段保存與異地備份成功
 
+## 進度交接（完成或暫停時）
+
+完成、暫停等人或遇到阻礙時，回覆前更新 `trips/<slug>/docs/status.md` 的目前階段、等待確認、阻礙、下一步。
+依 `.ai/rules/progress-tracking.md` 記錄哪些查核已通過、哪些仍待查；先更新 status，再執行下節保存。
+
 ## 階段保存（完成條件）
 
 研究資料查核與來源紀錄通過後，依 `.ai/rules/stage-backup.md` 保存資料檔及私人查核筆記。
