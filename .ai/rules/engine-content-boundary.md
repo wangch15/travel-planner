@@ -22,7 +22,7 @@
 
 ## 為什麼重要
 
-行程擁有者的 fork 要能長期 `git merge upstream/main` 拿到引擎更新。
+行程擁有者的複本要能長期 `git merge upstream/main` 拿到引擎更新。
 只要雙方的 commit 只碰各自那一邊，merge 就不會衝突。
 一旦你把行程資料寫進 `src/`，或把引擎邏輯寫進 `trips/`，這個保證就沒了。
 

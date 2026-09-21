@@ -8,7 +8,7 @@
 
 ## 這個 repo 是什麼
 
-travel-planner 是一個**可 fork 的旅程網頁模板**。使用者給你一份粗略的行程初稿，
+travel-planner 是一個**公開的旅程網頁模板**。使用者給你一份粗略的行程初稿，
 你照著這裡的 skills 把它做成一個互動網頁——有地形圖、逐段交通、餐食與備案、
 行前清單——然後部署到他自己的免費 Cloudflare 帳號。
 
@@ -33,7 +33,7 @@ travel-planner 是一個**可 fork 的旅程網頁模板**。使用者給你一�
 
 | 使用者說 | 讀 |
 |---|---|
-| 「我想做一個行程網頁」（第一次，還沒 fork） | `tp-setup`，然後 `tp-plan` |
+| 「我想做一個行程網頁」（第一次，還沒拿到專案） | `tp-setup`，然後 `tp-plan` |
 | 「我想規劃一趟新行程」 | `tp-plan` |
 | 「幫我查景點／餐廳／路線／停車」 | `tp-research` |
 | 「地圖怎麼來的」「重新產地圖」 | `tp-basemap` |
@@ -54,21 +54,24 @@ git fetch upstream
 git log --oneline HEAD..upstream/main
 ```
 
-`origin` 必須是**使用者自己的** fork、`upstream` 才是 `wangch15/travel-planner`。
-**`origin` 指向 `wangch15/travel-planner` 就立刻停下來**——那代表當初是 clone 不是
-fork，之後每次 commit 都會推進模板作者的 repo，而且不會報錯。修法見
-`.ai/rules/repo-ownership.md`。
+`origin` 必須是**使用者自己的私有 repo**、`upstream` 才是 `wangch15/travel-planner`。
+**`origin` 指向 `wangch15/travel-planner` 就立刻停下來**——那代表當初是直接 clone
+公開模板就開始做，使用者根本沒有自己的備份，而且行程資料會一直卡在本機。
+修法見 `.ai/rules/repo-ownership.md`。
+
+**同樣要停下來的情況：`origin` 是公開的。** 行程資料與 `docs/` 裡的私人筆記
+不能放在公開 repo。用 `gh repo view --json visibility` 確認。
 
 **回報落後幾個 commit，並問使用者要不要先更新**（要更新的話走 `tp-update`）。
 不要自己決定更新——更新有風險，而且他可能正在趕出發前的準備。
 
-沒有 `upstream` remote 的話代表這不是 fork 或 remote 沒設好，見 `tp-setup` 第 3 步。
+沒有 `upstream` remote 的話代表 remote 沒設好，見 `tp-setup` 第 3 步。
 
 ## 硬規則
 
 不管在做什麼都適用，先讀過再動手：
 
-- `.ai/rules/repo-ownership.md` —— 在自己的 fork 上工作，永遠不 push 到模板
+- `.ai/rules/repo-ownership.md` —— 在自己的私有 repo 上工作，永遠不 push 到模板
 - `.ai/rules/engine-content-boundary.md` —— 哪些檔案能改、哪些不能
 - `.ai/rules/data-schema-reference.md` —— 改資料前先讀 `docs/schema/`
 - `.ai/rules/research-integrity.md` —— 每個事實附來源與查核日期，查不到就標待確認
@@ -204,7 +207,7 @@ npm run check -- <slug>
 
 ## 為什麼重要
 
-行程擁有者的 fork 要能長期 `git merge upstream/main` 拿到引擎更新。
+行程擁有者的複本要能長期 `git merge upstream/main` 拿到引擎更新。
 只要雙方的 commit 只碰各自那一邊，merge 就不會衝突。
 一旦你把行程資料寫進 `src/`，或把引擎邏輯寫進 `trips/`，這個保證就沒了。
 
@@ -260,10 +263,12 @@ npm run check -- <slug>
 
 ## 規則
 
-**行程擁有者在自己的 fork 上工作，永遠不 push 到模板。**
+**模板是公開唯讀的，行程擁有者在自己的私有 repo 上工作。**
 
-模板 repo（`wangch15/travel-planner`）只進不出：引擎更新從它流向每個 fork，
-沒有任何東西應該從 fork 流回去——除非是刻意開的 pull request。
+- 模板 repo（`wangch15/travel-planner`）是**公開**的，任何人都能讀、都能拿。
+  引擎更新從它流向每一份複本，沒有任何東西應該流回去——除非是刻意開的 pull request。
+- 行程擁有者的複本是**私有**的。`trips/<slug>/docs/` 會進 git，裡面放訂房確認碼、
+  飲食限制、門鎖密碼這些東西（見 `privacy.md`），所以那個 repo 一定要是私有的。
 
 ## 開工前先確認
 
@@ -271,30 +276,49 @@ npm run check -- <slug>
 git remote -v
 ```
 
-- `origin` 必須是**使用者自己的** fork。
+- `origin` 必須是**使用者自己的私有 repo**。
 - `upstream` 必須是 `wangch15/travel-planner`。
 
-**如果 `origin` 是 `wangch15/travel-planner`，立刻停下來。**
-這代表當初是 clone 而不是 fork，之後每一次 commit 都會推進模板作者的 repo。
-被加為協作者的人**有寫入權限**，所以這件事不會報錯、會直接成功——正因為不會
-報錯，你必須自己檢查。
+`upstream` 沒接好，以後就拿不到引擎更新；照下面「取得專案的正確方式」補上。
 
-修法：走 `tp-setup` 第 3 步重新 fork，或直接改 remote：
+**如果 `origin` 是 `wangch15/travel-planner`，停下來。** 那代表當初是直接 clone
+就開始做，行程資料會 commit 進一份公開模板的工作目錄裡。推不上去（沒有寫入權），
+但那些 commit 會一直卡在本機，而且使用者的私有備份根本不存在。
+照下面的步驟補建自己的 repo，再把現有的 commit 推上去。
+
+## 取得專案的正確方式
 
 ```
-gh repo fork wangch15/travel-planner --remote=false --clone=false
+git clone https://github.com/wangch15/travel-planner.git
+cd travel-planner
 git remote rename origin upstream
-git remote add origin https://github.com/<使用者的帳號>/travel-planner.git
-git remote -v
+gh repo create travel-planner --private --source=. --remote=origin --push
 ```
+
+跑完驗一次 `git remote -v`，兩個 remote 都對才往下走。
+
+**不要用 fork。** 公開 repo 的 fork **一定是公開的**，GitHub 不允許把它改成私有。
+用 fork 等於把使用者的行程、`docs/` 裡的訂房資訊與私人筆記放上公開的 GitHub。
+
+**不要用「Use this template」。** 它可以選私有，但會開一條全新的 git 歷史，
+之後 `git merge upstream/main` 要 `--allow-unrelated-histories`，每個檔案都衝突——
+這個 repo 的引擎／內容邊界就是為了讓那個 merge 乾淨才設計的。
+
+## 模板 repo 裡不放任何真實行程
+
+**如果你現在就在模板 repo（`origin` 是 `wangch15/travel-planner`）裡工作——
+包含模板作者本人——`trips/` 底下只能有 `_example`。**
+
+模板作者自己的行程也走上面那條路：另一個私有 repo。模板 repo 是公開的，
+任何 commit 進去的行程資料都會公開，而且 git 歷史刪不掉。
 
 ## 永遠不做的事
 
 - `git push upstream <任何分支>`
-- `git push --force` 到任何不是使用者自己 fork 的地方
-- 直接修改模板 repo 的內容
+- 把任何真實行程 commit 進模板 repo
+- 把行程擁有者的 repo 設成公開
 
-要回報問題或提功能建議，開 issue：
+要回報問題或提功能建議，開 issue（模板是公開的，任何 GitHub 帳號都能開）：
 
 ```
 gh issue create -R wangch15/travel-planner
@@ -305,8 +329,8 @@ gh issue create -R wangch15/travel-planner
 ## 為什麼
 
 模板作者維護引擎，每個行程擁有者維護自己的 `trips/<slug>/`。
-一旦有人的行程資料進了模板 repo，別人 `git merge upstream/main` 就會拿到
-陌生人的行程，邊界就破了。
+公開的模板加上私有的複本，讓兩件事同時成立：引擎更新可以流向所有人，
+而沒有人的行程資料會流向任何人。
 ## 研究誠信
 
 **什麼時候適用：** 任何時候你要把一個「事實」寫進資料檔——營業時間、票價、

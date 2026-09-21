@@ -1,6 +1,6 @@
 ## 這個 repo 是什麼
 
-travel-planner 是一個**可 fork 的旅程網頁模板**。使用者給你一份粗略的行程初稿，
+travel-planner 是一個**公開的旅程網頁模板**。使用者給你一份粗略的行程初稿，
 你照著這裡的 skills 把它做成一個互動網頁——有地形圖、逐段交通、餐食與備案、
 行前清單——然後部署到他自己的免費 Cloudflare 帳號。
 
@@ -25,7 +25,7 @@ travel-planner 是一個**可 fork 的旅程網頁模板**。使用者給你一�
 
 | 使用者說 | 讀 |
 |---|---|
-| 「我想做一個行程網頁」（第一次，還沒 fork） | `tp-setup`，然後 `tp-plan` |
+| 「我想做一個行程網頁」（第一次，還沒拿到專案） | `tp-setup`，然後 `tp-plan` |
 | 「我想規劃一趟新行程」 | `tp-plan` |
 | 「幫我查景點／餐廳／路線／停車」 | `tp-research` |
 | 「地圖怎麼來的」「重新產地圖」 | `tp-basemap` |
@@ -46,21 +46,24 @@ git fetch upstream
 git log --oneline HEAD..upstream/main
 ```
 
-`origin` 必須是**使用者自己的** fork、`upstream` 才是 `wangch15/travel-planner`。
-**`origin` 指向 `wangch15/travel-planner` 就立刻停下來**——那代表當初是 clone 不是
-fork，之後每次 commit 都會推進模板作者的 repo，而且不會報錯。修法見
-`.ai/rules/repo-ownership.md`。
+`origin` 必須是**使用者自己的私有 repo**、`upstream` 才是 `wangch15/travel-planner`。
+**`origin` 指向 `wangch15/travel-planner` 就立刻停下來**——那代表當初是直接 clone
+公開模板就開始做，使用者根本沒有自己的備份，而且行程資料會一直卡在本機。
+修法見 `.ai/rules/repo-ownership.md`。
+
+**同樣要停下來的情況：`origin` 是公開的。** 行程資料與 `docs/` 裡的私人筆記
+不能放在公開 repo。用 `gh repo view --json visibility` 確認。
 
 **回報落後幾個 commit，並問使用者要不要先更新**（要更新的話走 `tp-update`）。
 不要自己決定更新——更新有風險，而且他可能正在趕出發前的準備。
 
-沒有 `upstream` remote 的話代表這不是 fork 或 remote 沒設好，見 `tp-setup` 第 3 步。
+沒有 `upstream` remote 的話代表 remote 沒設好，見 `tp-setup` 第 3 步。
 
 ## 硬規則
 
 不管在做什麼都適用，先讀過再動手：
 
-- `.ai/rules/repo-ownership.md` —— 在自己的 fork 上工作，永遠不 push 到模板
+- `.ai/rules/repo-ownership.md` —— 在自己的私有 repo 上工作，永遠不 push 到模板
 - `.ai/rules/engine-content-boundary.md` —— 哪些檔案能改、哪些不能
 - `.ai/rules/data-schema-reference.md` —— 改資料前先讀 `docs/schema/`
 - `.ai/rules/research-integrity.md` —— 每個事實附來源與查核日期，查不到就標待確認

@@ -1,6 +1,6 @@
 ---
 name: tp-update
-description: 把模板的引擎更新合併進使用者的 fork。開工時發現落後上游、或使用者說模板有更新時用。
+description: 把模板的引擎更新合併進使用者的複本。開工時發現落後上游、或使用者說模板有更新時用。
 ---
 
 # tp-update

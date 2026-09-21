@@ -1,13 +1,13 @@
 ---
 name: tp-setup
-description: 一次性環境準備。使用者第一次要用這個模板做行程時用，把工具、帳號、fork 都弄好。
+description: 一次性環境準備。使用者第一次要用這個模板做行程時用，把工具、帳號、專案都弄好。
 ---
 
 # tp-setup
 
 ## 什麼時候用
 
-使用者說「我想做一個行程網頁」但還沒有 fork、還沒裝好環境的時候。
+使用者說「我想做一個行程網頁」但還沒拿到專案、還沒裝好環境的時候。
 **只需要做一次**，之後每趟新行程直接用 `tp-plan`。
 
 ## agent 不做的事
@@ -40,7 +40,7 @@ description: 一次性環境準備。使用者第一次要用這個模板做行�
 |---|---|---|
 | **Node.js ≥ 20** | `node --version` | macOS 用 Homebrew、Windows 用官方安裝檔。版本不夠也要處理。 |
 | **git** | `git --version` | macOS 裝 Xcode Command Line Tools 即可、Windows 用 Git for Windows。 |
-| **gh**（GitHub CLI） | `gh --version` | fork 與私有 repo 授權都要用它。 |
+| **gh**（GitHub CLI） | `gh --version` | 開私有 repo 與 GitHub 授權都要用它。 |
 
 wrangler 不用另外裝，它是專案的 devDependency，`npm install` 就有。
 
@@ -50,21 +50,20 @@ wrangler 不用另外裝，它是專案的 devDependency，`npm install` 就有�
 
 然後跑 `gh auth login`，它會開瀏覽器請他授權。**這一步要等人**，講清楚畫面上要按什麼。
 
-**這個模板的 repo 是私有的**，使用者是被加為協作者才看得到。
-所以**一定要先完成這一步**，否則下一步會失敗，而且錯誤訊息看起來像「repo 不存在」。
+模板本身是公開的，讀它不需要登入。但**下一步要用他的帳號開一個私有 repo**，
+所以這一步不能跳過。順便用 `gh auth status` 確認真的登入了。
 
 ### 3. 取得專案
 
-```
-gh repo fork wangch15/travel-planner --clone
-```
+模板是公開的，**使用者的複本必須是私有的**——他的行程、`docs/` 裡的訂房資訊與
+私人筆記都會 commit 進去。四行指令，你幫他跑完：
 
-fork 是**你幫他做**的，他不需要知道 fork 是什麼。
-
-**一定要用 `gh repo fork`，不可以用 `gh repo clone` 或 `git clone`。**
-使用者是被加為協作者才看得到這個私有 repo，而協作者**有寫入權限**——
-clone 下來的話 `origin` 會是模板作者的 repo，之後每一次 commit 都會推進
-作者的 repo，而且**不會報任何錯**。
+```
+git clone https://github.com/wangch15/travel-planner.git
+cd travel-planner
+git remote rename origin upstream
+gh repo create travel-planner --private --source=. --remote=origin --push
+```
 
 跑完一定要驗：
 
@@ -72,16 +71,22 @@ clone 下來的話 `origin` 會是模板作者的 repo，之後每一次 commit 
 git remote -v
 ```
 
-- `origin` 是**使用者自己的** `<他的帳號>/travel-planner`
+- `origin` 是**使用者自己的** `<他的帳號>/travel-planner`，而且是**私有**的
 - `upstream` 是 `wangch15/travel-planner`
 
-兩個都對才往下走。`origin` 指向 `wangch15` 就是走錯路了，照
+兩個都對才往下走。`origin` 還指向 `wangch15` 就是第四行沒跑成功，照
 `.ai/rules/repo-ownership.md` 修好再繼續；`upstream` 沒接好，以後就拿不到引擎更新。
+
+**不要用 `gh repo fork`。** 公開 repo 的 fork 一定是公開的，GitHub 不允許改成私有——
+那會把使用者的行程與私人筆記放上公開的 GitHub。理由見
+`.ai/rules/repo-ownership.md`。
 
 **如果這一步失敗：**
 
-- 訊息提到權限或找不到 repo → 多半是第 2 步沒完成，或他還沒被加為協作者。
-  請他確認有收到邀請並接受，或請模板作者把他加進去。
+- `gh repo create` 說名稱已存在 → 他的帳號底下已經有 `travel-planner` 了。
+  問他那是不是舊的一份；要另開就換個名字（例如 `travel-planner-2`），
+  `origin` 指向新的那個就好，不影響後面任何步驟。
+- 訊息提到沒有權限或要求登入 → 第 2 步沒完成，回去跑 `gh auth login`。
 - 訊息提到 git 沒設定 `user.name`／`user.email` → 你幫他設好。
 
 ### 4. 安裝與自我檢查
