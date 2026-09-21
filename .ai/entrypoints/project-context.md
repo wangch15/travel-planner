@@ -74,7 +74,8 @@ git log --oneline HEAD..upstream/main
 這三件事**一定要人點頭**，不要自己判斷：
 
 1. **`docs/plan.md` 確認後才做深度查核**（`tp-plan`）
-2. **preview 看過才 ship**（`tp-ship`）
+2. **preview 看過才 ship**——第一次上線與結構性變更一定要；
+   改文字、換一家店這類小修改由 agent 自檢後直接 ship，範圍見 `tp-ship`
 3. **任何花錢或代表使用者的動作**——訂房、訂位、註冊帳號——**只給連結，不代做**
 
 ## 改引擎之前

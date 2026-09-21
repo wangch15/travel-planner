@@ -50,7 +50,7 @@ AI 會照這個順序帶你走，每一步都會跟你確認：
 | **聊行程** | 問你想去哪、住哪、怎麼移動，整理成逐日草案 | 用講的回答；**看過草案點頭** |
 | **查資料** | 查景點、路線、停車、餐廳，每一筆都附來源 | 等（這一步最久） |
 | **做地圖與照片** | 產生地形底圖、抓授權合法的照片 | 等 |
-| **上線前確認** | 在你電腦上開一個預覽網頁 | **打開看過、確認沒問題** |
+| **上線前確認** | 給你一個網址，**用手機就打得開** | **打開看過、確認沒問題** |
 | **上線** | 部署到你的 Cloudflare 帳號，給你網址 | 註冊 Cloudflare、按授權 |
 
 **有三件事 AI 一定會停下來等你**，不會自己決定：
@@ -136,6 +136,8 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 | `npm run check -- <slug>` | 驗證資料：座標、交通方式、詳細說明、照片授權、清單一致性 |
 | `npm run build -- <slug>` | 產出 `dist/<slug>/site/index.html`（單一檔案）與 `wrangler.json` |
 | `npm run preview -- <slug>` | build 後在 `localhost:4173` 開一個本機伺服器 |
+| `npm run preview -- <slug> --lan` | 同上，但同一個 wifi 的手機也打得開 |
+| `npm run preview -- <slug> --tunnel` | 同上，另外產生一個臨時的公開 https 網址（需要 `cloudflared`，不需要 Cloudflare 帳號） |
 | `npm run ship -- <slug>` | build 後用 wrangler 部署 |
 | `npm run basemap -- <slug>` | 從 OpenStreetMap 與公開高程資料產生地形底圖 |
 | `npm run photos -- <slug>` | 依 `photos.json` 把照片抓進行程資料夾 |
