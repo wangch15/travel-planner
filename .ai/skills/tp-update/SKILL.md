@@ -57,10 +57,13 @@ npm run migrate -- <slug>
 ```
 npm run check -- <slug>
 npm run build -- <slug>
-npm run preview -- <slug>
+npm run preview -- <slug> --lan
 ```
 
 然後走 `tp-ship` 的閘門二，確認過才 `npm run ship`。
+
+**引擎更新一定算結構性變更**，所以「小修改自檢後直接 ship」那一條不適用——
+一定要把網址給使用者、讓他在手機上看過。
 
 ## 衝突策略
 
