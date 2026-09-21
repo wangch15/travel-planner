@@ -147,6 +147,7 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 | 指令 | 做什麼 |
 |---|---|
 | `npm run trips` | 列出所有行程、資料是否通過驗證、各自的部署網址（`--all` 連內建範例一起列） |
+| `npm run update-check` | 比對上游，回報引擎落後幾版、哪幾版需要 `migrate`。**只回報，不會自己更新** |
 | `npm run new -- <slug>` | 建立一個新行程的骨架 |
 | `npm run new -- <slug> --from <舊slug>` | 同上，但沿用舊行程的偏好設定與 `theme.css`（日期、bbox、標題、`deploy.name` 不沿用） |
 | `npm run check -- <slug>` | 驗證資料：座標、交通方式、詳細說明、照片授權、清單一致性 |
@@ -158,11 +159,21 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 | `npm run basemap -- <slug>` | 從 OpenStreetMap 與公開高程資料產生地形底圖 |
 | `npm run photos -- <slug>` | 依 `photos.json` 把照片抓進行程資料夾 |
 | `npm run migrate -- <slug>` | 引擎更新後，把舊格式的資料升版 |
+| `npm run contrib-check` | 開 PR 回模板之前的閘門：擋掉夾帶的行程資料 |
 | `npm run sync:agent-assets` | 改過 `.ai/` 之後，重新產生 `AGENTS.md` 與 `CLAUDE.md` |
 | `npm test` | 引擎自己的測試 |
 
 `ship` 第一次跑之前要先 `npx wrangler login`（會開瀏覽器授權）。
 每個行程的 `deploy.name` 必須不一樣，否則後部署的會覆蓋掉先部署的——`check` 會擋。
+
+## 這個專案是怎麼運作的
+
+一個公開模板扇出成很多份私有複本，中間只有一條單向的 `git merge`。
+每個使用者擁有自己的行程內容，沒有人的資料會流向任何人。
+
+→ **[完整機制說明：`docs/how-it-works.md`](docs/how-it-works.md)**——
+repo 與分支怎麼長、「進 git」與「進產物」差在哪、引擎更新怎麼流過去、
+怎麼把改進回饋回模板。
 
 ## 目錄結構：引擎與內容的邊界
 
@@ -210,11 +221,18 @@ travel-planner/
 
 ---
 
-## 回報問題
+## 回報問題與貢獻改進
 
-用 GitHub issue：[bug 模板](.github/ISSUE_TEMPLATE/bug.md) 或 [功能建議模板](.github/ISSUE_TEMPLATE/feature.md)。
+**回報問題或提建議** → GitHub issue：[bug 模板](.github/ISSUE_TEMPLATE/bug.md) 或
+[功能建議模板](.github/ISSUE_TEMPLATE/feature.md)。不知道怎麼開的話，
+直接跟你的 AI 說「幫我回報一個問題」，它會幫你填。
 
-不知道怎麼開 issue 的話，直接跟你的 AI 說「幫我回報一個問題」，它會幫你填。
+**已經自己修好了，想合併回來** → 開 PR。判準是：**能不能用「現在的行為是錯的」
+來描述？**可以就開 PR，只能說「這樣比較好」的話請改開 issue。
+
+推之前一定要跑 `npm run contrib-check`——模板的 fork 一定是公開的，
+分支裡夾帶一個 `trips/` 檔案就等於公開你的行程與訂房資訊，而且刪不掉。
+完整流程見 [`.ai/rules/contributing-upstream.md`](.ai/rules/contributing-upstream.md)。
 
 ---
 

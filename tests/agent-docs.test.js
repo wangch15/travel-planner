@@ -8,14 +8,14 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const exists = (p) => fs.existsSync(path.join(ROOT, p));
 
 const SKILLS = ['tp-setup', 'tp-plan', 'tp-research', 'tp-basemap', 'tp-photos', 'tp-ship', 'tp-update', 'tp-maps-lists'];
-const RULES = ['engine-content-boundary', 'data-schema-reference', 'research-integrity', 'privacy'];
+const RULES = ['engine-content-boundary', 'data-schema-reference', 'research-integrity', 'privacy', 'contributing-upstream'];
 const REFS = ['places', 'routes', 'parking', 'dining', 'alternatives', 'photos'];
 
 test('八個 tp-* skill 都在', () => {
   for (const s of SKILLS) assert.ok(exists(`.ai/skills/${s}/SKILL.md`), `缺 ${s}`);
 });
 
-test('四份 rules 都在', () => {
+test('rules 都在', () => {
   for (const r of RULES) assert.ok(exists(`.ai/rules/${r}.md`), `缺 ${r}`);
 });
 
@@ -129,4 +129,31 @@ test('網址說明有完整的實際範例，看得出 email 與代號的關聯'
   assert.ok(h.includes('@'), '要有 email 範例，才看得出代號是從哪來的');
   const setup = read('.ai/skills/tp-setup/SKILL.md');
   assert.ok(/[a-z0-9-]+\.[a-z0-9]+\.workers\.dev/.test(setup), 'tp-setup 也要有完整範例供 agent 照唸');
+});
+
+test('機制說明在，而且 README 連得過去', () => {
+  assert.ok(exists('docs/how-it-works.md'), '缺 docs/how-it-works.md');
+  const how = read('docs/how-it-works.md');
+  for (const w of ['進 git', '進產物', 'upstream', 'schemaVersion']) {
+    assert.ok(how.includes(w), `機制說明缺 ${w}`);
+  }
+  assert.ok(read('README.md').includes('docs/how-it-works.md'), 'README 要連到機制說明');
+});
+
+test('版本落後有偵測機制，而且明講不會自己更新', () => {
+  const ctx = read('.ai/entrypoints/project-context.md');
+  assert.ok(ctx.includes('npm run update-check'), '開工流程要跑 update-check');
+  assert.ok(/不要自己決定|問他要不要/.test(ctx), '要明講更新是人的決定');
+  assert.ok(read('scripts/update-check.js').includes('只回報'), 'update-check 要自己說明它不更新');
+});
+
+test('回饋管道：PR 模板在，而且擋得住夾帶的行程資料', () => {
+  assert.ok(exists('.github/PULL_REQUEST_TEMPLATE.md'), '缺 PR 模板');
+  const pr = read('.github/PULL_REQUEST_TEMPLATE.md');
+  assert.ok(pr.includes('npm run contrib-check'), 'PR 模板要要求跑 contrib-check');
+  assert.ok(pr.includes('版本'), 'PR 模板要求填引擎版本');
+  const rule = read('.ai/rules/contributing-upstream.md');
+  assert.ok(/現在的行為是錯的/.test(rule), '要給出改進 vs 取捨的判準');
+  assert.ok(/fork 一定是公開的/.test(rule), '要說明 fork 為什麼是公開的');
+  assert.ok(rule.includes('npm run contrib-check'), '規則要指向那道閘門');
 });

@@ -11,9 +11,12 @@
 
 | | 路徑 | 誰維護 |
 |---|---|---|
-| 引擎 | `src/`、`scripts/`、`tools/`、`.ai/`、`docs/schema/`、`public/`、`package.json` | 模板作者 |
+| 引擎 | `src/`、`scripts/`、`tools/`、`.ai/`、`docs/`、`public/`、`package.json` | 模板作者 |
 | 內容 | `trips/<slug>/` 底下全部 | 行程擁有者 |
 | 產物 | `dist/` | 誰都不維護，整個 gitignore |
+
+**注意 `docs/` 有兩個**：repo 根目錄的 `docs/`（schema 文件、機制說明）是引擎；
+`trips/<slug>/docs/`（使用者的筆記）是內容。兩者路徑不同，不會混。
 
 `trips/<slug>/` 裡面：
 

@@ -42,9 +42,8 @@ travel-planner 是一個**公開的旅程網頁模板**。使用者給你一份�
 
 ```
 npm run trips
+npm run update-check
 git remote -v
-git fetch upstream
-git log --oneline HEAD..upstream/main
 ```
 
 `npm run trips` 會列出這份 repo 裡有哪些行程、資料有沒有通過驗證、各自的網址。
@@ -59,10 +58,13 @@ git log --oneline HEAD..upstream/main
 行程（走錯路了，停下來），還是他就是模板作者在維護引擎（正常，但 `trips/` 只能有
 `_example`）。判斷方式與修法見 `.ai/rules/repo-ownership.md`。
 
-**回報落後幾個 commit，並問使用者要不要先更新**（要更新的話走 `tp-update`）。
-不要自己決定更新——更新有風險，而且他可能正在趕出發前的準備。
+`npm run update-check` 會比對上游，告訴你落後幾版、每一版改了什麼、
+**哪幾版需要 `npm run migrate`**。它只回報，不會自己更新。
 
-沒有 `upstream` remote 的話代表 remote 沒設好，見 `tp-setup` 第 3 步。
+**把重點講給使用者聽，問他要不要現在更新**（要的話走 `tp-update`）。
+不要自己決定——更新有風險，而且他可能正在趕出發前的準備。
+
+沒有 `upstream` remote 的話 `update-check` 會直接告訴你怎麼補，見 `tp-setup` 第 3 步。
 
 ## 硬規則
 
@@ -73,6 +75,7 @@ git log --oneline HEAD..upstream/main
 - `.ai/rules/data-schema-reference.md` —— 改資料前先讀 `docs/schema/`
 - `.ai/rules/research-integrity.md` —— 每個事實附來源與查核日期，查不到就標待確認
 - `.ai/rules/privacy.md` —— 什麼只能進 `trips/<slug>/docs/`
+- `.ai/rules/contributing-upstream.md` —— 要開 PR 或 issue 回模板之前
 
 ## 三道人類閘門
 
@@ -88,5 +91,27 @@ git log --oneline HEAD..upstream/main
 先試兩個插槽（`theme.css`、`extra.js`）。真的非改引擎不可時：
 
 - 把改了什麼、為什麼插槽做不到，記進 `trips/<slug>/docs/engine-changes.md`
-- 考慮用 `.github/ISSUE_TEMPLATE/feature.md` 回報給模板作者，
-  讓它變成引擎的正式功能，你就不用一直自己維護
+- 考慮回饋給模板作者，讓它變成引擎的正式功能，你就不用一直自己維護
+
+## 把改進回饋給模板
+
+行程資料永遠不回流，但**引擎的改進可以**。判準只有一句：
+
+**這件事能不能用「現在的行為是錯的」來描述？**可以 → 開 PR；
+只能用「這樣比較好」描述 → 那是設計取捨，開 issue。
+
+```
+npm run contrib-check    # 擋掉夾帶的行程資料，開 PR 前不能跳
+gh issue create -R wangch15/travel-planner
+```
+
+**模板的 fork 一定是公開的**，分支裡夾帶一個 `trips/` 檔案就等於公開
+使用者的訂房資訊，而且 git 歷史刪不掉。完整流程與那道閘門見
+`.ai/rules/contributing-upstream.md`。
+
+**判斷完還是要問使用者一句再送**——那會掛他的名字。
+
+## 想搞懂整個機制
+
+`docs/how-it-works.md`：一個公開模板怎麼扇出成很多份私有複本、
+「進 git」與「進產物」差在哪、引擎更新怎麼流過去。

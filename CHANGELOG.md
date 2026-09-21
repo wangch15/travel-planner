@@ -26,6 +26,19 @@
 - **`npm run trips` 在模板 repo 裡不再叫人開行程。** 空的 `trips/` 原本一律回
   「先跑 npm run new」，但 origin 是模板本身的時候那正是硬規則禁止的事。現在會
   分辨 origin，並把 `repo-ownership` 的兩種情況攤開來讓 agent 判斷。
+- **新增 `docs/how-it-works.md`。** 一個公開模板怎麼扇出成很多份私有複本、
+  分岔為什麼發生在 repo 層級而不是 branch 層級、「進 git」與「進產物」差在哪、
+  引擎更新怎麼流過去。README 從技術細節那一節連過去，不占開頭篇幅。
+- **新增 `npm run update-check`。** 比對上游，回報落後幾版、每一版改了什麼、
+  哪幾版需要 `migrate`。使用者的複本原本沒有任何東西會通知他引擎更新了，
+  只有 AGENTS.md 裡一句「跑 git log 看看」。**它只回報，不會自己更新**——
+  要不要更新是人的決定。模板作者本人（origin 就是上游、沒有 upstream）
+  不會被誤報成「remote 沒設好」。
+- **新增回饋管道：`npm run contrib-check`、`.ai/rules/contributing-upstream.md`
+  與 PR 模板。** 判準是「能不能用『現在的行為是錯的』來描述」——可以就開 PR，
+  只能說「這樣比較好」的就開 issue。`contrib-check` 是那道安全閘門：模板的
+  fork 一定是公開的，分支裡夾帶一個 `trips/` 檔案就等於公開使用者的訂房資訊，
+  而且 git 歷史刪不掉。
 - 刪除 `HANDOFF.md`：五個實作階段都已完成，內容已與現況不符且會誤導 agent。
 - 資料需要 migrate：否。
 
