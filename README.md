@@ -165,7 +165,7 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 
 ### 行程級指令
 
-這些指令使用 `<slug>`（行程資料夾名稱）。`new` 必須指定新 slug；其餘指令只有一趟自己的行程時可省略，有多趟而沒指定時會報錯並列出可選的。
+這些指令使用 `<slug>`（行程資料夾名稱）。`new` 與 `adopt-deploy` 必須指定 slug；其餘指令只有一趟自己的行程時可省略，有多趟而沒指定時會報錯並列出可選的。
 
 | 指令 | 做什麼 |
 |---|---|
@@ -177,6 +177,8 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 | `npm run preview -- <slug> --lan` | 同上，但同一個 wifi 的手機也打得開 |
 | `npm run preview -- <slug> --tunnel` | 同上，另外產生一個臨時的公開 https 網址（需要 `cloudflared`，不需要 Cloudflare 帳號） |
 | `npm run ship -- <slug>` | build 後用 wrangler 部署 |
+| `npm run adopt-deploy -- <slug>` | 唯讀列出既有 Worker 事實及查核編號，不認領、不部署 |
+| `npm run adopt-deploy -- <slug> --confirm <查核編號>` | 人確認歸屬後重新查核，相符才建立本機紀錄；不部署 |
 | `npm run basemap -- <slug>` | 從 OpenStreetMap 與公開高程資料產生地形底圖 |
 | `npm run photos -- <slug>` | 依 `photos.json` 把照片抓進行程資料夾 |
 | `npm run migrate -- <slug>` | 引擎更新後，把舊格式的資料升版 |
@@ -203,7 +205,11 @@ Workers 的 `ship` 另外會唯讀查核帳號與遠端部署：同名 Worker �
 上次成功的本機紀錄時會停止，防止同帳號跨 repo 覆蓋。未登入、網路或權限問題也停止。
 成功後，實際網址與版本存在 `.local/deployments/<slug>.json`（gitignore，不進 git 或網站，不存登入憑證）。
 首次部署前網址尚未知；後續顯示上次成功的真實網址，不猜帳號子網域。
-換電腦、紀錄遺失或升級前的既有網站，會因沒有紀錄而被擋；目前沒有自動認領或 force 功能。
+換電腦、紀錄遺失或升級前的既有網站，會因沒有紀錄而被擋，但可以走獨立的 `adopt-deploy`。
+AI 先詢問是否同意唯讀查核，再把帳號名稱／ID、Worker 名稱、最後部署時間與版本列給你看；
+**使用者確認那是這趟網站後**，才用查核編號重新查核並建立紀錄。中間事實變了就重新確認。
+認領不部署，網址先留空，下一次成功 ship 才補上。已有合法紀錄不能覆蓋，損壞紀錄也不自動忽略；
+沒有自動認領或 force 功能，查核編號不是人已同意的證明。
 **Pages 不提供這道 Worker 遠端防撞保護**，只保存成功網址。這也不是防止同時部署的遠端原子鎖。
 
 ## 這個專案是怎麼運作的

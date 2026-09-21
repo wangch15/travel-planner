@@ -71,6 +71,22 @@ test('新 Worker：先查身分與遠端，成功後只記真網址與必要身�
   assert.ok(!fs.readFileSync(h.stateFile, 'utf8').includes('private@example.invalid'));
 });
 
+test('認領紀錄可暫無網址，但正常防撞比對不能被豁免', (t) => {
+  const state = { ...saved, url: null, adoption: { deploymentId: 'deployment-1', createdOn: '2026-09-21T00:00:00.000Z' } };
+  const h = harness(t, { state, probe: history() });
+  h.run();
+  assert.ok(h.logs.some((s) => /尚未取得/.test(s)));
+  assert.ok(!h.logs.join('\n').includes('網址：null'));
+  assert.deepEqual(JSON.parse(fs.readFileSync(h.stateFile)), { ...saved, versionId: V2 });
+  noDeploy(harness(t, { state, probe: history(V2) }), /版本|存在/);
+});
+
+test('普通或不完整認領紀錄仍不允許空網址', (t) => {
+  for (const state of [{ ...saved, url: null }, { ...saved, url: null, adoption: {} }, { ...saved, url: null, adoption: { deploymentId: 'x', createdOn: 'invalid' } }]) {
+    noDeploy(harness(t, { state, probe: history() }), /紀錄/);
+  }
+});
+
 test('同一趟同帳號同 Worker 上次版本才可更新，部署前顯示上次真網址', (t) => {
   const h = harness(t, { state: saved, probe: history() });
   h.run();

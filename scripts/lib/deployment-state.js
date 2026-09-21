@@ -55,8 +55,11 @@ function readState(file) {
   }
   try {
     const s = JSON.parse(data);
+    const adoptedWithoutUrl = s && s.target === 'workers' && s.url === null &&
+      typeof s.adoption?.deploymentId === 'string' && s.adoption.deploymentId.length > 0 &&
+      typeof s.adoption.createdOn === 'string' && Number.isFinite(Date.parse(s.adoption.createdOn));
     if (s.schemaVersion !== 1 || typeof s.slug !== 'string' || !NAME.test(s.name) || !ID.test(s.accountId) ||
-      !['workers', 'pages'].includes(s.target) || !validUrl(s.url, s.name, s.target) ||
+      !['workers', 'pages'].includes(s.target) || (!adoptedWithoutUrl && !validUrl(s.url, s.name, s.target)) ||
       (s.target === 'workers' && !VERSION.test(s.versionId))) throw new Error('invalid');
     return s;
   } catch {
@@ -79,7 +82,7 @@ function failure(r, phase) {
   return new Error(`${phase}失敗（退出碼 ${r.status ?? '未知'}），不能判定目標不存在；停止，請檢查 wrangler 的錯誤。`);
 }
 
-function accountId(r, env) {
+function accountInfo(r, env) {
   if (r.status !== 0 || r.error) throw failure(r, '帳號查核');
   let info;
   try { info = JSON.parse(clean(r.stdout)); }
@@ -95,20 +98,21 @@ function accountId(r, env) {
   }
   if (requested) {
     if (!info.accounts.some((a) => a.id === requested)) throw new Error('指定帳號不在登入帳號權限內，停止部署。');
-    return requested;
+    return info.accounts.find((a) => a.id === requested);
   }
   if (info.accounts.length !== 1) throw new Error('有多個帳號，請明確指定 CLOUDFLARE_ACCOUNT_ID 後重新查核；不能猜帳號。');
-  return info.accounts[0].id;
+  return info.accounts[0];
 }
 
-function checkWorker(r, account, name, state, matches) {
+// null 僅代表精確的 Worker-not-found；空部署列表不是不存在。
+function readWorkerDeployment(r, account, name) {
   if (r.status !== 0 || r.error) {
     // 只有本次 deployments API 的精確 Worker-not-found 錯誤才表示可新建。
     const text = output(r);
     const endpoint = `/accounts/${account}/workers/scripts/${name}/deployments`;
     const codes = [...text.matchAll(/\[code:\s*(\d+)\]/g)].map((m) => m[1]);
     if (!r.error && r.status === 1 && !NOT_LOGGED_IN.test(text) && !AUTH_FAILURE.test(text) && !NETWORK_FAILURE.test(text) &&
-      text.includes(`(${endpoint})`) && codes.length === 1 && codes[0] === '10007') return;
+      text.includes(`(${endpoint})`) && codes.length === 1 && codes[0] === '10007') return null;
     throw failure(r, '遠端查核');
   }
   let list;
@@ -122,7 +126,23 @@ function checkWorker(r, account, name, state, matches) {
   if (latest && list.filter((d) => Date.parse(d.created_on) === Date.parse(latest.created_on)).length !== 1) {
     throw new Error('遠端部署時間相同，無法確認唯一的最新版本，停止部署。');
   }
-  if (!matches || !latest || latest.versions.length !== 1 || latest.versions[0].version_id !== state.versionId || latest.versions[0].percentage !== 100) {
+  if (!latest) throw new Error('Worker 已存在但沒有可確認的最新部署版本，停止。');
+  return latest;
+}
+
+function inspectWorker(name, configFile, { runWrangler: run = runWrangler, env = process.env } = {}) {
+  if (typeof name !== 'string' || !NAME.test(name)) throw new Error('Worker 名稱不合法。');
+  const account = accountInfo(run(['whoami', '--json', '--config', configFile], { env }), env);
+  const result = run(['deployments', 'list', '--name', name, '--json', '--config', configFile], {
+    env: { ...env, CLOUDFLARE_ACCOUNT_ID: account.id, CF_ACCOUNT_ID: account.id },
+  });
+  return { accountId: account.id, accountName: account.name, latest: readWorkerDeployment(result, account.id, name) };
+}
+
+function checkWorker(r, account, name, state, matches) {
+  const latest = readWorkerDeployment(r, account, name);
+  if (latest === null) return;
+  if (!matches || latest.versions.length !== 1 || latest.versions[0].version_id !== state.versionId || latest.versions[0].percentage !== 100) {
     throw new Error(`Worker「${name}」已存在，但不是本趟本機紀錄的上次部署版本。停止以免覆蓋別的網站；請核對帳號與名稱，沒有紀錄時不可自動認領。`);
   }
 }
@@ -145,7 +165,7 @@ function deployBuiltTrip({ slug, config, outDir }, {
   const file = statePath(slug, stateDir);
   const previous = readState(file);
   const configFile = path.join(outDir, 'wrangler.json');
-  const account = accountId(run(['whoami', '--json', '--config', configFile], { env }), env);
+  const account = accountInfo(run(['whoami', '--json', '--config', configFile], { env }), env).id;
   const settings = { env: { ...env, CLOUDFLARE_ACCOUNT_ID: account, CF_ACCOUNT_ID: account } };
   const identity = { slug, target, name, accountId: account };
   const matches = previous && Object.entries(identity).every(([k, v]) => previous[k] === v);
@@ -155,7 +175,7 @@ function deployBuiltTrip({ slug, config, outDir }, {
     log('Pages：本次只保存成功網址，不提供 Worker 的遠端防撞保護。');
   }
   log(`即將部署：${slug}${config.title ? `（${config.title}）` : ''}；帳號 ${account}；${target} ${name}`);
-  log(matches ? `上次成功部署網址：${previous.url}（本機紀錄；不是即時網址查詢）` : '尚未取得本目標的真實網址；首次成功部署後才可記錄，不以佔位符猜測。');
+  log(matches && previous.url ? `上次成功部署網址：${previous.url}（本機紀錄；不是即時網址查詢）` : '尚未取得本目標的真實網址；首次成功部署後才可記錄，不以佔位符猜測。');
   const args = target === 'pages'
     ? ['pages', 'deploy', path.join(outDir, 'site'), '--project-name', name]
     : ['deploy', '--config', configFile];
@@ -176,4 +196,4 @@ function deployBuiltTrip({ slug, config, outDir }, {
   return state;
 }
 
-module.exports = { deployBuiltTrip, runWrangler };
+module.exports = { deployBuiltTrip, runWrangler, inspectWorker, STATE_DIR, statePath, readState };

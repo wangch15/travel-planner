@@ -164,6 +164,10 @@ git merge upstream/main   →   npm install   →   （需要的話）npm run mi
 成功部署才把輸出的真實網址與版本存到 `.local/deployments/<slug>.json`，gitignore，
 不進 git、不進網站，也不保存登入憑證。首次部署前網址尚未知；後續印上次成功的真實網址，
 不是即時子網域查詢，也不是人類確認。沒有紀錄的既有 Worker 不自動認領，換電腦時也一樣。
+恢復方式是獨立的 `npm run adopt-deploy -- <slug>`：先取得唯讀查核同意，列出帳號、Worker 與最後部署事實，
+由人判斷是不是這一趟網站。使用者明確確認後，才帶 `--confirm <查核編號>` 重新查核；
+事實未变且沒有正式紀錄才建立 `url: null` 的認領紀錄。下一次正常 ship 補真網址，不留下繞過保護的旗標。
+暫存收據在同一個 gitignore 目錄的 `pending/`，不是所有權憑證；既有合法或損壞紀錄都不覆蓋。
 **Pages 不提供這道 Worker 遠端防撞保護**，只保存成功網址；查核到部署之間的併發競態仍可能發生。
 
 ## 把改進回饋給模板

@@ -629,4 +629,6 @@ gh issue create -R wangch15/travel-planner
 
 `ship` 會唯讀核對帳號及 Worker 的上次版本，再顯示目標資訊；這段輸出**不是人類確認**，
 腳本不會停下來等 stdin。preview 閘門仍由 agent 在執行 ship 之前完成。
-既有 Worker 沒有相符紀錄會拒絕，不能手填紀錄、繞過腳本或刪除遠端來讓它過；處理方式見 `tp-ship`。
+既有 Worker 沒有相符紀錄會拒絕，不能手填紀錄、繞過腳本或刪除遠端來讓它過。
+沒有正式紀錄時，依 `tp-ship` 的 `adopt-deploy` 兩段式流程查核、請使用者確認歸屬；
+只有明確確認後才寫入認領紀錄。已認領但 `url: null` 仍表示網址未知，不能唸 null 或自行拼接網址。
