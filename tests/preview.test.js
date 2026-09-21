@@ -23,10 +23,15 @@ test('區網位址不含 loopback', () => {
   }
 });
 
-test('cloudflared 缺席時給得出安裝方式', () => {
-  for (const w of ['brew install cloudflared', 'winget', 'developers.cloudflare.com']) {
+test('cloudflared 缺席時給得出三大平台的安裝方式', () => {
+  for (const w of ['brew install cloudflared', 'winget', 'Linux', 'developers.cloudflare.com']) {
     assert.ok(CLOUDFLARED_INSTALL.includes(w), `安裝說明缺 ${w}`);
   }
+});
+
+test('cloudflared 缺席不是死路：要指出 --lan 這條退路', () => {
+  assert.ok(CLOUDFLARED_INSTALL.includes('--lan'), '沒裝 cloudflared 時要提示可以改用 --lan');
+  assert.ok(/不需要 Cloudflare 帳號/.test(CLOUDFLARED_INSTALL), '要講明不用辦帳號，否則使用者會以為又要註冊');
 });
 
 test('認得出 cloudflared 印的網址', () => {

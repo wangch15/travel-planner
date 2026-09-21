@@ -42,9 +42,31 @@ npm run ship -- <slug>
 `--lan` 會印出 `http://192.168.x.x:4173` 這種網址，**直接把它念給使用者、
 請他用手機打開**。同一個網路內的人都看得到，公共 wifi 就別用。
 
-`--tunnel` 需要 `cloudflared`（不需要 Cloudflare 帳號）。沒裝的話指令會印出
-安裝方式，**照著念給使用者聽，不要自己想辦法繞過**；他不想裝就退回 `--lan`。
+`--tunnel` 需要 `cloudflared`（免費，**不需要 Cloudflare 帳號**）。
 這個網址**關掉指令就失效**，而且拿到的人都看得到——要講清楚。
+
+### cloudflared 沒裝的時候：你幫他裝
+
+跟 Node、git、gh 一樣，**缺的你幫他裝**，不要丟指令叫他自己跑。
+差別只在**這個要先問一句**——它是選用的，而且 `--lan` 已經夠用：
+
+> 「要我幫你裝一個小工具嗎？裝了之後我可以給你一個任何網路都打得開的網址，
+> 你人不在家也能看、也能先傳給家人。不裝的話，只要你跟電腦在同一個 wifi
+> 底下一樣看得到。」
+
+他說好就照他的系統裝：
+
+| 系統 | 指令 |
+|---|---|
+| macOS | `brew install cloudflared` |
+| Windows | `winget install --id Cloudflare.cloudflared` |
+| Linux／其他 | 從 https://developers.cloudflare.com/tunnel/downloads/ 取 `.deb`、`.rpm` 或對應架構的 binary |
+
+**裝完自己再跑一次 `--tunnel` 驗證**，不要裝完就說「好了」。
+
+他說不用、或裝不起來（沒有 Homebrew、winget 不存在、公司電腦不給裝），
+**不要卡在這裡**：退回 `--lan`，把區網網址給他，繼續往下走。
+這只是預覽方式的差別，不影響任何行程內容。
 
 ## 閘門二：請人看過才能 ship
 

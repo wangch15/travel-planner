@@ -44,6 +44,11 @@ description: 一次性環境準備。使用者第一次要用這個模板做行�
 
 wrangler 不用另外裝，它是專案的 devDependency，`npm install` 就有。
 
+**`cloudflared` 刻意不在這張表裡。** 它只有在要產生公開預覽網址
+（`npm run preview -- <slug> --tunnel`）時才需要，多數人用 `--lan` 就夠了。
+真的要用的時候再裝，流程見 `tp-ship`——不要在這裡先問他要不要裝，
+那只會在他還沒看到任何東西的時候多丟一個決定給他。
+
 ### 2. GitHub 帳號與登入
 
 **人類必做：** 沒有 GitHub 帳號的話先去 github.com 註冊。

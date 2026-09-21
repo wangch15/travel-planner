@@ -19,11 +19,16 @@ const TYPES = { '.html':'text/html; charset=utf-8', '.jpg':'image/jpeg', '.png':
 const TUNNEL_URL = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
 
 const CLOUDFLARED_INSTALL = [
-  '找不到 cloudflared，沒辦法產生公開網址。安裝方式：',
-  '  macOS        brew install cloudflared',
-  '  Windows      winget install --id Cloudflare.cloudflared',
-  '  其他／手動    https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/',
+  '找不到 cloudflared，沒辦法產生公開網址。',
+  '它是一個免費的小工具，不需要 Cloudflare 帳號，裝一次就好。',
   '',
+  '安裝方式（挑使用者的系統）：',
+  '  macOS         brew install cloudflared',
+  '  Windows       winget install --id Cloudflare.cloudflared',
+  '  Linux／其他    https://developers.cloudflare.com/tunnel/downloads/',
+  '                （.deb、.rpm 與各架構的 binary 都在那裡）',
+  '',
+  '不想裝也沒關係：改用 --lan，同一個 wifi 的手機一樣打得開。',
   '裝好之後再跑一次同樣的指令就會有公開網址。',
 ].join('\n');
 
@@ -108,7 +113,10 @@ function main(argv) {
           console.log('**這個網址關掉這個指令就失效**，而且拿到網址的人都看得到內容。');
         } else {
           console.log(`\n${err}`);
-          if (!flags.lan) console.log('\n先用 --lan 的話，同一個 wifi 的手機一樣可以看。');
+          // 安裝說明本身已經指出 --lan 這條退路，別再講一次。
+          if (!flags.lan && err !== CLOUDFLARED_INSTALL) {
+            console.log('\n改用 --lan 的話，同一個 wifi 的手機一樣可以看。');
+          }
         }
       });
     }
