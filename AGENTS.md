@@ -59,13 +59,13 @@ git log --oneline HEAD..upstream/main
 **有兩趟以上的時候，每個指令都要帶 `-- <slug>`**——帶錯的話最糟的情況是
 `ship` 覆蓋掉另一趟的線上網站，而且不會有任何警告。
 
-`origin` 必須是**使用者自己的私有 repo**、`upstream` 才是 `wangch15/travel-planner`。
-**`origin` 指向 `wangch15/travel-planner` 就立刻停下來**——那代表當初是直接 clone
-公開模板就開始做，使用者根本沒有自己的備份，而且行程資料會一直卡在本機。
-修法見 `.ai/rules/repo-ownership.md`。
+**做行程的人**：`origin` 必須是他自己的**私有** repo、`upstream` 才是
+`wangch15/travel-planner`。`origin` 是公開的就停下來——行程資料與 `docs/` 裡的
+私人筆記不能放在公開 repo（用 `gh repo view --json visibility` 確認）。
 
-**同樣要停下來的情況：`origin` 是公開的。** 行程資料與 `docs/` 裡的私人筆記
-不能放在公開 repo。用 `gh repo view --json visibility` 確認。
+**`origin` 指向 `wangch15/travel-planner` 的時候要先分清楚**：使用者是要做自己的
+行程（走錯路了，停下來），還是他就是模板作者在維護引擎（正常，但 `trips/` 只能有
+`_example`）。判斷方式與修法見 `.ai/rules/repo-ownership.md`。
 
 **回報落後幾個 commit，並問使用者要不要先更新**（要更新的話走 `tp-update`）。
 不要自己決定更新——更新有風險，而且他可能正在趕出發前的準備。
@@ -298,10 +298,20 @@ git remote -v
 
 `upstream` 沒接好，以後就拿不到引擎更新；照下面「取得專案的正確方式」補上。
 
-**如果 `origin` 是 `wangch15/travel-planner`，停下來。** 那代表當初是直接 clone
-就開始做，行程資料會 commit 進一份公開模板的工作目錄裡。推不上去（沒有寫入權），
-但那些 commit 會一直卡在本機，而且使用者的私有備份根本不存在。
-照下面的步驟補建自己的 repo，再把現有的 commit 推上去。
+### `origin` 是 `wangch15/travel-planner` 的時候
+
+這有兩種可能，**先分清楚是哪一種再動手**：
+
+**(a) 使用者要做自己的行程** → 走錯路了，停下來。
+那代表當初是直接 clone 就開始做，行程資料會 commit 進一份公開模板的工作目錄裡。
+推不上去（沒有寫入權），但那些 commit 會一直卡在本機，而且使用者的私有備份
+根本不存在。照下面「取得專案的正確方式」補建自己的 repo，再把現有的 commit 推上去。
+
+**(b) 使用者就是模板作者，正在維護引擎本身**（改 `src/`、`scripts/`、`.ai/`、文件）
+→ 這是正常的，繼續做。但 `trips/` 底下只能有 `_example`（見下一節）。
+
+分不出來是哪一種就問使用者一句。**有一個情況不用問：`origin` 是模板、
+而 `trips/` 底下有非底線開頭的行程——那一定是 (a)，停下來。**
 
 ## 取得專案的正確方式
 
