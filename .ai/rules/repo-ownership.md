@@ -73,6 +73,30 @@ gh repo create travel-planner --private --source=. --remote=origin
 模板作者自己的行程也走上面那條路：另一個私有 repo。模板 repo 是公開的，
 任何 commit 進去的行程資料都會公開，而且 git 歷史刪不掉。
 
+## 最後一道 pre-push
+
+`.githooks/pre-push` 由 `npm install` 的 prepare 安裝：設定本 repo 的 `core.hooksPath` 為 `.githooks`。
+引擎更新時 hook 檔案會隨 merge 流入複本；既有使用者也要跑 npm install 並確認安裝結果。
+
+hook 直接使用 Git argv 給的 remote URL，不會重新查 remote 設定。只有明確可解析的 github.com
+HTTPS／git SSH URL 才能查核；不支援的 SSH alias、其他主機或含憑證的 URL 會拒絕，不猜目的地。
+它每次都查，不管只改 README、新增／強推分支，或刪除分支的全零 refs；不掃 commit 範圍、不快取可見度。
+
+- 目的地是 `wangch15/travel-planner`：只有工作目錄 trips/ 沒有非底線開頭的資料夾才允許。
+  這個例外只判斷目錄，不是歷史資料掃描，也不是模板帳號所有權驗證；模板仍只能放 `_example`。
+- 其他目的地：對 URL 指定的 owner/repo 執行 gh 私有查核，10 秒逾時即拒絕。
+  PUBLIC 時提醒既有 repo 內容已公開，可能含訂房資訊；擋本次不會撤回已外洩資料。
+
+| 條件 | hook 動作 | 結果 |
+|---|---|---|
+| 其他目的地為 PUBLIC、INTERNAL 或查核失敗 | 拒絕，說明原因及下一步 | 目前只有本機備份，尚未異地備份 |
+| 其他目的地本次查核為 PRIVATE | 允許這次推送，之後仍須核對備份結果 | 不快取許可 |
+
+`.ai/rules/stage-backup.md` 仍是第一道，不能因有 hook 就省略 agent 的每次查核。
+**hook 不是萬無一失，`--no-verify` 就能繞過；它防不小心，不防刻意。** agent 不得自行繞過或停用。
+若工具不執行 Git hooks、直接走 API，或尚未安裝／被改掉 hooksPath，也沒有這道保護；不能保證每款桌面工具都會攔。
+查核後 repo 可見度仍可能被人更改，hook 不是持續監控或能撤回資料的機制。
+
 ## 永遠不做的事
 
 - `git push upstream <任何分支>`

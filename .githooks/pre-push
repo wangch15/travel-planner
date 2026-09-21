@@ -1,0 +1,6 @@
+#!/bin/sh
+if ! command -v node >/dev/null 2>&1; then
+  printf '%s\n' '目前只有本機備份，尚未異地備份' '原因：執行推送的工具找不到 Node.js，無法做私有查核。' '下一步：請安裝 Node.js 20 以上並讓這個工具能找到 node，重開工具後再試；不要跳過檢查。' >&2
+  exit 1
+fi
+exec node "$(dirname "$0")/../scripts/pre-push.js" "$@"

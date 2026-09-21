@@ -106,6 +106,12 @@ npm test
 
 測試要全綠。沒綠就先處理，不要帶著壞掉的引擎往下做。
 
+`npm install` 的 prepare 會安裝最後一道 pre-push；用 `git config --get core.hooksPath` 確認預設是 `.githooks`。
+如果已設定其他 hooksPath，installer 不會覆蓋；停下來請人決定如何保留／整合原有 hooks，不能直接宣稱保護已生效。
+非 Git 目錄或找不到 git 時會靜默跳過，所以 install 成功不代表 hook 已安裝。
+環境修好後可用 `npm run prepare` 重試。工具必須能找到 Node 與 gh；不執行 Git hooks 的工具不在這道保護內。
+詳細拒絕條件與 `--no-verify` 的限制見 `.ai/rules/repo-ownership.md`；第一道備份規則仍要做。
+
 順便跑 `npm run preview -- _example --lan` 讓使用者看一眼範例行程，
 知道最後會做出什麼樣子的東西。加 `--lan` 是為了讓他**用手機開**——
 這個東西是給人在旅途中用手機看的，在電腦上看跟實際使用差很多。

@@ -82,4 +82,6 @@ git ls-remote origin refs/heads/<已確認的分支>
 | 這次 PRIVATE、push 成功且遠端 commit 核對成功 | 回報本階段與異地備份已完成 | 可回報階段完成 |
 
 本機 commit 若也失敗，另明說「工作檔尚未成功提交」，不要假稱有可還原的 checkpoint。
-這是 agent 必須執行的流程，不是 pre-push hook，也不保證 repo 在查核後永遠保持私有。
+這份流程仍是 agent 的**第一道**查核；另有 `.githooks/pre-push` 當 Git 推送的**最後一道**，見 repo-ownership。
+兩者都要保留：規則擋不住非 agent 的推送，hook 又可被 `--no-verify` 或不執行 hooks 的工具繞過。
+它們都不保證 repo 在查核後永遠保持私有；hook 放行也不等於遠端已成功備份。

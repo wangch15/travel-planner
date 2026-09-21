@@ -36,7 +36,10 @@ git merge upstream/main
 npm install
 ```
 
-`npm install` 不能跳過——引擎可能加了新的相依套件。
+`npm install` 不能跳過——引擎可能加了新的相依套件，prepare 也會設定新版本的 pre-push。
+接著用 `git config --get core.hooksPath` 確認預設是 `.githooks`；hook 檔案由上游 merge 更新。
+如果已有其他 hooksPath，不要覆蓋或停用，請人先處理整合並確認保護生效。
+不是 Git repo／git 不可用時 installer 會跳過；修好後跑 `npm run prepare`，不能因 install 成功就假稱已受保護。
 
 ### 4. 需要的話升版資料
 

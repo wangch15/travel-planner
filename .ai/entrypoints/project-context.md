@@ -53,7 +53,7 @@ git remote -v
 
 **有兩趟以上的時候，行程級指令都要帶 `-- <slug>`**——帶錯的話最糟的情況是
 `ship` 覆蓋掉另一趟的線上網站，而且不會有任何警告。
-Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`test` 不帶行程 slug；
+Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`prepare`、`test` 不帶行程 slug；
 `contrib-check` 的選填參數是 Git 比較基準，不是行程名稱。分類見 README 的指令表。
 
 **更危險的是檔案編輯：它不經過任何指令，沒有東西會擋你。**
@@ -80,7 +80,7 @@ Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`
 
 不管在做什麼都適用，先讀過再動手：
 
-- `.ai/rules/repo-ownership.md` —— 在自己的私有 repo 上工作，永遠不 push 到模板
+- `.ai/rules/repo-ownership.md` —— 行程在自己的私有 repo；pre-push 是最後一道，不能取代規則或保證所有工具都執行 hooks
 - `.ai/rules/stage-backup.md` —— 階段完成前保存；每次 push 前重新驗 origin 私有，失敗停止且不得說完成
 - `.ai/rules/progress-tracking.md` —— 完成、暫停與阻礙都更新既有 status.md，先更新再保存
 - `.ai/rules/engine-content-boundary.md` —— 哪些檔案能改、哪些不能

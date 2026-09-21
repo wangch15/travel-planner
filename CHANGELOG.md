@@ -2,6 +2,12 @@
 
 ## 1.1.0（2026-09-21）
 
+- **新增 pre-push 最後一道目的地檢查。** npm install 的 prepare 設定 repo-local `core.hooksPath` 指向 `.githooks`，
+  不覆蓋已有其他設定；非 Git 環境靜默跳過。hook 只認 Git 傳入的實際 URL，除模板目錄條件例外外，
+  每次查核目的地 PRIVATE，包含 README-only 與刪除分支；未登入、格式錯誤或 10 秒逾時都拒絕。
+  公開 contrib fork 也會被拒絕，不能因 contrib-check 通過就自動推送。
+  原本 agent 規則保留作第一道；`--no-verify`、未安裝或不執行 Git hooks 的工具仍能繞過，不是萬無一失。
+
 - **補記 wrangler 固定版本的理由與代價（9ad6658）。** 從 `^4.133.0` 固定為 `4.135.0`，
   因為部署保護解析 CLI 的 JSON 形狀、錯誤碼及 stdout 網址／版本；未核對的更新可能破壞安全判斷。
   代價是使用者**不會自動取得 wrangler 的安全更新**。模板維護者需主動追蹤修補，

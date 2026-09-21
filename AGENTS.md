@@ -61,7 +61,7 @@ git remote -v
 
 **有兩趟以上的時候，行程級指令都要帶 `-- <slug>`**——帶錯的話最糟的情況是
 `ship` 覆蓋掉另一趟的線上網站，而且不會有任何警告。
-Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`test` 不帶行程 slug；
+Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`prepare`、`test` 不帶行程 slug；
 `contrib-check` 的選填參數是 Git 比較基準，不是行程名稱。分類見 README 的指令表。
 
 **更危險的是檔案編輯：它不經過任何指令，沒有東西會擋你。**
@@ -88,7 +88,7 @@ Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`
 
 不管在做什麼都適用，先讀過再動手：
 
-- `.ai/rules/repo-ownership.md` —— 在自己的私有 repo 上工作，永遠不 push 到模板
+- `.ai/rules/repo-ownership.md` —— 行程在自己的私有 repo；pre-push 是最後一道，不能取代規則或保證所有工具都執行 hooks
 - `.ai/rules/stage-backup.md` —— 階段完成前保存；每次 push 前重新驗 origin 私有，失敗停止且不得說完成
 - `.ai/rules/progress-tracking.md` —— 完成、暫停與阻礙都更新既有 status.md，先更新再保存
 - `.ai/rules/engine-content-boundary.md` —— 哪些檔案能改、哪些不能
@@ -274,6 +274,13 @@ npm run contrib-check
 仍須人工審查；也不要換成包含私人歷史的 base 來讓檢查過關。
 檢查後若新增 commit、合併或改寫歷史，推送前必須重跑。
 
+## pre-push 對公開貢獻的限制
+
+公開的 contrib fork 也會被新 hook 拒絕，即使 `contrib-check` 全綠；本次沒有新增公開貢獻豁免。
+到這裡先停止，與使用者討論回報方式，優先用已去識別化的 issue；不要把下面的歷史參考流程整段執行。
+**agent 不得自行加 `--no-verify`、改 hooksPath 或停用 hook** 來開 PR。
+刻意公開引擎分支需要人另行決定操作安排，不是「測試通過」就自動獲准。
+
 ## 為什麼要另外 fork
 
 使用者自己的私有 repo 是 `gh repo create` 開的，**跟模板沒有 fork 關係**，
@@ -303,11 +310,10 @@ git cherry-pick <commit>
 npm run contrib-check
 npm test
 
-# 4. 推到那個公開的 fork，不是推到 upstream
-git push contrib contrib-<主題>
-
-# 5. 開 PR
-gh pr create -R wangch15/travel-planner --head <他的帳號>:contrib-<主題>
+# 4. 到此停止：pre-push 會拒絕這個公開 fork，先向使用者說明並討論。
+# 下列只保留作歷史參考，不是 agent 可以自動執行的步驟：
+# git push contrib contrib-<主題>
+# gh pr create -R wangch15/travel-planner --head <他的帳號>:contrib-<主題>
 ```
 
 `.github/PULL_REQUEST_TEMPLATE.md` 會問你四件事，照實填。
@@ -418,7 +424,7 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
 
 | | 路徑 | 誰維護 |
 |---|---|---|
-| 引擎 | `src/`、`scripts/`、`tools/`、`.ai/`、`docs/`、`public/`、`package.json` | 模板作者 |
+| 引擎 | `src/`、`scripts/`、`tools/`、`.ai/`、`.githooks/`、`docs/`、`public/`、`package.json` | 模板作者 |
 | 內容 | `trips/<slug>/` 底下全部 | 行程擁有者 |
 | 產物 | `dist/` | 誰都不維護，整個 gitignore |
 
@@ -617,6 +623,30 @@ gh repo create travel-planner --private --source=. --remote=origin
 模板作者自己的行程也走上面那條路：另一個私有 repo。模板 repo 是公開的，
 任何 commit 進去的行程資料都會公開，而且 git 歷史刪不掉。
 
+## 最後一道 pre-push
+
+`.githooks/pre-push` 由 `npm install` 的 prepare 安裝：設定本 repo 的 `core.hooksPath` 為 `.githooks`。
+引擎更新時 hook 檔案會隨 merge 流入複本；既有使用者也要跑 npm install 並確認安裝結果。
+
+hook 直接使用 Git argv 給的 remote URL，不會重新查 remote 設定。只有明確可解析的 github.com
+HTTPS／git SSH URL 才能查核；不支援的 SSH alias、其他主機或含憑證的 URL 會拒絕，不猜目的地。
+它每次都查，不管只改 README、新增／強推分支，或刪除分支的全零 refs；不掃 commit 範圍、不快取可見度。
+
+- 目的地是 `wangch15/travel-planner`：只有工作目錄 trips/ 沒有非底線開頭的資料夾才允許。
+  這個例外只判斷目錄，不是歷史資料掃描，也不是模板帳號所有權驗證；模板仍只能放 `_example`。
+- 其他目的地：對 URL 指定的 owner/repo 執行 gh 私有查核，10 秒逾時即拒絕。
+  PUBLIC 時提醒既有 repo 內容已公開，可能含訂房資訊；擋本次不會撤回已外洩資料。
+
+| 條件 | hook 動作 | 結果 |
+|---|---|---|
+| 其他目的地為 PUBLIC、INTERNAL 或查核失敗 | 拒絕，說明原因及下一步 | 目前只有本機備份，尚未異地備份 |
+| 其他目的地本次查核為 PRIVATE | 允許這次推送，之後仍須核對備份結果 | 不快取許可 |
+
+`.ai/rules/stage-backup.md` 仍是第一道，不能因有 hook 就省略 agent 的每次查核。
+**hook 不是萬無一失，`--no-verify` 就能繞過；它防不小心，不防刻意。** agent 不得自行繞過或停用。
+若工具不執行 Git hooks、直接走 API，或尚未安裝／被改掉 hooksPath，也沒有這道保護；不能保證每款桌面工具都會攔。
+查核後 repo 可見度仍可能被人更改，hook 不是持續監控或能撤回資料的機制。
+
 ## 永遠不做的事
 
 - `git push upstream <任何分支>`
@@ -764,7 +794,9 @@ git ls-remote origin refs/heads/<已確認的分支>
 | 這次 PRIVATE、push 成功且遠端 commit 核對成功 | 回報本階段與異地備份已完成 | 可回報階段完成 |
 
 本機 commit 若也失敗，另明說「工作檔尚未成功提交」，不要假稱有可還原的 checkpoint。
-這是 agent 必須執行的流程，不是 pre-push hook，也不保證 repo 在查核後永遠保持私有。
+這份流程仍是 agent 的**第一道**查核；另有 `.githooks/pre-push` 當 Git 推送的**最後一道**，見 repo-ownership。
+兩者都要保留：規則擋不住非 agent 的推送，hook 又可被 `--no-verify` 或不執行 hooks 的工具繞過。
+它們都不保證 repo 在查核後永遠保持私有；hook 放行也不等於遠端已成功備份。
 ## 先確定是哪一趟
 
 **什麼時候適用：** 有兩趟以上行程的時候，你要**讀或改** `trips/` 底下任何檔案、

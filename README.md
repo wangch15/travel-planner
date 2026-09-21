@@ -200,7 +200,24 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 | `npm run update-check` | 比對上游，回報引擎落後幾版、哪幾版需要 `migrate`。**只回報，不會自己更新** |
 | `npm run contrib-check` | 檢查完整新增歷史的禁止路徑；可用 `npm run contrib-check -- <base>` 指定比較基準，預設 `upstream/main` |
 | `npm run sync:agent-assets` | 改過 `.ai/` 之後，重新產生 `AGENTS.md`、`CLAUDE.md` 與工具用 skills |
+| `npm run prepare` | npm install 會自動執行；安裝本 repo 的 pre-push，已有其他 hooksPath 不覆蓋 |
 | `npm test` | 引擎自己的測試 |
+
+## Git 推送的最後一道檢查
+
+`npm install` 的 prepare 會執行 `scripts/install-hooks.js`，設定本 repo 的 `core.hooksPath` 為被追蹤的 `.githooks`。
+Git hooks 本身不會隨 clone 複製，這一步不能假設已做過；用 `git config --get core.hooksPath` 確認。
+不是 Git repo 或找不到 git 時 installer 靜默跳過，不讓安裝失敗；已有其他 hooksPath 不覆蓋，會請人先處理整合。
+修好環境後可跑 `npm run prepare` 重試。引擎更新會帶來 hook 檔案，仍須完成 npm install 並確認安裝結果。
+
+hook 使用 Git 提供的實際推送 URL，不重新猜 origin；目的地若是公開模板，只有 trips/ 沒有非底線目錄才放行。
+其他 GitHub 目的地**每次都要查到 PRIVATE**，包括只改 README 或刪除分支；PUBLIC、未登入、查不到、格式錯誤或 10 秒逾時都會拒絕。
+如果 repo 已改公開，既有內容可能已外洩，攔住這次不會撤回舊資料；請先檢查可見度與可能外洩的密碼。
+
+**它防不小心，不防刻意：`--no-verify` 就能繞過。** 只有會執行 Git hooks 的工具才受這道保護；
+直接用 API、不執行 hook、尚未安裝或改掉 hooksPath 都不保證被攔。沒有額外的環境變數或旗標豁免。
+執行推送的工具必須能找到 Node 與 gh；查核支援標準 github.com HTTPS／git SSH URL，未知主機或 SSH 別名會停止，不猜目的地。
+AI 原本的階段備份與每次私有查核規則仍保留，hook 不能取代它們；公開 contrib fork 也不會被自動豁免。
 
 ## 部署檢查與本機紀錄
 
@@ -253,6 +270,7 @@ travel-planner/
 ├── scripts/     引擎指令：check、build、preview、ship、new、migrate、photos
 ├── tools/       底圖產生（純 Node）
 ├── .ai/         agent 文件的唯一來源 → AGENTS.md / CLAUDE.md
+├── .githooks/   被追蹤的 pre-push；npm install 設定 hooksPath
 ├── docs/schema/ 六個資料檔的欄位文件 ← 改資料前先讀這裡
 ├── public/      _headers 與 robots.txt
 └── trips/
@@ -303,7 +321,8 @@ travel-planner/
 
 推之前一定要跑 `npm run contrib-check`——模板的 fork 一定是公開的，
 分支裡夾帶一個 `trips/` 檔案就等於公開你的行程與訂房資訊，而且刪不掉。
-完整流程見 [`.ai/rules/contributing-upstream.md`](.ai/rules/contributing-upstream.md)。
+新的 pre-push 也會擋公開 contrib fork；不要自行繞過，先停止與使用者討論，必要時只回報 issue。
+完整限制與參考流程見 [`.ai/rules/contributing-upstream.md`](.ai/rules/contributing-upstream.md)。
 
 ---
 

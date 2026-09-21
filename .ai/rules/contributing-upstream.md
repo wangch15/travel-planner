@@ -70,6 +70,13 @@ npm run contrib-check
 仍須人工審查；也不要換成包含私人歷史的 base 來讓檢查過關。
 檢查後若新增 commit、合併或改寫歷史，推送前必須重跑。
 
+## pre-push 對公開貢獻的限制
+
+公開的 contrib fork 也會被新 hook 拒絕，即使 `contrib-check` 全綠；本次沒有新增公開貢獻豁免。
+到這裡先停止，與使用者討論回報方式，優先用已去識別化的 issue；不要把下面的歷史參考流程整段執行。
+**agent 不得自行加 `--no-verify`、改 hooksPath 或停用 hook** 來開 PR。
+刻意公開引擎分支需要人另行決定操作安排，不是「測試通過」就自動獲准。
+
 ## 為什麼要另外 fork
 
 使用者自己的私有 repo 是 `gh repo create` 開的，**跟模板沒有 fork 關係**，
@@ -99,11 +106,10 @@ git cherry-pick <commit>
 npm run contrib-check
 npm test
 
-# 4. 推到那個公開的 fork，不是推到 upstream
-git push contrib contrib-<主題>
-
-# 5. 開 PR
-gh pr create -R wangch15/travel-planner --head <他的帳號>:contrib-<主題>
+# 4. 到此停止：pre-push 會拒絕這個公開 fork，先向使用者說明並討論。
+# 下列只保留作歷史參考，不是 agent 可以自動執行的步驟：
+# git push contrib contrib-<主題>
+# gh pr create -R wangch15/travel-planner --head <他的帳號>:contrib-<主題>
 ```
 
 `.github/PULL_REQUEST_TEMPLATE.md` 會問你四件事，照實填。

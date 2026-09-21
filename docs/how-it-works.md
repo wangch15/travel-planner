@@ -76,7 +76,7 @@ A 和 B 的 `main` 共用 clone 那一刻之前的全部歷史，之後各走各
 ```
 
 **從這裡開始行程級指令都要帶 slug**（`npm run check -- norway-2028`）。
-Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`test` 不帶行程 slug；
+Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`prepare`、`test` 不帶行程 slug；
 `contrib-check` 可選的參數是 Git 比較基準。
 帶錯的話最糟是 `ship` 把另一趟的線上網站覆蓋掉——`npm run trips` 就是拿來
 先看一眼有哪些行程的。
@@ -113,6 +113,11 @@ Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`
 
 **「要私有」跟「有備份」不是互斥的，是同一個設計的兩面。**
 
+另外，npm install 的 prepare 會將本機 core.hooksPath 指向被追蹤的 `.githooks`。
+pre-push 依 Git 提供的實際目的地 URL 做最後查核，不論是否改到行程檔；也會擋公開 contrib fork。
+原本 stage-backup 規則保留作第一道。hook 可被 `--no-verify` 繞過，未安裝或不執行 Git hooks 的工具也不受保護；
+它不是持續監控，不能撤回已公開的資料。
+
 ## 引擎更新怎麼流過去
 
 **作者 push 不動任何人，只能等他們來拿。**
@@ -136,7 +141,7 @@ git merge upstream/main   →   npm install   →   （需要的話）npm run mi
 
 | | 路徑 | 誰維護 |
 |---|---|---|
-| 引擎 | `src/`、`scripts/`、`tools/`、`.ai/`、`docs/`、`public/`、`package.json` | 模板作者 |
+| 引擎 | `src/`、`scripts/`、`tools/`、`.ai/`、`.githooks/`、`docs/`、`public/`、`package.json` | 模板作者 |
 | 內容 | `trips/<slug>/` 底下全部 | 行程擁有者 |
 | 產物 | `dist/` | 誰都不維護，整個 gitignore |
 
