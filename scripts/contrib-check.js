@@ -5,7 +5,7 @@
 // fork 改成私有）。所以推上去的分支裡只要夾帶一個 trips/ 底下的檔案，
 // 使用者的行程、訂房確認碼與私人筆記就公開了，而且 git 歷史刪不掉。
 //
-// 這個指令就是那道閘門：比對分支與 base，只要有非 _example 的 trips/ 改動就擋。
+// 檢查 base..HEAD 的全部新增歷史，不只最後 diff；已刪除的私人檔案仍會隨 Git 推送。
 const { execFileSync } = require('node:child_process');
 const { ROOT } = require('./lib/paths.js');
 
@@ -48,14 +48,14 @@ function renderVerdict({ blocked, engine }) {
   }
   if (!engine.length) {
     return [
-      '這個分支跟 base 沒有差異，沒有東西可以提。',
+      '這個分支相對 base 沒有新增的檔案歷史，沒有東西可以提。',
       '',
       '只是想提建議或回報問題的話開 issue 就好，不用 PR：',
       '  gh issue create -R wangch15/travel-planner',
     ].join('\n');
   }
   return [
-    `✓ 通過，可以開 PR。動到的引擎檔案共 ${engine.length} 個：`,
+    `✓ 本機路徑歷史檢查通過。新增歷史涉及的引擎檔案共 ${engine.length} 個：`,
     '',
     ...engine.map((p) => `  ${p}`),
     '',
@@ -67,10 +67,15 @@ function renderVerdict({ blocked, engine }) {
 }
 
 function changedPaths(base) {
-  const out = execFileSync('git', ['diff', '--name-only', `${base}...HEAD`], {
-    cwd: ROOT, encoding: 'utf8',
-  });
-  return out.split('\n').map((s) => s.trim()).filter(Boolean);
+  // 兩點：HEAD 可達而 base 不可達的 commits，包含合併進來的側支。
+  // -m：merge 對每個 parent 比較，包含只在解衝突時加入的檔案。
+  // --no-renames：改名視為刪除 + 新增，兩端路徑都要查。
+  // -z：保留非 ASCII、空白與換行路徑，避免 Git quoting 隱藏 trips/ 前綴。
+  const out = execFileSync('git', [
+    'log', '--format=', '--name-only', '-z', '--no-renames', '-m', '--root',
+    '--end-of-options', `${base}..HEAD`, '--',
+  ], { cwd: ROOT, encoding: 'utf8' });
+  return [...new Set(out.split('\0').filter(Boolean))].sort();
 }
 
 module.exports = { classifyPaths, renderVerdict, changedPaths, BLOCKED };
@@ -78,7 +83,9 @@ module.exports = { classifyPaths, renderVerdict, changedPaths, BLOCKED };
 if (require.main === module) {
   const base = process.argv[2] || DEFAULT_BASE;
   try {
-    console.log(renderVerdict(classifyPaths(changedPaths(base))));
+    const verdict = classifyPaths(changedPaths(base));
+    console.log(renderVerdict(verdict));
+    if (verdict.blocked.length) process.exitCode = 1;
   } catch (e) {
     console.log(`比不出差異（base：${base}）：${e.message}`);
     console.log('\nupstream 沒接好的話見 tp-setup 第 3 步，或自己指定 base：');

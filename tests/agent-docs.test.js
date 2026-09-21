@@ -158,6 +158,16 @@ test('回饋管道：PR 模板在，而且擋得住夾帶的行程資料', () =>
   assert.ok(rule.includes('npm run contrib-check'), '規則要指向那道閘門');
 });
 
+test('contrib-check 的文件承諾限於本機完整新增歷史的路徑檢查', () => {
+  const rule = read('.ai/rules/contributing-upstream.md');
+  assert.match(rule, /base\.\.HEAD/);
+  for (const requirement of ['新增後刪除', '改名', '合併', '非零退出碼', '停止', '不檢查檔案內容']) {
+    assert.ok(rule.includes(requirement), `貢獻閘門文件缺少：${requirement}`);
+  }
+  assert.match(rule, /fork → push → PR.*未.*端到端/);
+  assert.ok(!rule.includes('目前只檢查最終差異'), '修復後不能仍把舊行為當成現況');
+});
+
 test('多趟行程時不准猜是哪一趟', () => {
   const r = read('.ai/rules/which-trip.md');
   assert.ok(/不要猜|問他/.test(r), '要明講不能猜');

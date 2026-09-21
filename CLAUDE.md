@@ -247,8 +247,15 @@ gh issue create -R wangch15/travel-planner
 npm run contrib-check
 ```
 
-它會比對分支與 `upstream/main`，只要有非 `_example` 的 `trips/` 改動就擋下來。
+它檢查 `base..HEAD` 的完整新增歷史（base 預設為 `upstream/main`），不是最終 diff。
+新增後刪除、改名／搬移，以及合併進來的側支與 merge commit 都會檢查。
+只要歷史中有非 `_example` 的 `trips/`、`dist/` 或 `.cache/` 禁止路徑，就以**非零退出碼**拒絕；
+讀不到比較基準也拒絕。檢查或測試失敗就**停止**，不得繼續 push。
 `trips/_example` 是模板附的範例，屬於引擎，可以改。
+
+**這是路徑檢查，不檢查檔案內容。** 放在引擎檔、commit 訊息或 PR 文字中的私人資訊，
+仍須人工審查；也不要換成包含私人歷史的 base 來讓檢查過關。
+檢查後若新增 commit、合併或改寫歷史，推送前必須重跑。
 
 ## 為什麼要另外 fork
 
@@ -263,6 +270,9 @@ git remote add contrib https://github.com/<他的帳號>/travel-planner-contrib.
 那個 fork 是公開的，但它**只會收到乾淨的引擎分支**，不會收到他的 `main`。
 
 ## 完整流程
+
+**驗證範圍：本機歷史檢查有回歸測試；`--fork-name` 的 fork → push → PR 路徑尚未做過端到端驗證。**
+下面是預定操作流程，不代表遠端權限、fork 命名與 PR 建立已實測可用。
 
 ```
 # 1. 從上游開一條乾淨的分支——不要從他自己的 main 開
