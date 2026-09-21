@@ -1,41 +1,31 @@
 #!/usr/bin/env node
-// build 後部署：node scripts/ship.js <slug>
-const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+// build 後部署；遠端查核與成功紀錄見 deployment-state.js。
 const { resolveSlug, listTrips } = require('./lib/paths.js');
 const { loadTrip } = require('./lib/load-trip.js');
 const { buildTrip } = require('./build.js');
 const { findConflict, conflictMessage } = require('./lib/deploy-names.js');
+const { deployBuiltTrip } = require('./lib/deployment-state.js');
 
-const slug = resolveSlug(process.argv.slice(2));
-
-// check 擋過一次了，但它繞得過去（有人直接跑 ship）。這是最後一道，而且是
-// 唯一一道站在「真的要覆蓋線上內容」之前的閘門。
-const conflict = findConflict(slug);
-if (conflict) {
-  console.error(`✗ ${conflictMessage(slug, conflict.name, conflict.others)}`);
-  process.exit(1);
+// options.runWrangler 可替換全部外部呼叫；匯入本檔不會執行或部署。
+function main(argv = process.argv.slice(2), options = {}) {
+  const log = options.log || console.log;
+  const error = options.error || console.error;
+  try {
+    const slug = resolveSlug(argv);
+    // 保留 repo 內撞名的最後一道防線，遠端查核之前就拒絕。
+    const conflict = findConflict(slug);
+    if (conflict) throw new Error(conflictMessage(slug, conflict.name, conflict.others));
+    const { config } = loadTrip(slug);
+    const { outDir } = buildTrip(slug);
+    const others = listTrips().filter((s) => s !== slug);
+    if (others.length) log(`這份 repo 還有其他行程沒有被動到：${others.join('、')}`);
+    deployBuiltTrip({ slug, config, outDir }, { ...options, log });
+    return 0;
+  } catch (e) {
+    error('✗ ' + e.message);
+    return 1;
+  }
 }
 
-const { config } = loadTrip(slug);
-const { outDir } = buildTrip(slug);
-const target = (config.deploy && config.deploy.target) || 'workers';
-const args = target === 'pages'
-  ? ['pages', 'deploy', path.join(outDir, 'site'), '--project-name', config.deploy.name]
-  : ['deploy', '--config', path.join(outDir, 'wrangler.json')];
-
-// 部署會直接覆蓋掉 deploy.name 對應的線上網站。有多趟行程時，slug 帶錯的代價是
-// 另一趟的網址被換掉而且不會有任何警告，所以這裡把要動的東西攤開來講。
-const url = target === 'pages'
-  ? `${config.deploy.name}.pages.dev`
-  : `${config.deploy.name}.<你的帳號>.workers.dev`;
-console.log(`即將部署：${slug}${config.title ? `（${config.title}）` : ''}`);
-console.log(`目標網址：${url}　—— 會覆蓋這個網址上現有的內容`);
-const others = listTrips().filter((s) => s !== slug);
-if (others.length) console.log(`這份 repo 還有其他行程沒有被動到：${others.join('、')}`);
-console.log(`wrangler ${args.join(' ')}\n`);
-const r = spawnSync('npx', ['wrangler', ...args], { stdio: 'inherit' });
-if (r.status !== 0) {
-  console.error('✗ 部署失敗。第一次部署要先跑 npx wrangler login；新帳號會被問要不要註冊 workers.dev 子網域，選是。');
-  process.exit(r.status || 1);
-}
+module.exports = { main };
+if (require.main === module) process.exitCode = main();

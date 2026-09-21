@@ -192,9 +192,18 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 | `npm run sync:agent-assets` | 改過 `.ai/` 之後，重新產生 `AGENTS.md`、`CLAUDE.md` 與工具用 skills |
 | `npm test` | 引擎自己的測試 |
 
+## 部署檢查與本機紀錄
+
 `ship` 第一次跑之前要先 `npx wrangler login`（會開瀏覽器授權）。
 每個行程的 `deploy.name` 必須不一樣，否則後部署的會把先部署的線上內容換掉而網址不變。
 `check` 與 `ship` 兩道都會擋（跨行程比對，含內建的 `_example`）。
+
+Workers 的 `ship` 另外會唯讀查核帳號與遠端部署：同名 Worker 已存在、卻不符合這一趟
+上次成功的本機紀錄時會停止，防止同帳號跨 repo 覆蓋。未登入、網路或權限問題也停止。
+成功後，實際網址與版本存在 `.local/deployments/<slug>.json`（gitignore，不進 git 或網站，不存登入憑證）。
+首次部署前網址尚未知；後續顯示上次成功的真實網址，不猜帳號子網域。
+換電腦、紀錄遺失或升級前的既有網站，會因沒有紀錄而被擋；目前沒有自動認領或 force 功能。
+**Pages 不提供這道 Worker 遠端防撞保護**，只保存成功網址。這也不是防止同時部署的遠端原子鎖。
 
 ## 這個專案是怎麼運作的
 
