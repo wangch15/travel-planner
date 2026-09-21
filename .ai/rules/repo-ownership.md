@@ -22,6 +22,14 @@ git remote -v
 
 `upstream` 沒接好，以後就拿不到引擎更新；照下面「取得專案的正確方式」補上。
 
+## 每次備份 push 前都要重新查
+
+開工時檢查過不算下一次推送的許可。**每次 push 前**都要依 `.ai/rules/stage-backup.md`
+重新核對 origin 的實際 push URL，並對那個 repo 執行 `gh repo view --json visibility` 查核
+（顯式指定 origin 的 owner/repo，不能誤查 upstream）。
+只有本次成功得到 PRIVATE 才能 push；查不到、gh 未登入、非私有或離線都停下來，不推送。
+回報「目前只有本機備份，尚未異地備份」，直到推送與遠端 commit 核對都成功才算階段完成。
+
 ### `origin` 是 `wangch15/travel-planner` 的時候
 
 這有兩種可能，**先分清楚是哪一種再動手**：
@@ -43,10 +51,12 @@ git remote -v
 git clone https://github.com/wangch15/travel-planner.git
 cd travel-planner
 git remote rename origin upstream
-gh repo create travel-planner --private --source=. --remote=origin --push
+gh repo create travel-planner --private --source=. --remote=origin
 ```
 
-跑完驗一次 `git remote -v`，兩個 remote 都對才往下走。
+建立 repo 與推送分開，不用 create 的隱含 push。跑完驗一次 `git remote -v`，
+再依 `.ai/rules/stage-backup.md` 重新核對真正的 origin 私有狀態，通過才推送並核對遠端 commit。
+任一步失敗就停止，不能把建立 repo 當成已備份；成功才往下走。
 
 **不要用 fork。** 公開 repo 的 fork **一定是公開的**，GitHub 不允許把它改成私有。
 用 fork 等於把使用者的行程、`docs/` 裡的訂房資訊與私人筆記放上公開的 GitHub。

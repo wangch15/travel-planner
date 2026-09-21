@@ -177,6 +177,12 @@ npm run new -- <slug> --from <上一趟的 slug>
 **不要把這趟的行程內容寫進去**——它記的是「這群人是什麼樣的人」，
 不是「這次去了哪裡」。
 
+## 階段保存（完成條件）
+
+閘門一通過、brief／plan 與 `_profile.md` 更新後，依 `.ai/rules/stage-backup.md` 保存本機 checkpoint 並備份。
+每次 push 前重新確認 origin 是使用者自己的私有 repo；備份核對成功，才回報本階段完成並轉 `tp-research`。
+失敗或離線就停下來，明說「目前只有本機備份，尚未異地備份」，不要直接當成已完成。
+
 ## 完成後
 
-`plan.md` 確認了，接著用 `tp-research` 開始查核並填資料檔。
+草案確認與階段備份都成功了，接著用 `tp-research` 開始查核並填資料檔。

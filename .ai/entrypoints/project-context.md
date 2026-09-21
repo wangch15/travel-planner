@@ -79,6 +79,7 @@ Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`
 不管在做什麼都適用，先讀過再動手：
 
 - `.ai/rules/repo-ownership.md` —— 在自己的私有 repo 上工作，永遠不 push 到模板
+- `.ai/rules/stage-backup.md` —— 階段完成前保存；每次 push 前重新驗 origin 私有，失敗停止且不得說完成
 - `.ai/rules/engine-content-boundary.md` —— 哪些檔案能改、哪些不能
 - `.ai/rules/data-schema-reference.md` —— 改資料前先讀 `docs/schema/`
 - `.ai/rules/research-integrity.md` —— 每個事實附來源與查核日期，查不到就標待確認

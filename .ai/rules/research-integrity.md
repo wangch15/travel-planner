@@ -38,6 +38,7 @@
 ## 完成的定義
 
 1. `npm run check -- <slug>` 通過，而且
-2. `trips/<slug>/docs/sources.md` 列得出每一條資料的來源與查核日期。
+2. `trips/<slug>/docs/sources.md` 列得出每一條資料的來源與查核日期，而且
+3. 依 `.ai/rules/stage-backup.md` 保存成果並驗證異地備份成功。
 
-兩個都達成才算研究做完。
+三個都達成才算研究階段完成；資料查核通過不能代替備份。

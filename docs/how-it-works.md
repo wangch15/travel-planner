@@ -108,7 +108,8 @@ Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`
 1. `docs/` 裡有訂房確認碼、門鎖密碼、飲食限制
 2. 那些東西**會進 git**
 3. 所以那個 repo **必須是私有的**（為什麼不能用 fork、為什麼要 `--private`）
-4. 而因為它進 git，所以它**有異地備份**——換一台電腦也還在
+4. commit 只保存在本機；必須 push 到已確認私有的 origin，並核對遠端 commit 成功，才**有異地備份**。
+   每次 push 前都要重新確認 origin 私有，不沿用開工時的結果；流程見 `.ai/rules/stage-backup.md`。
 
 **「要私有」跟「有備份」不是互斥的，是同一個設計的兩面。**
 

@@ -47,9 +47,14 @@ description: 把確認過的逐日草案查核成五個資料檔。閘門一通�
 
 ## 完成的定義
 
-兩個都要達成：
+三個都要達成：
 
 1. `npm run check -- <slug>` 通過
 2. `trips/<slug>/docs/sources.md` 列得出每一條資料的來源與查核日期
+3. 下節的階段保存與異地備份成功
 
-然後接著做 `tp-basemap` 與 `tp-photos`。
+## 階段保存（完成條件）
+
+研究資料查核與來源紀錄通過後，依 `.ai/rules/stage-backup.md` 保存資料檔及私人查核筆記。
+每次 push 前重新確認 origin 是使用者自己的私有 repo；備份核對成功，才回報研究階段完成並接 `tp-basemap`／`tp-photos`。
+失敗或離線就停下來，明說「目前只有本機備份，尚未異地備份」，不能說研究階段已完成。

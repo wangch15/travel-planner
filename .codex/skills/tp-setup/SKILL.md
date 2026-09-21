@@ -61,13 +61,13 @@ wrangler 不用另外裝，它是專案的 devDependency，`npm install` 就有�
 ### 3. 取得專案
 
 模板是公開的，**使用者的複本必須是私有的**——他的行程、`docs/` 裡的訂房資訊與
-私人筆記都會 commit 進去。四行指令，你幫他跑完：
+私人筆記都會 commit 進去。先建立 repo，不在 create 時隱含推送：
 
 ```
 git clone https://github.com/wangch15/travel-planner.git
 cd travel-planner
 git remote rename origin upstream
-gh repo create travel-planner --private --source=. --remote=origin --push
+gh repo create travel-planner --private --source=. --remote=origin
 ```
 
 跑完一定要驗：
@@ -79,7 +79,10 @@ git remote -v
 - `origin` 是**使用者自己的** `<他的帳號>/travel-planner`，而且是**私有**的
 - `upstream` 是 `wangch15/travel-planner`
 
-兩個都對才往下走。`origin` 還指向 `wangch15` 就是第四行沒跑成功，照
+兩個都對，再依 `.ai/rules/stage-backup.md` 的每次推送檢查：重新查真正 origin 的私有狀態，
+通過才推送目前 HEAD，並核對遠端 commit。沒有新增檔案就不造空 commit。
+失敗或離線明說「目前只有本機備份，尚未異地備份」，不能說 setup 已完成。
+備份成功才往下走。`origin` 還指向 `wangch15` 就是取得私有 repo 沒成功，照
 `.ai/rules/repo-ownership.md` 修好再繼續；`upstream` 沒接好，以後就拿不到引擎更新。
 
 **不要用 `gh repo fork`。** 公開 repo 的 fork 一定是公開的，GitHub 不允許改成私有——
