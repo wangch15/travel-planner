@@ -299,6 +299,7 @@ test('閘門二用影響範圍分層，不是用「改了什麼東西」分類',
   assert.ok(/走不走得通|可行性/.test(ship), '事實更新要有升級判準');
   assert.ok(/最高|升級/.test(ship), '混合改動要採最高層級');
   assert.ok(/不確定/.test(ship), '要有「不確定就當結構性」的退路');
+  assertGateOrder(ship);
 });
 
 test('三處講閘門二範圍的文件不能各講各的', () => {
@@ -308,4 +309,65 @@ test('三處講閘門二範圍的文件不能各講各的', () => {
   assert.ok(!/換一家店這類小修改.*直接 ship/.test(ctx), '進入點還留著舊說法');
   assert.ok(!/小修改（換一家店/.test(readme), 'README 還留著舊說法');
   assert.ok(/影響|走得通|可行性/.test(ctx), '進入點要指向影響範圍的判準');
+  for (const [name, text] of [['入口', ctx], ['README', readme]]) {
+    assert.match(text, /首次[\s\S]*固定第三層[\s\S]*優先/, `${name} 缺例外優先關係`);
+    assert.match(text, /照片[\s\S]*版面[\s\S]*看過/, `${name} 缺照片／版面先看過的動作`);
+    assert.match(text, /未命中[\s\S]*呈現/, `${name} 純呈現不能覆蓋固定例外`);
+  }
+});
+
+function assertGateOrder(ship) {
+  const scope = ship.split('### 閘門二適用範圍')[1].split('## 第一次部署')[0];
+  const fixed = scope.indexOf('#### 固定第三層：優先檢查');
+  const questions = scope.indexOf('#### 依序問這三個問題');
+  assert.ok(fixed >= 0 && fixed < questions, '固定第三層必須先於任何三問返回路徑');
+  const fixedBlock = scope.slice(fixed, questions);
+  assert.match(fixedBlock, /命中.*第三層[\s\S]*人看過才 ship/);
+  assert.match(fixedBlock, /未命中.*才.*三個問題/);
+  const q1 = scope.split('**1. ')[1].split('**2. ')[0];
+  const q2 = scope.split('**2. ')[1].split('**3. ')[0];
+  const q3 = scope.split('**3. ')[1].split('#### ')[0];
+  assert.match(q1, /沒有 → \*\*第一層[\s\S]*check[\s\S]*直接 ship/);
+  assert.match(q2, /可行性沒變[\s\S]*第二層[\s\S]*查核來源[\s\S]*checked/);
+  assert.match(q3, /不確定[\s\S]*第三層[\s\S]*人看過才 ship/);
+  const general = scope.split('#### 兩條總則')[1];
+  assert.match(general, /一次改了好幾樣.*最高.*層/);
+  assert.match(general, /不確定算哪一層.*第三層/);
+}
+
+test('可行性檢查包含從入場到後續銜接，而不是只驗抵達時開門', () => {
+  const ship = read('.ai/skills/tp-ship/SKILL.md');
+  const checks = ship.split('#### 「那天還走不走得通」怎麼判斷')[1].split('#### ')[0];
+  assert.match(checks, /不是完整清單/);
+  assert.match(checks, /最後入場[\s\S]*停留[\s\S]*末班車[\s\S]*後續預約/);
+  assert.match(checks, /任何一條[\s\S]*第三層/);
+});
+
+const gateCases = [
+  ['換照片，沒有改行程文字', '第三層', '查核後 preview，人看過才 ship'],
+  ['只更新票價，沒有命中例外且整天仍可行', '第二層', '查核來源、更新 checked、check 後 ship'],
+  ['抵達仍營業，但已過最後入場', '第三層', '重新安排並 preview，人看過才 ship'],
+  ['改錯字加換照片的混合修改', '第三層', '採最高層級，preview 後人看過才 ship'],
+  ['首次上線，即使只有文字', '第三層', '完整 preview，人看過才 ship'],
+];
+for (const [condition, level, action] of gateCases) {
+  test(`閘門二具體情境：${condition} → ${level}及必要動作`, () => {
+    const ship = read('.ai/skills/tp-ship/SKILL.md');
+    assertGateOrder(ship);
+    const rows = ship.split('\n').filter((line) => line.startsWith('| '))
+      .map((line) => line.split('|').slice(1, -1).map((s) => s.trim()));
+    assert.deepEqual(rows.find((row) => row[0] === condition), [condition, level, action]);
+  });
+}
+
+test('守門測試會抓到固定例外後移、混合最高層刪除及不確定改成直接部署', () => {
+  const ship = read('.ai/skills/tp-ship/SKILL.md');
+  assertGateOrder(ship);
+  const start = ship.indexOf('#### 固定第三層：優先檢查');
+  const end = ship.indexOf('#### 依序問這三個問題', start);
+  const block = ship.slice(start, end);
+  const moved = ship.replace(block, '').replace('#### 兩條總則', block + '#### 兩條總則');
+  assert.throws(() => assertGateOrder(moved), /固定第三層必須先於/);
+  assert.throws(() => assertGateOrder(ship.replace(/.*一次改了好幾樣.*\n/, '')));
+  assert.throws(() => assertGateOrder(ship.replace('不確定算哪一層 → 當第三層', '不確定算哪一層 → 直接 ship')));
 });
