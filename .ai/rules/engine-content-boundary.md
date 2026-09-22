@@ -23,6 +23,31 @@
 - 引擎會讀：`trip.config.json`、五個資料檔、`photos/`、`basemap.json`、兩個插槽（`theme.css`、`extra.js`）
 - 引擎**永遠不讀**：`docs/`（你的筆記）、`.cache/`（快取，gitignore）
 
+## `src/` 裡面也有一條線：`render.js` 與 `app.js`
+
+**要測的邏輯一律放 `render.js`。**
+
+| 檔案 | 是什麼 | 測得到嗎 |
+|---|---|---|
+| `src/util.js`、`src/render.js` | **純函式**：吃資料、回傳 HTML 字串。不碰 DOM、不碰 `window` | ✅ 測試用 `node:vm` 載入它們（見 `tests/helpers/render-ctx.js`） |
+| `src/app.js` | 只接 DOM 與事件：抓元素、綁 listener、把 `render.js` 的輸出塞進頁面 | ❌ **在測試環境跑不起來**，沒有 DOM |
+| `src/styles.css`、`src/index.html` | 外殼 | 只被當文字檢查 |
+
+所以**寫在 `app.js` 裡的判斷邏輯等於沒有測試**。實際踩過：燈箱「沒照片時要不要隱藏圖片區」
+的判斷原本在 `app.js`，所以那個行為完全沒有測試覆蓋——把它抽成 `render.js` 的
+`lightboxSliderHTML(key)` 之後才寫得出測試。
+
+**判準**：那段程式碼只是「把字串塞進某個元素」→ 留在 `app.js`。
+只要涉及**判斷**（要不要顯示、顯示幾個、顯示哪一種）→ 搬進 `render.js` 回傳結構或字串，
+`app.js` 只負責照著做。
+
+### 這條線也是信任邊界
+
+`app.js` 與 build 出來的 HTML 在使用者的瀏覽器裡執行，跟 `trips/<slug>/extra.js` 一樣
+**視為不受信任的程式**——它們碰得到頁面，但碰不到憑證、部署或檔案系統。
+`render.js` 只是產生字串，不執行任何來自行程資料的程式。
+把判斷放在 `render.js` 不只是為了可測，也讓「哪些程式碼需要被信任」這件事界線清楚。
+
 ## 為什麼重要
 
 行程擁有者的複本要能長期 `git merge upstream/main` 拿到引擎更新。

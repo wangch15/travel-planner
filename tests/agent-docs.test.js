@@ -502,3 +502,27 @@ test('有寫入權的人（模板作者、協作者）改引擎的流程要寫�
   assert.ok(/engine-changes/.test(section), '做行程時順手修引擎要記 engine-changes');
   assert.ok(/PR/.test(section) && /review/.test(section), 'PR 的價值是 review，不是權限');
 });
+
+test('引擎更新一律走完整閘門二，不得放寬成「agent 驗過就算」', () => {
+  const update = read('.ai/skills/tp-update/SKILL.md');
+  const i = update.indexOf('引擎更新一定算結構性變更');
+  assert.ok(i > 0, 'tp-update 必須保留「引擎更新一定算結構性變更」');
+  const section = update.slice(i, i + 500);
+  assert.ok(/一定要把網址給使用者|讓他在手機上看過/.test(section), '要明確要求給預覽網址');
+  // 這道閘門不能改成「agent 自己量過沒有可見變化就免了」——那是模型自己給自己許可，
+  // 而桌面 GUI 的信任邊界明文禁止（模型不能改 approved 欄位取得許可）。
+  assert.ok(!/(自己|agent).{0,12}(驗過|量過|確認過).{0,20}(免|不用|可直接)/.test(section),
+    '不得放寬成 agent 自我認證');
+  assert.ok(/不適用|不因/.test(section), '要明講「小修改自檢後直接 ship」那一條不適用');
+});
+
+test('render.js 與 app.js 的分工要寫進邊界規則', () => {
+  const rule = read('.ai/rules/engine-content-boundary.md');
+  const i = rule.indexOf('render.js');
+  assert.ok(i > 0, 'engine-content-boundary 要說明 render.js 與 app.js 的分工');
+  const section = rule.slice(Math.max(0, i - 300), i + 900);
+  assert.ok(/純函式|可測/.test(section), 'render.js 是可測的純函式層');
+  assert.ok(/DOM/.test(section), 'app.js 碰 DOM');
+  assert.ok(/測不到|跑不起來|無法測/.test(section), '要講明 app.js 在測試環境跑不起來');
+  assert.ok(/不可信|不受信任/.test(section), '產出的 HTML 與 app.js 屬於不可信執行環境');
+});
