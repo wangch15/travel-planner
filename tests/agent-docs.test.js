@@ -400,3 +400,28 @@ test('貢獻流程要標明哪一段實測過、哪一段沒有與為什麼', ()
   assert.ok(/parent and fork|同一個帳號|第二個 GitHub 帳號/.test(rule),
     '要寫出作者測不了的原因，否則下一輪還會有人去試');
 });
+
+test('_profile.md 要分清楚「這趟特有」與「永久改變」', () => {
+  const plan = read('.ai/skills/tp-plan/SKILL.md');
+  // 鎖定「寫回 _profile」那一節，避免抓到文件別處不相關的字眼。
+  const start = plan.indexOf('把這趟學到的寫回');
+  assert.ok(start > 0, '找不到「把這趟學到的寫回 _profile.md」那一節');
+  const section = plan.slice(start, plan.indexOf('\n## ', start));
+
+  // 使用者說「這次只有兩個人去」，agent 不該去改共用 profile 的人數——
+  // 那會污染下一趟的前提。這趟特有的條件屬於那趟的 trip.config.json。
+  assert.ok(/這趟特有|只有這趟|這次特有/.test(section), '這一節要講「這趟特有」的情況');
+  assert.ok(/永久|長期/.test(section), '這一節要有「永久改變」的對照');
+  assert.ok(section.includes('trip.config.json'), '要指出這趟特有的條件該寫哪裡');
+  assert.ok(/不要(改|動|寫進)[^\n]*_profile|_profile[^\n]*不要(改|動)/.test(section),
+    '要明講這趟特有的差異不可以寫進 _profile.md');
+});
+
+test('--from 帶過來的是複本，不是跟舊行程連動', () => {
+  const plan = read('.ai/skills/tp-plan/SKILL.md');
+  const start = plan.indexOf('--from` 會帶過來');
+  assert.ok(start > 0, '找不到 --from 說明');
+  const section = plan.slice(start, start + 900);
+  assert.ok(/複本|各自一份|不會連動|不影響(舊|上一趟|前一趟)/.test(section),
+    '要講明改新行程的設定不會動到舊行程');
+});
