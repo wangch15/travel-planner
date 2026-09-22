@@ -226,6 +226,18 @@ function parkingHTML(p) {
     + '<dt>導航</dt><dd><a href="' + esc(url) + '" target="_blank" rel="noopener">在 Google Maps 開啟停車場' + ico('i-ext') + '</a></dd>'
     + '</dl>';
 }
+// 燈箱上方的圖片區。沒照片就整個隱藏——原本只有餐廳會隱藏，其他地點沒照片時
+// 圖片區仍佔 46dvh 只放一行字。餐廳那條特例證明作者早就認定那樣不好，只是沒做全。
+// 想看照片的人往下捲就有「參考資料」列著官網，不需要在這裡再提示一次。
+function lightboxSliderHTML(key) {
+  const p = PLACES[key];
+  const photos = PHOTOS[key] || [];
+  const track = photos.map((ph, i) => '<figure><img src="' + esc(ph.src) + '" alt="' + esc(p ? p.name : '') + '" loading="' + (i ? 'lazy' : 'eager') + '" decoding="async">'
+    + '<figcaption>' + esc(ph.credit) + (ph.page ? '・<a href="' + esc(ph.page) + '" target="_blank" rel="noopener">' + (ph.commons ? 'Wikimedia Commons' : '來源') + '</a>' : '') + '</figcaption></figure>').join('');
+  const dots = photos.length > 1 ? photos.map((_, i) => '<i' + (i ? '' : ' class="on"') + '></i>').join('') : '';
+  return { hidden: photos.length === 0, track, dots, navHidden: photos.length < 2 };
+}
+
 function detailBodyHTML(key) {
   const p = PLACES[key], d = DETAILS[key];
   const role = roleOf(key);

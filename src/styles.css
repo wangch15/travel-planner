@@ -349,7 +349,6 @@ dialog.lb[open]::backdrop{animation:lbfade .34s ease}
 .lb-dots{position:absolute;bottom:38px;left:0;right:0;display:flex;justify-content:center;gap:6px;pointer-events:none}
 .lb-dots i{width:6px;height:6px;border-radius:50%;background:#FFF3E2;opacity:.45;transition:opacity .2s,transform .2s;box-shadow:0 0 2px rgba(0,0,0,.4)}
 .lb-dots i.on{opacity:1;transform:scale(1.35)}
-.lb-nophoto{height:100%;display:grid;place-items:center;color:var(--ink-3);font-size:12.5px;text-align:center;padding:20px;line-height:1.7}
 .lb-body{overflow-y:auto;padding:18px 20px 26px;overscroll-behavior:contain;flex:1 1 auto}
 .lb-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding-right:36px}
 .lb-head h2{font-size:22px;letter-spacing:-.005em}

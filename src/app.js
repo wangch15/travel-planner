@@ -373,16 +373,11 @@ function openDetail(key, opener) {
   const p = PLACES[key], d = DETAILS[key];
   if (!p || !d) return;
   lbOpener = opener || document.activeElement;
-  const photos = PHOTOS[key] || [];
-  // 沒有餐廳照片時直接呈現菜單與訂位資訊，不佔半個螢幕留白。
-  lbTrack.closest('.lb-slider').hidden = !!d.dining && photos.length === 0;
-
-  lbTrack.innerHTML = photos.length
-    ? photos.map((ph, i) => '<figure><img src="' + esc(ph.src) + '" alt="' + esc(p.name) + '" loading="' + (i ? 'lazy' : 'eager') + '" decoding="async">'
-        + '<figcaption>' + esc(ph.credit) + (ph.page ? '・<a href="' + esc(ph.page) + '" target="_blank" rel="noopener">' + (ph.commons ? 'Wikimedia Commons' : '來源') + '</a>' : '') + '</figcaption></figure>').join('')
-    : '<div class="lb-nophoto">這個地點沒有可用的免費授權照片。<br>參考連結裡的官方網站有相簿。</div>';
-  lbDots.innerHTML = photos.length > 1 ? photos.map((_, i) => '<i' + (i ? '' : ' class="on"') + '></i>').join('') : '';
-  lbPrev.hidden = lbNext.hidden = photos.length < 2;
+  const slider = lightboxSliderHTML(key);
+  lbTrack.closest('.lb-slider').hidden = slider.hidden;
+  lbTrack.innerHTML = slider.track;
+  lbDots.innerHTML = slider.dots;
+  lbPrev.hidden = lbNext.hidden = slider.navHidden;
 
   lbBody.innerHTML = detailBodyHTML(key);
 

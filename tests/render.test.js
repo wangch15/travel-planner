@@ -123,3 +123,39 @@ test('地圖清單只有一顆按鈕，沒有多餘的說明文字', () => {
   assert.ok(!html.includes('個地點，含餐食與備案'), '不該再有地點數與登入提醒');
   assert.ok(html.includes('aria-label="在 Google Maps 開啟 D1 私人清單（新分頁）"'), 'aria-label 已足夠說明用途');
 });
+
+test('燈箱：沒照片就整個隱藏圖片區，不佔半個螢幕放一行字', () => {
+  // 原本只有餐廳沒照片會隱藏；其他地點沒照片時圖片區仍佔 46dvh，只放
+  // 「這個地點沒有可用的免費授權照片」一行字。餐廳那條特例證明作者早就認定
+  // 那樣不好，只是沒做全。
+  const trip = makeTrip();
+  const key = Object.keys(trip.PLACES).find((k) => !(trip.PHOTOS[k] || []).length && !trip.DETAILS[k]?.dining);
+  assert.ok(key, 'fixture 要有一個非餐廳、沒照片的地點');
+  const ctx = ctxFor(trip);
+  assert.equal(typeof ctx.lightboxSliderHTML, 'function', 'render.js 要提供 lightboxSliderHTML');
+  const r = ctx.lightboxSliderHTML(key);
+  assert.equal(r.hidden, true, '沒照片的地點圖片區要隱藏');
+  assert.ok(!/lb-nophoto/.test(r.track), '不再產生那段「沒有可用照片」的佔位');
+});
+
+test('燈箱：有照片時照常產生 figure、dots 與前後鍵狀態', () => {
+  const trip = makeTrip();
+  const key = Object.keys(trip.PLACES)[0];
+  trip.PHOTOS[key] = [
+    { src: 'img/a-1.jpg', credit: 'Someone・CC BY-SA 4.0', page: 'https://example.invalid/a', commons: true },
+    { src: 'img/a-2.jpg', credit: '© 官方網站' },
+  ];
+  const r = ctxFor(trip).lightboxSliderHTML(key);
+  assert.equal(r.hidden, false);
+  const n = trip.PHOTOS[key].length;
+  assert.equal((r.track.match(/<figure>/g) || []).length, n, 'figure 數量要等於照片數');
+  assert.equal((r.dots.match(/<i/g) || []).length, n > 1 ? n : 0, '只有多張才有 dots');
+  assert.equal(r.navHidden, n < 2, '只有多張才顯示前後鍵');
+});
+
+test('燈箱：餐廳沒照片的既有行為維持隱藏', () => {
+  const trip = makeTrip();
+  const key = Object.keys(trip.DETAILS).find((k) => trip.DETAILS[k]?.dining && !(trip.PHOTOS[k] || []).length);
+  if (!key) return; // fixture 沒有餐廳就略過，主行為由上一個測試蓋住
+  assert.equal(ctxFor(trip).lightboxSliderHTML(key).hidden, true);
+});

@@ -4,7 +4,8 @@ const vm = require('node:vm');
 // 不會變成 context 屬性，且分次 runInContext 彼此看不到對方的 const，所以這裡把所有
 // 原始碼接成一段執行，最後再把要用的名字逐一掛上 globalThis（沒宣告的用 try 略過）。
 const EXPORTS = ['esc', 'ico', 'md', 'money', 'KIND', 'll', 'mapsUrl', 'routeUrl',
-  'legHTML', 'stopHTML', 'mealsHTML', 'dayHTML', 'overviewHTML', 'roleOf', 'detailBodyHTML', 'extraHTML', 'stopParkingHTML'];
+  'legHTML', 'stopHTML', 'mealsHTML', 'dayHTML', 'overviewHTML', 'roleOf', 'detailBodyHTML', 'extraHTML', 'stopParkingHTML',
+  'lightboxSliderHTML'];
 
 function renderContext(trip, sources) {
   const ctx = {
