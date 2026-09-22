@@ -79,6 +79,42 @@ npm run preview -- <slug> --lan
 每次 push 前重新確認 origin 是使用者自己的私有 repo；備份核對成功，才回報更新階段完成。
 失敗或離線就停下來，明說「目前只有本機備份，尚未異地備份」；不要因網站已更新就略過備份，也不要為補備份再部署。
 
+## `refusing to merge unrelated histories`
+
+`git merge upstream/main` 回這個錯的話，**那份複本跟模板沒有共同歷史**——
+通常是當初用「Use this template」建的，或是把檔案複製進一個新開的 repo。
+這種情況 merge 永遠不會成功，**不要加 `--allow-unrelated-histories` 硬上**：
+實測一份 1.0.0 的複本這樣做會產生 69 個衝突，其中 68 個是引擎與同步產物。
+
+**改走「換引擎」而不是「合併引擎」**，這件事之所以安全，正是因為引擎／內容
+邊界讓行程資料是一個自我完備的資料夾（同一次實測中 `trips/<slug>/` 衝突數為 0）：
+
+```
+# 1. 在別的地方 clone 一份乾淨的最新引擎
+git clone https://github.com/wangch15/travel-planner.git <新資料夾>
+cd <新資料夾>
+git remote rename origin upstream
+
+# 2. 把行程整個搬過來（跨行程的 _profile.md 如果有也要搬）
+cp -R <舊複本>/trips/<slug> trips/
+cp <舊複本>/trips/_profile.md trips/     # 舊版可能沒有這個檔案
+
+# 3. 接上他自己的私有 repo
+gh repo create <名稱> --private --source=. --remote=origin
+
+# 4. 驗證
+npm install
+npm test
+npm run check -- <slug>
+```
+
+`schemaVersion` 沒變的話不需要 `migrate`；變了就照上面第 4 步的流程跑。
+
+**舊的那份 repo 不要刪也不要改**——確認新的那份 `check` 通過、preview 看起來
+對之前，它是唯一的退路。新舊歷史無關，所以推到同一個遠端會被 GitHub 擋
+（non-fast-forward）；**這種情況要開一個新的私有 repo，不要 force push 蓋掉
+舊歷史**，那會讓退路消失。
+
 ## 衝突策略
 
 **發現衝突先停止更新流程**，不要接著 install、migrate 或 ship，也不要按路徑整份選邊覆蓋。
