@@ -463,3 +463,18 @@ test('多帳號時要提醒 gh auth switch 不會換 git 憑證', () => {
   assert.ok(/auth setup-git/.test(setup),
     'gh auth switch 不換 git 憑證，push 會回 Repository not found');
 });
+
+test('下線要人點頭，而且要在第一次部署時就告知可以關', () => {
+  const ship = read('.ai/skills/tp-ship/SKILL.md');
+  // 錨定標題，不要抓到前面那句「理由見下面『旅程結束之後』」的引用。
+  const i = ship.indexOf('## 旅程結束之後');
+  assert.ok(i > 0, 'tp-ship 缺「旅程結束之後」那一節');
+  const section = ship.slice(i, ship.indexOf('\n## ', i));
+  assert.ok(/不得自行決定|要人明確點頭/.test(section), 'agent 不得自行下線');
+  assert.ok(/trips\//.test(section) && /不會動|不會被刪/.test(section), '要講明行程資料不動');
+  assert.ok(/查核編號不是同意證明|不代表人已同意/.test(section));
+  // 第一次部署就要講，不要等使用者自己想起來
+  const first = ship.slice(ship.indexOf('## 第一次部署'), i);
+  assert.ok(/可以關|下線/.test(first), '第一次部署時就要告知這件事可以關掉');
+  assert.ok(read('.ai/rules/privacy.md').includes('unship'), 'privacy 要提到可以下線');
+});

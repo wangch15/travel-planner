@@ -116,6 +116,17 @@
   切換後 push 會回 `Repository not found`，要補跑 `gh auth setup-git`。
 - **`stage-backup.md` 講明 force 是規則層的禁止，`pre-push` hook 不會擋它**，
   免得有人因為 hook 放行就以為 force 是允許的。
+- **新增 `npm run unship -- <slug>`：旅程結束後把公開網站下線。** 原本完全沒有
+  這條路——`grep` 遍整個 repo 找不到任何下線、刪除網站或取消部署的說明。
+  那個網址拿到的人就打得開，內容是每天住哪、幾號到幾號不在家；旅程結束之後
+  資料的價值歸零但風險不變，而沒有人告訴使用者這件事可以關、也沒說怎麼關。
+  **只移除 Cloudflare 上那份公開 HTML**，`trips/<slug>/` 的資料、照片、`docs/`
+  筆記與私有 repo 完全不動，之後 `ship` 就能重新上線。兩段式確認（同
+  `adopt-deploy`）：第一段唯讀，印出即將失效的網址與不會被刪的東西；agent
+  不得自行決定，要人明確點頭。沒有本機部署紀錄會被擋（先 `adopt-deploy`），
+  `pages` 目標不支援。**刪完會再查一次遠端**確認 Worker 真的不存在——
+  wrangler 的退出碼不夠可信；還在就誠實回報沒刪成功並保留紀錄，不謊報下線。
+  `tp-ship` 也要求在**第一次部署時就告知這件事可以關**，不要等使用者想起來。
 - 刪除 `HANDOFF.md`：五個實作階段都已完成，內容已與現況不符且會誤導 agent。
 - 資料需要 migrate：否。
 

@@ -13,6 +13,7 @@
     "preview": "node scripts/preview.js",
     "ship": "node scripts/ship.js",
     "adopt-deploy": "node scripts/adopt-deploy.js",
+    "unship": "node scripts/unship.js",
     "new": "node scripts/new-trip.js",
     "trips": "node scripts/list-trips.js",
     "update-check": "node scripts/update-check.js",
