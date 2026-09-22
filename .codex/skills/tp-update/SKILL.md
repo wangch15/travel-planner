@@ -99,8 +99,10 @@ git remote rename origin upstream
 cp -R <舊複本>/trips/<slug> trips/
 cp <舊複本>/trips/_profile.md trips/     # 舊版可能沒有這個檔案
 
-# 3. 接上他自己的私有 repo
+# 3. 接上他自己的私有 repo，並把分支追蹤改到 origin
+#    （否則 main 會追蹤 upstream——公開模板——GUI 按 Push 就推錯地方）
 gh repo create <名稱> --private --source=. --remote=origin
+git branch -u origin/main main
 
 # 4. 驗證
 npm install

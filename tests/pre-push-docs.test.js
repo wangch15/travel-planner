@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { ROOT } = require('../scripts/lib/paths.js');
 const { readDoc, section, row } = require('./helpers/doc-contracts.js');
 
 function contract(doc) {
@@ -66,4 +69,16 @@ test('變異：未知目的地放行、缺範圍放行、快取 PRIVATE 都不�
   assert.throws(() => contract(good.replace('拒絕，說明原因及下一步', '直接放行')));
   assert.throws(() => contract(good.replace('| 不快取許可 |', '| 永久放行 |')));
   assert.throws(() => contract(good.replace('拒絕，不把掃不到當成乾淨', '沒有範圍也放行')));
+});
+
+test('推向模板被擋時要先指出最可能的原因：推錯 remote', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'scripts/lib/pre-push.js'), 'utf8');
+  assert.ok(/origin.*upstream|upstream.*origin/.test(src),
+    '訊息要提示確認推的是 origin 而不是 upstream——那是最常見的原因');
+});
+
+test('查核失敗的訊息要提多帳號要切 gh active', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'scripts/lib/pre-push.js'), 'utf8');
+  assert.ok(/auth switch/.test(src),
+    '多帳號時 gh active 不是 repo 擁有者，查核會失敗而訊息只說認證問題');
 });

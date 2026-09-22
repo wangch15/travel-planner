@@ -478,3 +478,15 @@ test('下線要人點頭，而且要在第一次部署時就告知可以關', ()
   assert.ok(/可以關|下線/.test(first), '第一次部署時就要告知這件事可以關掉');
   assert.ok(read('.ai/rules/privacy.md').includes('unship'), 'privacy 要提到可以下線');
 });
+
+test('取得專案之後要把分支追蹤改到 origin，不能留在公開模板', () => {
+  // clone 模板 + remote rename origin upstream 之後，main 追蹤的是 upstream/main。
+  // 用 CLI 明確指定 remote 的人不會發現；用 GUI 的人一按 Push 就推向公開模板。
+  const setup = read('.ai/skills/tp-setup/SKILL.md');
+  assert.ok(/branch -u origin\/main|--set-upstream-to=origin\/main/.test(setup),
+    'tp-setup 要把分支追蹤改到 origin');
+  assert.ok(/GUI|Desktop|預設/.test(setup), '要說明為什麼——GUI 用預設目標會推錯');
+  const update = read('.ai/skills/tp-update/SKILL.md');
+  assert.ok(/branch -u origin\/main|--set-upstream-to=origin\/main/.test(update),
+    'tp-update 的救援路徑也 clone 模板，同樣要修追蹤');
+});

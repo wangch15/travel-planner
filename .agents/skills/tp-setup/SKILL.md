@@ -79,7 +79,14 @@ git clone https://github.com/wangch15/travel-planner.git
 cd travel-planner
 git remote rename origin upstream
 gh repo create travel-planner --private --source=. --remote=origin
+git branch -u origin/main main
 ```
+
+**第五行不能省。** clone 之後 `main` 追蹤的是原本的 origin，改名之後就變成
+追蹤 `upstream`——也就是**公開模板**。用 CLI 明確指定 `git push origin` 的人
+不會發現；**用 GitHub Desktop 這類 GUI 的人一按 Push，預設目標就是公開模板**，
+pre-push hook 會擋下來，但他看到的是一個看不懂的錯誤。
+把追蹤改到 `origin` 之後，「Push」預設就是他自己的私有 repo。
 
 跑完一定要驗：
 

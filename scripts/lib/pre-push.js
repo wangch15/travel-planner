@@ -39,7 +39,9 @@ function checkPush({ remoteUrl, remoteName, updates, root = process.cwd() }, { r
   if (repo.toLowerCase() === TEMPLATE) {
     try {
       if (hasRealTrip(root)) return reject('目的地是公開模板，但 trips/ 下有真實行程資料夾；行程擁有者不能推模板。',
-        '請依 repo-ownership 規則改用自己的私有複本，保留本機資料；不要刪行程目錄來繞過檢查。');
+        '最常見的原因是推錯 remote：分支追蹤的是 upstream（模板）而不是 origin（你的私有 repo）。'
+        + ' 先看 git branch -vv；追蹤 upstream 的話跑 git branch -u origin/main main，然後改推 origin。'
+        + ' 真的沒有自己的私有 repo 才依 repo-ownership 規則補建。不要刪行程目錄來繞過檢查。');
       return { allowed: true, repo };
     } catch {
       return reject('無法讀取 trips/，不能確認這是只有引擎的模板維護。',
@@ -65,7 +67,9 @@ function checkPush({ remoteUrl, remoteName, updates, root = process.cwd() }, { r
   }
   if (!result || result.error || result.status !== 0) {
     return reject('無法查核目的地是否私有；可能尚未登入、沒有權限或 repo 不存在。',
-      '請完成 gh auth login，確認有權限讀取這次推送的 repo，再重試。');
+      '請完成 gh auth login，確認有權限讀取這次推送的 repo，再重試。'
+      + ' 有多個 GitHub 帳號的話，gh 的 active 帳號必須是這個 repo 的擁有者或協作者：'
+      + ' gh auth status 看目前是誰，gh auth switch -u <帳號> 切換。GUI 客戶端不會幫你切。');
   }
   let visibility;
   try {

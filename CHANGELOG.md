@@ -133,6 +133,16 @@
   被告知自己最新，卻少了幾十個 commit**。現在同時比 `git rev-list --count`：
   落後就講落後幾個；算不出來（淺複製、缺物件）就明說「無法確認」並給出自己
   查的指令，**不再把未知當成最新**。
+- **修正：取得專案的流程會留下一個追蹤公開模板的 `main`。** `git clone` 模板再
+  `git remote rename origin upstream` 之後，`main` 追蹤的是 `upstream/main`。
+  用 CLI 明確指定 `git push origin` 的人不會發現；**用 GitHub Desktop 這類 GUI
+  的人一按 Push，預設目標就是公開模板**——pre-push hook 會擋，但看到的是一個
+  看不懂的錯誤。實測時模板作者本人就踩到了。`tp-setup` 與 `tp-update` 的救援
+  路徑都補上 `git branch -u origin/main main`。
+- **pre-push hook 的訊息補上最可能的原因。** 推向模板被擋時先提示「分支追蹤的是
+  upstream 而不是 origin」與修法，而不是只叫人去讀 repo-ownership；私有查核
+  失敗時提示多帳號要先 `gh auth switch`——GUI 客戶端不會幫你切，而它的錯誤
+  訊息只說「認證失敗」。
 - 刪除 `HANDOFF.md`：五個實作階段都已完成，內容已與現況不符且會誤導 agent。
 - 資料需要 migrate：否。
 
