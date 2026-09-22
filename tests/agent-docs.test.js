@@ -164,7 +164,10 @@ test('contrib-check 的文件承諾限於本機完整新增歷史的路徑檢查
   for (const requirement of ['新增後刪除', '改名', '合併', '非零退出碼', '停止', '不檢查檔案內容']) {
     assert.ok(rule.includes(requirement), `貢獻閘門文件缺少：${requirement}`);
   }
-  assert.match(rule, /fork → push → PR.*未.*端到端/);
+  // 這一段的一半（contrib-check → hook → push → gh pr create）已於 2026-09-22 實測；
+  // 仍未驗的是 gh repo fork 與跨帳號 push，守門點在「那一半必須仍被標示為未驗」。
+  assert.match(rule, /未驗/, '不得聲稱整條貢獻路徑已驗證');
+  assert.match(rule, /gh repo fork/, '未驗的那一段要指名是哪一段');
   assert.ok(!rule.includes('目前只檢查最終差異'), '修復後不能仍把舊行為當成現況');
 });
 
@@ -379,4 +382,21 @@ test('守門測試會抓到固定例外後移、混合最高層刪除及不確�
   assert.throws(() => assertGateOrder(ship.replace('- 重產底圖或換照片\n', '')), /固定第三層條件/);
   assert.throws(() => assertGateOrder(ship.replace(/.*一次改了好幾樣.*\n/, '')));
   assert.throws(() => assertGateOrder(ship.replace('不確定算哪一層 → 當第三層', '不確定算哪一層 → 直接 ship')));
+});
+
+test('fork 指令不能帶 gh 不接受的旗標', () => {
+  const rule = read('.ai/rules/contributing-upstream.md');
+  // gh 回應：the --remote flag is unsupported when a repository argument is provided
+  assert.ok(!/gh repo fork[^\n]*--remote/.test(rule), 'fork 指令不該帶 --remote，gh 會直接拒絕');
+  assert.ok(rule.includes('gh repo fork'), '還是要有 fork 指令');
+  assert.ok(rule.includes('git remote add contrib'), '帶 repo 參數時 gh 不動 remote，要自己補這一行');
+});
+
+test('貢獻流程要標明哪一段實測過、哪一段沒有與為什麼', () => {
+  const rule = read('.ai/rules/contributing-upstream.md');
+  assert.ok(/已驗|實測/.test(rule), '要說明已驗證的範圍');
+  assert.ok(/未驗/.test(rule), '要說明未驗證的範圍');
+  // 未驗不是因為偷懶，是 GitHub 不允許同一帳號同時擁有 parent 與 fork
+  assert.ok(/parent and fork|同一個帳號|第二個 GitHub 帳號/.test(rule),
+    '要寫出作者測不了的原因，否則下一輪還會有人去試');
 });

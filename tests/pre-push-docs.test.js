@@ -45,7 +45,10 @@ test('公開貢獻恢復成兩道歷史查核，不是 fork 白名單或停在�
   assert.match(rule, /乾淨.*分支[\s\S]*放行/);
   assert.match(rule, /夾帶.*trips\/[\s\S]*兩道.*擋/);
   assert.match(rule, /agent 不得.*--no-verify/);
-  assert.match(rule, /fork → push → PR.*未.*端到端/);
+  // 這一段的一半（contrib-check → hook → push → gh pr create）已於 2026-09-22 實測；
+  // 仍未驗的是 gh repo fork 與跨帳號 push，守門點在「那一半必須仍被標示為未驗」。
+  assert.match(rule, /未驗/, '不得聲稱整條貢獻路徑已驗證');
+  assert.match(rule, /gh repo fork/, '未驗的那一段要指名是哪一段');
   assert.match(rule, /^git push contrib contrib-<主題>$/m, '恢復正常貢獻推送步驟，不是刪掉整條路');
   assert.ok(!rule.includes('到此停止：pre-push 會拒絕這個公開 fork'));
 });

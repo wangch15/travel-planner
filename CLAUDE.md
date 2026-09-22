@@ -294,16 +294,36 @@ npm run contrib-check
 GitHub 不接受從無關的 repo 開 PR。所以要另外 fork 一份**只拿來送 PR** 的複本：
 
 ```
-gh repo fork wangch15/travel-planner --fork-name travel-planner-contrib --clone=false --remote=false
+gh repo fork wangch15/travel-planner --fork-name travel-planner-contrib --clone=false
 git remote add contrib https://github.com/<他的帳號>/travel-planner-contrib.git
 ```
+
+**不要加 `--remote=false`。** `gh` 會直接拒絕：
+`the --remote flag is unsupported when a repository argument is provided`。
+帶 repo 參數的時候 `gh` 本來就不會動你的 remote，所以第二行要自己補。
 
 那個 fork 是公開的，但它**只會收到乾淨的引擎分支**，不會收到他的 `main`。
 
 ## 完整流程
 
-**驗證範圍：本機歷史檢查有回歸測試；`--fork-name` 的 fork → push → PR 路徑尚未做過端到端驗證。**
-下面是預定操作流程，不代表遠端權限、fork 命名與 PR 建立已實測可用。
+**驗證範圍**（2026-09-22 實測）：
+
+- **已驗**：`contrib-check` → pre-push hook → `git push`（新分支）→ `gh pr create`
+  → PR 模板，整段在真實 GitHub 上跑通過。
+- **未驗**：`gh repo fork` 與跨帳號的 `git push contrib`。
+
+**未驗的原因是 GitHub 的硬限制，不是沒人去做**：
+
+```
+A single user account cannot own both a parent and fork.
+```
+
+模板作者的帳號擁有模板本身，所以**他永遠 fork 不了自己的 repo**，`--fork-name`
+也沒用。要驗這一段必須有第二個 GitHub 帳號。
+
+**對行程擁有者來說這不是問題**——他的帳號不擁有模板，fork 正常。
+但下面兩行是照 `gh` 的說明文字寫的，作者無法實測，**第一次走這條路的人
+如果卡住，請開 issue 回報**。
 
 ```
 # 1. 從上游開一條乾淨的分支——不要從他自己的 main 開

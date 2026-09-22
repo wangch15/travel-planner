@@ -79,6 +79,16 @@
   有沒有動到人會照著走的資訊 → 那天的路線與可行性有沒有變 → 不確定就當結構性。
   另給出「走不走得通」的四條升級判準（移動時間變了、抵達落在營業時間外、
   多出預約等前提、順序或過夜地點變了），混合改動採最高層級。
+- **修正：貢獻流程的 fork 指令帶了 `gh` 不接受的旗標。** 文件寫的
+  `gh repo fork ... --remote=false` 會直接被拒絕（`the --remote flag is
+  unsupported when a repository argument is provided`），也就是每個想貢獻的
+  人第一行就卡住。拿掉該旗標，並註明帶 repo 參數時 `gh` 不動 remote，
+  所以 `git remote add contrib` 要自己補。
+- **貢獻流程的驗證範圍改成實測結果。** `contrib-check` → pre-push hook →
+  `git push`（新分支）→ `gh pr create` → PR 模板整段已在真實 GitHub 跑通。
+  仍未驗的是 `gh repo fork` 與跨帳號 push，**原因是 GitHub 的硬限制**：
+  同一個帳號不能同時擁有 parent 與 fork，所以模板作者永遠 fork 不了自己的 repo，
+  要驗必須有第二個帳號。文件寫明這一點，免得下一輪又有人試著去驗。
 - 刪除 `HANDOFF.md`：五個實作階段都已完成，內容已與現況不符且會誤導 agent。
 - 資料需要 migrate：否。
 
