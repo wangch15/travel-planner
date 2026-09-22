@@ -425,3 +425,41 @@ test('--from 帶過來的是複本，不是跟舊行程連動', () => {
   assert.ok(/複本|各自一份|不會連動|不影響(舊|上一趟|前一趟)/.test(section),
     '要講明改新行程的設定不會動到舊行程');
 });
+
+test('deploy.target 的 pages 要標成過時並指出遷移方向', () => {
+  const schema = read('docs/schema/trip-config.md');
+  assert.ok(/過時|deprecated|不建議/.test(schema), 'schema 文件要標明 pages 已過時');
+  assert.ok(/workers/.test(schema));
+  const ship = read('.ai/skills/tp-ship/SKILL.md');
+  assert.ok(/過時|deprecated|不建議/.test(ship), 'tp-ship 要說明 pages 已過時');
+});
+
+test('wrangler 自己產生的設定檔要被 gitignore', () => {
+  const ig = read('.gitignore');
+  assert.ok(/wrangler\.jsonc/.test(ig), 'wrangler pages deploy 會在根目錄產生 wrangler.jsonc');
+});
+
+test('repo 名稱撞到時要建議中立名稱，不是 travel-planner-2', () => {
+  const setup = read('.ai/skills/tp-setup/SKILL.md');
+  const i = setup.indexOf('名稱已存在');
+  assert.ok(i > 0, '找不到名稱衝突的處理');
+  const section = setup.slice(i, i + 700);
+  assert.ok(/中立|不含目的地|不要用目的地/.test(section),
+    '要建議中立、不含目的地的名稱——這個 repo 會裝他所有的行程');
+  assert.ok(!/travel-planner-2/.test(section), 'travel-planner-2 看不出是什麼，不該當建議');
+});
+
+test('force push 的說法：規則與 hook 的實際行為不能打架', () => {
+  const backup = read('.ai/rules/stage-backup.md');
+  const own = read('.ai/rules/repo-ownership.md');
+  const both = backup + own;
+  // hook 實測不擋 force push；規則說禁止。要講明那是規則層的禁止，不是 hook 擋得住
+  assert.ok(/hook 不會擋|hook 擋不住|不由 hook/.test(both),
+    'force push 是規則層的禁止，要說明 hook 不會擋，否則會讓人誤以為被涵蓋');
+});
+
+test('多帳號時要提醒 gh auth switch 不會換 git 憑證', () => {
+  const setup = read('.ai/skills/tp-setup/SKILL.md');
+  assert.ok(/auth setup-git/.test(setup),
+    'gh auth switch 不換 git 憑證，push 會回 Repository not found');
+});

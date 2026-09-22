@@ -58,6 +58,17 @@ wrangler 不用另外裝，它是專案的 devDependency，`npm install` 就有�
 模板本身是公開的，讀它不需要登入。但**下一步要用他的帳號開一個私有 repo**，
 所以這一步不能跳過。順便用 `gh auth status` 確認真的登入了。
 
+**同一台機器有多個 GitHub 帳號的時候**（`gh auth status` 列出兩個以上）：
+`gh auth switch` **只換 `gh` 的帳號，不換 git 的憑證**。切換之後直接 push
+會回 `Repository not found`（另一個帳號看不到這個私有 repo），看起來像 repo
+不存在，其實是憑證錯了。每次切換帳號之後要補跑：
+
+```
+gh auth setup-git -h github.com
+```
+
+一般使用者只有一個帳號，不會遇到這件事。
+
 ### 3. 取得專案
 
 模板是公開的，**使用者的複本必須是私有的**——他的行程、`docs/` 裡的訂房資訊與
@@ -92,8 +103,14 @@ git remote -v
 **如果這一步失敗：**
 
 - `gh repo create` 說名稱已存在 → 他的帳號底下已經有 `travel-planner` 了。
-  問他那是不是舊的一份；要另開就換個名字（例如 `travel-planner-2`），
-  `origin` 指向新的那個就好，不影響後面任何步驟。
+  先問他那是不是舊的一份。要另開就**取一個中立、不含目的地的名稱**，
+  例如 `my-trips`、`travel-plans`——**這個 repo 會裝他所有的行程**
+  （每趟在 `trips/` 底下多一個資料夾），用第一趟的目的地當 repo 名字，
+  第二趟起就對不上了。`origin` 指向新的那個就好，不影響後面任何步驟。
+
+  **模板作者本人一定會撞到這一條**（他的帳號擁有 `wangch15/travel-planner`）。
+  那不是走錯路，照上面取一個中立名稱即可——他的引擎工作與行程工作本來就該
+  分在兩個 repo（見 `.ai/rules/repo-ownership.md`）。
 - 訊息提到沒有權限或要求登入 → 第 2 步沒完成，回去跑 `gh auth login`。
 - 訊息提到 git 沒設定 `user.name`／`user.email` → 你幫他設好。
 

@@ -808,7 +808,11 @@ gh repo view <origin-owner>/<repo> --json visibility
 git push origin HEAD:<已確認的分支>
 ```
 
-禁止裸 `git push` 依賴預設 remote，也禁止 force。若中途切換目的地、分支或重試，回到第 2 步重查。
+禁止裸 `git push` 依賴預設 remote，也禁止 force。
+
+**force 是規則層的禁止，`pre-push` hook 不會擋它。** hook 管的是「私人資料有沒有
+推到公開的地方」，而 force 推到自己的私有 repo 不是那個問題——它的風險是蓋掉
+遠端已有的歷史，那只有規則擋得住。所以**不要因為 hook 放行就以為 force 是允許的**。若中途切換目的地、分支或重試，回到第 2 步重查。
 push 失敗就停止，保留本機成果；不為了「完成」而換 remote、強推或跳過權限檢查。
 
 ### 4. 驗證遠端，再回報完成

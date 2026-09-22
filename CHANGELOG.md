@@ -96,6 +96,26 @@
   `_profile.md` 一個字都不要動。
 - **`--from` 講明帶過來的是複本不是連動。** 每趟有自己的 `trip.config.json`，
   改新行程不影響舊行程；但每一項仍要跟使用者核對，不能當成已確認的事實。
+- **修正：`deploy.target: "pages"` 的第二次部署會發佈未編譯的模板。**
+  `wrangler pages deploy` 會在 cwd 產生 `wrangler.jsonc`（`assets.directory: "src"`），
+  那個檔案一存在，之後每次 Pages 部署都改去發佈 `src/`，而 `ship` 仍回報成功
+  （實測第二次部署產出 6 KB 的 `<title>/*__TITLE__*/</title>`）。改成以產出目錄
+  為 cwd——`dist/` 整個 gitignore，產生的設定無害。`wrangler.jsonc` 與
+  `wrangler.toml` 也加進 `.gitignore`。
+- **修正：Pages 的部署網址驗證對不上現在的 Cloudflare。** Pages 已併進 Workers，
+  `wrangler pages deploy` 回的是 `<name>.<帳號>.workers.dev` 而不是
+  `<name>.pages.dev`，所以每次都停在「無法辨識唯一的真實網址」、本機部署紀錄
+  永遠寫不進去，認領與防撞保護跟著失效。現在兩種形式都接受。
+- **`deploy.target: "pages"` 標為過時**，附遷移步驟。特別講明舊的
+  `<name>.pages.dev` 是獨立的 Pages 專案，不會跟著更新，遷移後線上會有兩份；
+  刪掉舊專案是使用者自己去 Cloudflare 做的事，agent 不代刪。
+- **`tp-setup` 的名稱衝突改建議中立名稱。** 原本建議 `travel-planner-2`，
+  看不出是什麼；改成 `my-trips` 這類不含目的地的名稱，並說明模板作者本人
+  一定會撞到這一條、那不是走錯路。
+- **`tp-setup` 補上多帳號的 git 憑證陷阱**：`gh auth switch` 不換 git 憑證，
+  切換後 push 會回 `Repository not found`，要補跑 `gh auth setup-git`。
+- **`stage-backup.md` 講明 force 是規則層的禁止，`pre-push` hook 不會擋它**，
+  免得有人因為 hook 放行就以為 force 是允許的。
 - 刪除 `HANDOFF.md`：五個實作階段都已完成，內容已與現況不符且會誤導 agent。
 - 資料需要 migrate：否。
 

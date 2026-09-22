@@ -32,12 +32,13 @@ function validUrl(value, name, target) {
   try {
     const u = new URL(value);
     if (u.protocol !== 'https:' || u.username || u.password || u.port || u.pathname !== '/' || u.search || u.hash) return false;
-    if (target === 'workers') {
-      const labels = u.hostname.split('.');
-      return labels.length === 4 && labels[0] === name && labels[2] === 'workers' && labels[3] === 'dev';
-    }
-    return u.hostname === `${name}.pages.dev` ||
-      (u.hostname.endsWith(`.${name}.pages.dev`) && u.hostname.split('.').length === 4);
+    const labels = u.hostname.split('.');
+    const workersDev = labels.length === 4 && labels[0] === name && labels[2] === 'workers' && labels[3] === 'dev';
+    if (target === 'workers') return workersDev;
+    // Cloudflare 已把 Pages 併進 Workers：wrangler pages deploy 現在回的是
+    // <name>.<帳號>.workers.dev。舊的 pages.dev 形式仍要接受（既有專案還在用）。
+    return workersDev || u.hostname === `${name}.pages.dev` ||
+      (u.hostname.endsWith(`.${name}.pages.dev`) && labels.length === 4);
   } catch { return false; }
 }
 
@@ -176,10 +177,13 @@ function deployBuiltTrip({ slug, config, outDir }, {
   }
   log(`即將部署：${slug}${config.title ? `（${config.title}）` : ''}；帳號 ${account}；${target} ${name}`);
   log(matches && previous.url ? `上次成功部署網址：${previous.url}（本機紀錄；不是即時網址查詢）` : '尚未取得本目標的真實網址；首次成功部署後才可記錄，不以佔位符猜測。');
+  // wrangler pages deploy 會在 cwd 產生 wrangler.jsonc（assets.directory: "src"）。
+  // 留在 repo 根目錄的話，下一次部署就會改去發佈 src/——未編譯的模板——而且
+  // 回報成功。改以產出目錄為 cwd：那裡整個 gitignore，產生的設定無害。
   const args = target === 'pages'
-    ? ['pages', 'deploy', path.join(outDir, 'site'), '--project-name', name]
+    ? ['pages', 'deploy', 'site', '--project-name', name]
     : ['deploy', '--config', configFile];
-  const result = run(args, settings);
+  const result = run(args, target === 'pages' ? { ...settings, cwd: outDir } : settings);
   if (result.status !== 0 || result.error) throw failure(result, '部署');
   const state = successState(output(result), identity);
   const temporary = `${file}.${process.pid}.tmp`;

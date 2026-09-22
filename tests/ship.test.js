@@ -331,3 +331,26 @@ test('部署紀錄目錄必須 gitignore，其他引擎檔不能被一起忽略'
   });
   assert.equal(ignored.trim(), '.local/deployments/trip-a.json');
 });
+
+test('Pages：wrangler 現在回 workers.dev 網址，要認得、要記得下來', (t) => {
+  // Cloudflare 已把 Pages 併進 Workers。實測 wrangler pages deploy 回的是
+  // <name>.<帳號>.workers.dev，不是 <name>.pages.dev。原本只驗 pages.dev，
+  // 導致每次 Pages 部署都停在「無法辨識唯一的真實網址」，紀錄永遠寫不進去。
+  const url = 'https://trip-a.synthetic.workers.dev';
+  const h = harness(t, { target: 'pages', result: ok(`Deployed trip-a triggers (1 sec)\n  ${url}\n`) });
+  h.run();
+  assert.equal(JSON.parse(fs.readFileSync(h.stateFile)).url, url);
+});
+
+test('Pages：部署要在產出目錄裡執行，不能讓 repo 根目錄的 wrangler 設定劫持內容', (t) => {
+  // wrangler pages deploy 會在 cwd 產生 wrangler.jsonc（assets.directory: "src"）。
+  // 那個檔案一存在，之後每次部署都改去發佈 src/——未編譯的模板——而且回報成功。
+  const h = harness(t, { target: 'pages' });
+  h.run();
+  const call = h.calls.find((c) => c.args[0] === 'pages');
+  assert.ok(call, '應該呼叫 pages deploy');
+  assert.equal(call.settings.cwd, path.join(h.root, 'dist/trip-a'),
+    'pages deploy 必須以產出目錄為 cwd，否則會讀到 repo 根目錄的 wrangler 設定');
+  assert.ok(!call.args.some((a) => String(a).includes(h.root) && String(a).includes('dist')),
+    '以 outDir 為 cwd 時應該用相對路徑，不要再帶絕對路徑');
+});

@@ -36,7 +36,26 @@
 | `basemap.detail` | ✔ | string | `low` \| `normal` \| `high`，控制簡化容差。 | `"normal"` |
 | `basemap.contourLevels` | ✔ | number \| null | `null` 時自動選層級。 | `null` |
 | `deploy.name` | ✔ | string | Worker 或 Pages 專案名稱，也是 localStorage 的前綴。 | `"example-trip"` |
-| `deploy.target` | ✔ | string | `workers`（預設）或 `pages`。 | `"workers"` |
+| `deploy.target` | ✔ | string | `workers`（預設）。`pages` 已**過時**，見下。 | `"workers"` |
+
+### `deploy.target: "pages"` 已經過時
+
+**新行程一律用 `workers`。** Cloudflare 已經把 Pages 併進 Workers，
+`wrangler pages deploy` 現在回的網址是 `<name>.<帳號>.workers.dev`
+而不是 `<name>.pages.dev`，Cloudflare 自己也建議改用 `wrangler deploy`。
+
+引擎仍然支援 `pages`（既有專案還在用），但**已經在用的建議遷移**：
+
+1. 把 `deploy.target` 改成 `"workers"`
+2. `npm run check -- <slug>` → `npm run build -- <slug>`
+3. 目標名稱已經有東西的話先 `npm run adopt-deploy -- <slug>`（`pages` 不支援認領，
+   改成 `workers` 之後才能用）
+4. `npm run ship -- <slug>`
+
+遷移後網址會變成 `<deploy.name>.<你的帳號>.workers.dev`。
+**舊的 `<name>.pages.dev` 是一個獨立的 Pages 專案，不會自動跟著更新**——
+它會停在最後一次 Pages 部署的內容。確認新網址正常、並把新網址告知拿過舊連結的人
+之後，才在 Cloudflare 的 Workers & Pages 刪掉那個舊的 Pages 專案。
 
 ## 完整範例
 

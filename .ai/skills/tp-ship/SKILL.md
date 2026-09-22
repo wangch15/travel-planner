@@ -243,8 +243,17 @@ npx wrangler login
 
 `trip.config` 的 `deploy.target`：
 
-- `workers`（預設）：Cloudflare Workers 靜態資源
-- `pages`：Cloudflare Pages，給已經有 Pages 專案、不想換網址的情況
+- `workers`（預設）：Cloudflare Workers 靜態資源。**新行程一律用這個。**
+- `pages`：**已過時。** Cloudflare 把 Pages 併進 Workers 了，`wrangler pages deploy`
+  現在回的是 `.workers.dev` 網址，Cloudflare 自己也建議改用 `wrangler deploy`。
+  引擎仍支援它（既有專案還在用），但看到 `pages` 就**建議使用者遷移**，
+  步驟見 `docs/schema/trip-config.md`。`adopt-deploy` 不支援 `pages`，
+  所以要用認領流程也得先遷移。
+
+**遷移時要講清楚一件事**：舊的 `<name>.pages.dev` 是一個**獨立的 Pages 專案**，
+不會跟著更新，會停在最後一次 Pages 部署的內容。所以遷移後線上會同時有新舊兩份。
+等使用者確認新網址正常、也把新網址告知拿過舊連結的人，才請他自己去 Cloudflare
+刪掉舊的 Pages 專案——**那是花錢帳號裡的資源，你不要代刪**。
 
 ## 維護模式
 
