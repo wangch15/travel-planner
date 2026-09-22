@@ -66,7 +66,7 @@ function entriesNewerThan(entries, local) {
   return entries.filter((e) => compareVersions(e.version, local) > 0);
 }
 
-function renderReport({ local, upstream, entries = [], error = null, remote = UPSTREAM }) {
+function renderReport({ local, upstream, entries = [], error = null, remote = UPSTREAM, behind }) {
   if (error === 'no-upstream') {
     return [
       `找不到 ${UPSTREAM} remote，所以沒辦法知道引擎有沒有更新。`,
@@ -96,6 +96,27 @@ function renderReport({ local, upstream, entries = [], error = null, remote = UP
     ].join('\n');
   }
   if (cmp === 0 || !entries.length) {
+    // 版本號相同不代表內容相同。這個專案把改動併進未 tag 的版本，所以只比
+    // semver 會讓每個同版本的使用者都被告知「已經最新」，卻少了幾十個 commit。
+    if (behind === null || behind === undefined) {
+      return [
+        `本機與上游的版本號相同（${local}），但**無法確認實際落後幾個 commit**。`,
+        '',
+        '版本號相同不代表內容相同——改動可能併進了同一個版本。',
+        `請自己確認：git fetch ${remote} && git log --oneline HEAD..${remote}/${BRANCH}`,
+        '不要只因為版本號一樣就當成最新。',
+      ].join('\n');
+    }
+    if (behind > 0) {
+      return [
+        `版本號相同（${local}），但落後 ${behind} 個 commit。`,
+        '',
+        '改動併進了同一個版本號，所以看版本看不出來。上游有這些本機還沒有的 commit：',
+        '',
+        ...(entries.length ? [] : [`  git log --oneline HEAD..${remote}/${BRANCH}`, '']),
+        '**要不要更新是使用者的決定，不要自己合併。** 他說要的話走 tp-update。',
+      ].join('\n');
+    }
     return `引擎已經是最新的（${local}）。`;
   }
 
@@ -150,7 +171,13 @@ function collect({ fetch = true } = {}) {
     return { local, upstream: null, error: 'fetch-failed', remote };
   }
   const upstream = JSON.parse(pkg).version;
-  return { local, upstream, remote, entries: entriesNewerThan(parseChangelog(changelog), local) };
+  // 落後幾個 commit 才是實際狀態；版本號只是摘要。算不出來就回 null，不要當 0。
+  let behind = null;
+  try {
+    const n = git(['rev-list', '--count', `HEAD..${remote}/${BRANCH}`]).trim();
+    if (/^\d+$/.test(n)) behind = Number(n);
+  } catch { /* 淺複製或缺物件時算不出來，維持 null */ }
+  return { local, upstream, remote, behind, entries: entriesNewerThan(parseChangelog(changelog), local) };
 }
 
 module.exports = { compareVersions, parseChangelog, entriesNewerThan, renderReport, collect, pickRemote };
