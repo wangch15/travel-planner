@@ -128,6 +128,10 @@ gh issue create -R wangch15/travel-planner
 
 **判斷完還是要問使用者一句再送**——那會掛他的名字。
 
+**你在模板本身的工作目錄裡（`origin` 是模板、有寫入權）的話**：引擎改動就在這裡做，
+開分支 → PR → merge，然後到行程 repo 跑 `tp-update` 用真實行程驗。不要在行程 repo
+裡開發引擎。見 `contributing-upstream.md` 的「有寫入權的人」。
+
 ## 想搞懂整個機制
 
 `docs/how-it-works.md`：一個公開模板怎麼扇出成很多份私有複本、

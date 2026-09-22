@@ -490,3 +490,15 @@ test('取得專案之後要把分支追蹤改到 origin，不能留在公開模�
   assert.ok(/branch -u origin\/main|--set-upstream-to=origin\/main/.test(update),
     'tp-update 的救援路徑也 clone 模板，同樣要修追蹤');
 });
+
+test('有寫入權的人（模板作者、協作者）改引擎的流程要寫清楚', () => {
+  const rule = read('.ai/rules/contributing-upstream.md');
+  const i = rule.indexOf('## 有寫入權');
+  assert.ok(i > 0, 'contributing-upstream 要有「有寫入權的人」那一節');
+  const section = rule.slice(i, rule.indexOf('\n## ', i + 1) > 0 ? rule.indexOf('\n## ', i + 1) : undefined);
+  assert.ok(/不需要 fork|不用 fork/.test(section), '有寫入權就不需要 fork');
+  assert.ok(/模板.*工作目錄|模板自己的/.test(section), '要說明引擎改動在模板的工作目錄做');
+  assert.ok(/行程.*repo.*測試|tp-update/.test(section), '行程 repo 是測試場，改完要 tp-update 驗');
+  assert.ok(/engine-changes/.test(section), '做行程時順手修引擎要記 engine-changes');
+  assert.ok(/PR/.test(section) && /review/.test(section), 'PR 的價值是 review，不是權限');
+});

@@ -187,6 +187,10 @@ git merge upstream/main   →   npm install   →   （需要的話）npm run mi
 | 壞掉了、或想要一個沒有的功能 | **開 issue**：`gh issue create -R wangch15/travel-planner` |
 | 已經在本機改好了，而且是純粹的改進（不是設計取捨） | **開 PR**，見 `.ai/rules/contributing-upstream.md` |
 
+**模板作者自己改引擎**走另一條更短的路：在模板的工作目錄開分支 → PR（為了 review）
+→ merge → 到行程 repo 跑 `tp-update` 用真實行程驗。**行程 repo 是引擎的測試場，
+不是開發場。** 細節見 `.ai/rules/contributing-upstream.md` 的「有寫入權的人」。
+
 **PR 的硬規則：分支裡不能有任何 `trips/` 底下的東西。**
 模板的 fork 一定是公開的，行程資料與私人筆記推上去就是公開的，而且刪不掉。
 `npm run contrib-check` 會在推之前擋下來。

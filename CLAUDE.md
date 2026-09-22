@@ -136,6 +136,10 @@ gh issue create -R wangch15/travel-planner
 
 **判斷完還是要問使用者一句再送**——那會掛他的名字。
 
+**你在模板本身的工作目錄裡（`origin` 是模板、有寫入權）的話**：引擎改動就在這裡做，
+開分支 → PR → merge，然後到行程 repo 跑 `tp-update` 用真實行程驗。不要在行程 repo
+裡開發引擎。見 `contributing-upstream.md` 的「有寫入權的人」。
+
 ## 想搞懂整個機制
 
 `docs/how-it-works.md`：一個公開模板怎麼扇出成很多份私有複本、
@@ -353,6 +357,65 @@ gh pr create -R wangch15/travel-planner --head <他的帳號>:contrib-<主題>
 - 在 PR 裡夾帶 `trips/`（`_example` 除外）、`dist/`、`.cache/`
 - **代替使用者決定要不要送**。這是他的東西，也會掛他的名字。
   你判斷「這是純粹的改進、可以送」之後，**還是要問他一句**再送。
+
+## 有寫入權的人：模板作者與協作者
+
+上面整套 fork 流程是給**沒有模板寫入權**的人用的。模板作者（與他加的協作者）
+有寫入權，**不需要 fork**，流程更短——但判準與閘門一樣不能省。
+
+### 改引擎 → 在模板自己的工作目錄做，不要在行程 repo 做
+
+```
+模板的工作目錄（origin 就是 wangch15/travel-planner）
+  git switch -c <主題>
+  ...改、寫測試、npm test...
+  git push origin <主題>            ← 推分支，不推 main
+  gh pr create                      ← 開 PR
+  ...review、merge...
+
+行程 repo（origin 是自己的私有 repo）
+  npm run update-check              ← 應該回報落後
+  走 tp-update                      ← 用真實行程驗這個改動
+```
+
+**行程 repo 是引擎的測試場，不是開發場。** 在那裡開發引擎，每個引擎 commit
+都會混進行程歷史，之後每次要往模板送都得 cherry-pick 篩一遍。改完模板之後
+在行程 repo 跑 `tp-update`，用真實資料驗——那才是它的角色。
+
+**PR 的價值是 review，不是權限。** 你本來就推得上去。開 PR 是為了有一個可以
+review 的 diff——自己看一次、或交給另一個 agent 看一次——再合併。
+小改動不想 review 直接推 `main` 也行，那是作者的決定。
+
+### 做行程時撞到引擎 bug，順手修了
+
+這才會用到上面的 cherry-pick 流程，差別只在**不用 fork**：
+
+```
+行程 repo
+  ...修引擎解自己的燃眉之急，commit...
+  記進 trips/<slug>/docs/engine-changes.md      ← 一定要，下次 merge 靠它
+  git switch -c contrib-<主題> upstream/main    ← 從乾淨的上游開
+  git cherry-pick <只動引擎的 commit>
+  npm run contrib-check                         ← 閘門，擋夾帶
+  git push upstream contrib-<主題>              ← 直接推模板，不用 contrib fork
+  gh pr create -R wangch15/travel-planner --head contrib-<主題>
+```
+
+pre-push hook 仍然會跑：目的地是模板、而 `trips/` 有真實行程，它會檢查**這條分支
+的歷史**乾不乾淨。乾淨就放行，夾帶就擋——跟朋友的路徑同一道閘門。
+
+### 判準與朋友一樣
+
+「現在的行為是錯的」還是「這樣比較好」的判斷、`contrib-check`、`npm test`、
+改了 `.ai/` 要 `sync:agent-assets`——**一樣都要**。有寫入權省掉的只有 fork，
+不是閘門。
+
+### 兩個方向、兩條路，沒有第三條
+
+```
+模板 ──(tp-update)──▶ 行程 repo
+模板 ◀──(PR)───────── 行程 repo（或模板的分支）
+```
 
 ## 只想回報不想修
 
