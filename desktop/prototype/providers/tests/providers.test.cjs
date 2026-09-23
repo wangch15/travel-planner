@@ -31,7 +31,8 @@ if (args.includes('--acp')) {
   });
 } else {
   let input=''; process.stdin.on('data',chunk=>input+=chunk);process.stdin.on('end',()=>{
-    const payload=JSON.parse(input);
+    let payload=JSON.parse(input),images=[];
+    if(payload.type==='user'){const content=payload.message.content;images=content.filter(b=>b.type==='image');payload=JSON.parse(content.find(b=>b.type==='text').text);}
     if(payload.request==='hang'){setInterval(()=>{},1000);return;}
     if(payload.request==='bad-json'){console.log('{broken');return;}
     if(payload.request==='oversized'){process.stdout.write('x'.repeat(2200000));return;}
@@ -43,6 +44,7 @@ if (args.includes('--acp')) {
     if(payload.mode==='materialize')answer.filesJson=JSON.stringify({'data.js':'export const DAYS = [];'});
     if(payload.mode==='research')Object.assign(answer,{sources:[{url:'https://example.invalid/official',title:'Official fixture',evidence:'Fixture evidence'}],unresolved:[],feasibility:'待人工核對'});
     if(payload.request==='invalid-answer')answer.extra='unrequested';
+    if(images.length)answer.summary='圖片:'+images.map(b=>b.source.type+'/'+b.source.media_type+'/'+Buffer.from(b.source.data,'base64').length).join(',');
     const sid='11111111-1111-4111-8111-111111111111';
     if(provider==='claude') {
       send({type:'system',subtype:'init',session_id:sid,tools:[],mcp_servers:[]});
@@ -58,6 +60,12 @@ if (args.includes('--acp')) {
   });
 }
 `;
+
+// Claude receives one stream-json user message; Gemini receives the payload itself.
+function payloadOf(input) {
+  const message = JSON.parse(input);
+  return message.type === 'user' ? JSON.parse(message.message.content.find(b => b.type === 'text').text) : message;
+}
 
 async function fixture(t, provider, options = {}) {
   const directory = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'tp-providers-')));
@@ -127,15 +135,42 @@ for(const provider of ['claude','gemini']) {
       assert.equal(f.editor.active,null);
       const continued=await f.editor.generate({snapshot:f.snapshot,dayId:null,text:'new question',thread:{id:threadId,lastTurnId:turnId},history:[{role:'user',text:'hang'},{role:'assistant',text:'已停止這輪'}]});
       assert.equal(continued.threadId,threadId);assert.equal(continued.summary,'已保留對話');
-      assert.equal(JSON.parse(f.launches.at(-1).input).request,'new question');
+      assert.equal(payloadOf(f.launches.at(-1).input).request,'new question');
     }finally{await f.editor.stop();await rejected.catch(()=>{});}
   });
-  test(`${provider}: image attachments fail before requesting a model`,async t=>{
-    const f=await fixture(t,provider);const before=f.launches.length;
-    await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:'image',attachments:[{kind:'image',localPath:'/private/not-read'}]}),{code:'MODEL_NO_IMAGES'});
-    assert.equal(f.launches.length,before);
-  });
 }
+
+const PNG_1PX = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l6UAAAAASUVORK5CYII=', 'base64');
+
+test('gemini: image attachments fail before requesting a model',async t=>{
+  const f=await fixture(t,'gemini');const before=f.launches.length;
+  assert.equal(f.capabilities.images,false);
+  await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:'image',attachments:[{kind:'image',localPath:'/private/not-read'}]}),{code:'MODEL_NO_IMAGES'});
+  assert.equal(f.launches.length,before);
+});
+
+test('claude: screenshots travel as base64 image blocks in one stream-json user message',async t=>{
+  const f=await fixture(t,'claude');
+  assert.equal(f.capabilities.images,true);
+  const image=path.join(f.directory,'booking.bin');await fs.writeFile(image,PNG_1PX);
+  const answer=await f.editor.generate({snapshot:f.snapshot,dayId:null,text:'讀這張訂房截圖',attachments:[{kind:'image',mime:'image/png',size:PNG_1PX.length,localPath:image}]});
+  assert.equal(answer.summary,'圖片:base64/image/png/'+PNG_1PX.length);
+  const launch=f.launches.at(-1);
+  assert.deepEqual(launch.args.slice(launch.args.indexOf('--input-format'),launch.args.indexOf('--input-format')+2),['--input-format','stream-json']);
+  assert.equal(payloadOf(launch.input).request,'讀這張訂房截圖');
+  assert.equal(launch.input.endsWith('\n'),true);
+});
+
+test('claude: image attachments with unsafe path, type or size fail before launch',async t=>{
+  const f=await fixture(t,'claude');const image=path.join(f.directory,'ok.bin');await fs.writeFile(image,PNG_1PX);const before=f.launches.length;
+  for(const attachment of [
+    {kind:'image',mime:'image/png',size:PNG_1PX.length,localPath:'relative.bin'},
+    {kind:'image',mime:'image/gif',size:PNG_1PX.length,localPath:image},
+    {kind:'image',mime:'image/png',size:PNG_1PX.length+1,localPath:image},
+    {kind:'image',mime:'image/png',size:PNG_1PX.length,localPath:path.join(f.directory,'missing.bin')},
+  ])await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:'image',attachments:[attachment]}),{code:'INVALID_INPUT'});
+  assert.equal(f.launches.length,before);
+});
 
 test('Gemini isolated ACP login uses only oauth-personal and preserves outside credential files',async t=>{
   const f=await fixture(t,'gemini');await fs.unlink(path.join(f.account.runtime.home,'.gemini/oauth_creds.json'));

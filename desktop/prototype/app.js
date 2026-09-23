@@ -696,7 +696,7 @@ function renderCodexAccount(account) {
   $('codex-switch').hidden = account.state !== 'connected'||account.capabilities?.switchAccount===false;
   $('codex-copy-link').hidden = activeProvider!=='codex'||account.state !== 'waiting-login';
   $('codex-login-help').hidden = activeProvider!=='codex'||account.state !== 'waiting-login';
-  $('provider-capabilities').textContent=activeProvider==='gemini'?'Gemini 連線暫停，請使用 Codex 或 Claude。':activeProvider==='codex'?'支援文字、圖片與原生對話續接。':'支援 Claude Pro／Max。目前支援文字、公開網址與來源研究；圖片與思考強度請使用 Codex。';
+  $('provider-capabilities').textContent=activeProvider==='gemini'?'Gemini 連線暫停，請使用 Codex 或 Claude。':activeProvider==='codex'?'支援文字、圖片與原生對話續接。':'支援 Claude Pro／Max。支援文字、截圖、公開網址與來源研究；思考強度請使用 Codex。';
   if (account.state !== 'connected') { modelRequest++; $('codex-model').replaceChildren(); $('chat-model').replaceChildren(); $('codex-model-row').hidden=true; }
   updateComposer();
   if (account.state === 'connected') loadModels();

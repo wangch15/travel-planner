@@ -1,9 +1,11 @@
 /* Additional desktop flows use fixed main-process capabilities and explicit confirmations. */
 (() => {
+  // Thumbnails exist only for images added in this window; stored bytes stay in the main process.
+  const thumbnails=new Map();
   let models=[],references=[],selectedRefs=new Set(),referenceScope='',lastAccount='',featureState={},materializedCandidate=false,viewedPreviewURL=null;
   let conversationItems=[],currentConversation=null,showArchived=false,conversationRequest=0,renameConversationId=null;
   let backupToken=null,publishToken=null,adoptionToken=null,elapsedTimer=null,startedAt=0;
-  const exclusive=new Set(['tool-prepare','tool-install','provider-select','trip-delete-prepare','trip-delete-confirm','trip-restore','project-setup-prepare','project-setup-confirm','git-identity-prepare','git-identity-confirm','trip-create','plan-confirm','references-add','references-url','references-remove','research-confirm','materialize-confirm','materialize-discard','job-wait','job-pause','job-recover','handoff','backup-prepare','backup-confirm','publish-prepare','publish-confirm','adoption-prepare','adoption-confirm','archive-export','archive-import','auth-start','auth-cancel','cloudflare-account','conversation-new','conversation-switch','conversation-rename','conversation-archive']);
+  const exclusive=new Set(['tool-prepare','tool-install','provider-select','trip-delete-prepare','trip-delete-confirm','trip-restore','project-setup-prepare','project-setup-confirm','git-identity-prepare','git-identity-confirm','trip-create','plan-confirm','references-add','references-add-bytes','references-url','references-remove','research-confirm','materialize-confirm','materialize-discard','job-wait','job-pause','job-recover','handoff','backup-prepare','backup-confirm','publish-prepare','publish-confirm','adoption-prepare','adoption-confirm','archive-export','archive-import','auth-start','auth-cancel','cloudflare-account','conversation-new','conversation-switch','conversation-rename','conversation-archive']);
   const api=async(action,input={})=>{
     if(!window.travelDesktop?.feature)throw Error('請在桌面 App 使用這個功能。');
     const owns=exclusive.has(action)&&!aiBusy;if(owns){aiBusy=true;proposalBusy=true;updateComposer();}
@@ -182,11 +184,34 @@
   }
   $('show-research').onclick=()=>{renderResearch();$('research-dialog').showModal();};$('close-research').onclick=()=>$('research-dialog').close();
   $('confirm-research').onclick=()=>action('confirm-research',async()=>{const result=await api('research-confirm',target());useConversation(result);if(result.proposal){pendingProposal={...result.proposal,...target(),previewLoaded:false};$('preview').removeAttribute('src');renderPreview();renderProposal();}$('research-dialog').close();notify('查核摘要已確認，請再次檢查候選預覽。');});
-  function updateReferenceCount(){tell('references-count',selectedRefs.size?`${selectedRefs.size} 份參考資料`:'');}
+  function updateReferenceCount(){tell('references-count',selectedRefs.size?`${selectedRefs.size} 份參考資料`:'');renderComposerAttachments();}
+  function renderComposerAttachments(){
+    const tray=$('composer-attachments'),items=references.filter(item=>selectedRefs.has(item.id));tray.replaceChildren();tray.hidden=!items.length;
+    for(const item of items){const chip=el('li',undefined,'composer-attachment');if(thumbnails.has(item.id)){const img=el('img');img.src=thumbnails.get(item.id);img.alt='';chip.append(img);}
+      chip.append(el('span',item.name));const remove=button('×',()=>{selectedRefs.delete(item.id);renderReferences();$('message').focus();});remove.setAttribute('aria-label',`不附加 ${item.name}`);remove.title='這次不附加（仍保留在參考資料）';chip.append(remove);tray.append(chip);}
+  }
   async function loadReferences(){const scope=JSON.stringify([project?.projectId,selected?.trip.slug,accountState.label]);if(scope!==referenceScope){referenceScope=scope;selectedRefs.clear();}const result=await api('references-list',target());references=result.items;renderReferences();}
   function renderReferences(){$('references-list').replaceChildren();for(const item of references){const row=el('div',undefined,'reference-row'),label=el('label'),check=document.createElement('input');check.type='checkbox';check.checked=selectedRefs.has(item.id);check.onchange=()=>{if(check.checked)selectedRefs.add(item.id);else selectedRefs.delete(item.id);updateReferenceCount();};label.append(check,document.createTextNode(` ${item.name} · ${Math.ceil(item.size/1024)} KB`));row.append(label,button('移除',async()=>{await api('references-remove',{...target(),id:item.id});selectedRefs.delete(item.id);await loadReferences();}));$('references-list').append(row);}if(!references.length)$('references-list').append(el('p','尚未加入參考資料。'));updateReferenceCount();}
   $('open-references').onclick=async()=>{$('references-dialog').showModal();tell('reference-message','');try{await loadReferences();}catch(e){tell('reference-message',e.message);}};$('close-references').onclick=()=>$('references-dialog').close();
   $('add-reference-file').onclick=()=>action('add-reference-file',async()=>{const result=await api('references-add',target());if(result.canceled)return;result.items.forEach(i=>selectedRefs.add(i.id));await loadReferences();});
+  const ATTACHABLE=/\.(txt|md|json|png|jpe?g|webp)$/i,IMAGE_NAMES={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'};
+  const readDataURL=file=>new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>resolve(null);reader.readAsDataURL(file);});
+  function attachmentName(file){if(file.name&&file.name!=='image.png'&&ATTACHABLE.test(file.name))return file.name;const ext=IMAGE_NAMES[file.type];if(!ext)return null;const d=new Date(),p=n=>String(n).padStart(2,'0');return `截圖-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.${ext}`;}
+  async function attachFiles(files){
+    if(!selected||selected.demo||!window.travelDesktop){notify('請先連接專案並選擇旅程，再加入截圖或檔案。');return;}
+    if(aiBusy){notify('AI 回覆中，請稍後再加入附件。');return;}
+    const accepted=files.map(file=>({file,name:attachmentName(file)})).filter(item=>item.name).slice(0,6);
+    if(accepted.length<files.length)notify('只能加入文字、Markdown、JSON、PNG、JPEG 或 WebP，一次最多 6 個。');
+    // Settle the trip/account scope first; a scope change clears selections, including ones added below.
+    try{await loadReferences();}catch(e){notify(e.message);return;}
+    for(const {file,name} of accepted){try{const {item}=await api('references-add-bytes',{...target(),name,bytes:new Uint8Array(await file.arrayBuffer())});selectedRefs.add(item.id);if(item.kind==='image'){const url=await readDataURL(file);if(url)thumbnails.set(item.id,url);}}catch(e){notify(e.message||'附件未能加入。');}}
+    try{await loadReferences();}catch(e){notify(e.message);}
+  }
+  $('message').addEventListener('paste',event=>{const files=[...(event.clipboardData?.files||[])];if(!files.length)return;if(!event.clipboardData.getData('text/plain'))event.preventDefault();attachFiles(files);});
+  const hasFiles=event=>[...(event.dataTransfer?.types||[])].includes('Files');
+  $('chat-form').addEventListener('dragover',event=>{if(!hasFiles(event))return;event.preventDefault();event.dataTransfer.dropEffect='copy';$('chat-form').classList.add('drop-target');});
+  $('chat-form').addEventListener('dragleave',event=>{if(!$('chat-form').contains(event.relatedTarget))$('chat-form').classList.remove('drop-target');});
+  $('chat-form').addEventListener('drop',event=>{$('chat-form').classList.remove('drop-target');if(!hasFiles(event))return;event.preventDefault();attachFiles([...event.dataTransfer.files]);});
   $('reference-url-form').onsubmit=async event=>{event.preventDefault();tell('reference-message','正在讀取公開頁面…');try{const result=await api('references-url',{...target(),url:$('reference-url').value});selectedRefs.add(result.item.id);await loadReferences();tell('reference-message','已讀取並記錄取得時間；內容仍需要查核。');$('reference-url').value='';}catch(e){tell('reference-message',e.message);}};
   function renderJob(){
     const fallback=featureState.needsRestart&&(!featureState.job||!featureState.job.threadId||['running','completed'].includes(featureState.job.status));

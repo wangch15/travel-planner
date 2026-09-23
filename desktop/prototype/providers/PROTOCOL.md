@@ -25,7 +25,17 @@ host messages as `history: [{role:'user'|'assistant',text}]` when continuing a
 provider-prefixed thread. The latest 20 messages fitting 48,000 characters are
 sent; the entire request is limited to 512 KB. Native session resume is disabled.
 Recovery returns `unknown`, so the host must never automatically replay an
-uncertain request. Images and effort controls are explicitly unsupported.
+uncertain request. Effort controls are explicitly unsupported.
+
+Images: Claude accepts up to six PNG/JPEG/WebP attachments (8 MiB each). The
+host passes each stored attachment's `mime`, `size` and absolute `localPath`;
+the adapter re-checks type, size and file identity, then sends one
+`--input-format stream-json` user message whose content is the JSON request as a
+text block followed by base64 `image` blocks. Claude requests always use this
+input format, with or without images. Verified 2026-09-23 against Claude Code
+2.1.280 with the full isolation flags below: the image was read correctly and
+`init.tools` still listed only `StructuredOutput`. Gemini still rejects images
+with `MODEL_NO_IMAGES` before launching.
 
 All six modes are implemented: discussion, edit-day, edit-all, planning,
 materialize, research. Host validators and user preview/save gates still decide

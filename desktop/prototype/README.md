@@ -1,5 +1,9 @@
 # Desktop trip workbench
 
+## 貼上截圖與拖曳檔案
+
+聊天輸入框可直接貼上剪貼簿的截圖（⌘V／Ctrl+V），或把文字、Markdown、JSON、PNG、JPEG、WebP 檔案拖進輸入框；一次最多 6 個。附件存在 App user-data（與「加入參考資料」相同的檢查與上限），自動勾選並在輸入框上方顯示縮圖，按 × 只是這次不附加，仍保留在參考資料。剪貼簿同時有文字時照常貼上文字。Claude 與 Codex 都能讀截圖；Gemini 舊接法仍不支援。訂房確認信請用這個方式帶入，App 不連接網路信箱。驗證：`smoke:paste`（假模型、臨時專案、模擬的 paste／drop 事件）。**實機系統剪貼簿 ⌘V 尚未通過**：2026-09-24 使用者實測貼不上，原因待查。
+
 ## 發布預覽核對
 
 發布準備與最終確認都綁定行程資料及完整發布產物（HTML、照片、robots.txt、_headers）的摘要。引擎或頁面產物在看過預覽後變動，必須重新預覽並確認；寫入部署目錄的檔案就是核對過的位元組快照。
@@ -61,7 +65,7 @@ Claude 登入結果現在會查官方 auth status，而非只看登入子程序�
 - 正式旅程經確認後移至原私人專案被 Git 忽略的 `.local/desktop-trash`，保留全部資料／照片／私人筆記。可重開後還原；同名目錄存在就拒絕覆蓋。沒有永久刪除、遠端 Git 或線上網站操作。
 - App 啟動自動核對保存的登入，顯示檢查中／需登入／工具缺少等狀態。切換服務時隔離舊回覆，保留舊對話並建立新對話。設定頁依 Orca 參考整理為設定列、狀態與漸進展開的維護區。
 - 工具與更新提供具體安裝引導。GH 可下載官方二進位檔並校驗至 App 工具目錄；其他固定安裝流程在使用者確認後開啟 Terminal／PowerShell，完成後重新檢查。Wrangler 內建，可直接進 Cloudflare 登入。測試沒有實際執行安裝。
-- 目前只有 Codex、Claude Code 可在聊天／設定切換；Gemini 舊接法的資料與實作保留，但選項暫時隱藏，不能登入或送出。Claude Code 透過官方 CLI 與 App 專屬登入運作，版本號只供診斷；保留的 Gemini 接法仍為 Gemini CLI 0.46.0，尚未改接 `agy`。六種文字模式均有實作。來源、介面與限制見 [providers/PROTOCOL.md](providers/PROTOCOL.md)。Claude 僅 Pro／Max；Gemini 尚無 App 內換帳號；這兩個 provider 不支援圖片、effort、自動額度等待或不確定結果的原生恢復。模型選項是官方 CLI 別名，可用性仍由帳號決定。
+- 目前只有 Codex、Claude Code 可在聊天／設定切換；Gemini 舊接法的資料與實作保留，但選項暫時隱藏，不能登入或送出。Claude Code 透過官方 CLI 與 App 專屬登入運作，版本號只供診斷；保留的 Gemini 接法仍為 Gemini CLI 0.46.0，尚未改接 `agy`。六種文字模式均有實作。來源、介面與限制見 [providers/PROTOCOL.md](providers/PROTOCOL.md)。Claude 僅 Pro／Max；Gemini 尚無 App 內換帳號；這兩個 provider 不支援 effort、自動額度等待或不確定結果的原生恢復；Gemini 也不支援圖片（Claude 自 2026-09-23 起支援截圖）。模型選項是官方 CLI 別名，可用性仍由帳號決定。
 - 這兩個新 provider 的自動驗證使用假程序，另驗了實際已安裝 CLI 的無登入啟動／狀態與未認證 ACP 初始化；没有發送真實模型請求或完成使用者授權。
 
 驗證：root501 + engine92 + desktop198 =791項單元測試；原生 navigation、workflow、batch、版本、安全、版面、startup、preview、updater 回歸通過。navigation 驗證選單鍵盤與右鍵、示範刪除重開、旅程回收還原、切換／恢復 provider、安裝確認。Windows 真機仍待使用者後續安排。
