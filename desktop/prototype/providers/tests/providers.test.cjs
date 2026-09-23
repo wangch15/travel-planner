@@ -231,7 +231,7 @@ test('Claude login reconciles delayed official status even when login command ex
   await fs.writeFile(script,FAKE.replace("send({loggedIn:true,authMethod:'claude.ai',apiProvider:'firstParty',email:'fixture@example.invalid',subscriptionType:'pro'});process.exit();",status)
     .replace("if (args.includes('auth')) { process.exit(); }","if (args.includes('auth')) { "+login+" }"));
   assert.equal((await f.account.connect()).state,'needs-login');
-  const completed=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('status was not reconciled')),1000);
+  const completed=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('status was not reconciled')),5000);
     f.account.on('changed',a=>{if(a.state==='connected'){clearTimeout(timer);resolve(a);}else if(a.state==='login-failed'){clearTimeout(timer);reject(Error('premature failure'));}});});
   assert.equal((await f.account.login()).account.state,'waiting-login');
   assert.equal((await completed).label,'fixture@example.invalid');

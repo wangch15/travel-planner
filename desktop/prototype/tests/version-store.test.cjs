@@ -4,7 +4,7 @@ const fs=require('node:fs/promises');
 const os=require('node:os');
 const path=require('node:path');
 const {VersionStore}=require('../version-store.cjs');
-async function fixture(t){const root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'travel-versions-')));t.after(()=>fs.rm(root,{recursive:true,force:true}));return {root,store:new VersionStore(root),target:{root:'/sample/project',slug:'coast'}};}
+async function fixture(t){const root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'travel-versions-')));t.after(()=>fs.rm(root,{recursive:true,force:true}));return {root,store:new VersionStore(root),target:{root:path.join(root,'sample','project'),slug:'coast'}};}
 const draft={baselineDigest:'baseline',originalSource:'initial',proposedSource:'next',selectedKeys:['1:title'],kind:'save',label:'Adjust title',contextDigest:'context',createdAt:'2026-09-22T00:00:00.000Z'};
 test('initial version, save and restore survive restart, retain history and isolate targets',async t=>{
  const {root,store,target}=await fixture(t);assert.deepEqual(await store.read(target),{version:1,revisions:[],draft:null,intent:null});
@@ -15,8 +15,8 @@ test('initial version, save and restore survive restart, retain history and isol
  assert.equal((await store.finish(target,save,'next')).number,2);assert.equal((await store.read(target)).draft,null);assert.equal((await store.finish(target,save,'next')).number,2);
  const restore=await store.prepare(target,{beforeSource:'next',afterSource:'initial',contextDigest:'context',label:'Restore V1',kind:'restore'});
  await store.finish(target,restore,'initial');const state=await new VersionStore(root).read(target);assert.deepEqual(state.revisions.map(r=>r.source),['initial','next','initial']);assert.equal(state.revisions[2].kind,'restore');assert.equal(state.intent,null);
- assert.equal((await store.read({...target,slug:'other'})).revisions.length,0);assert.equal((await store.read({...target,root:'/another/project'})).revisions.length,0);
- assert.equal((await fs.stat(store.filename(target))).mode&0o777,0o600);
+ assert.equal((await store.read({...target,slug:'other'})).revisions.length,0);assert.equal((await store.read({...target,root:path.join(root,'another','project')})).revisions.length,0);
+ if(process.platform!=='win32')assert.equal((await fs.stat(store.filename(target))).mode&0o777,0o600);
 });
 test('draft survives restart without any preview receipt and concurrent writes serialize',async t=>{
  const {root,store,target}=await fixture(t);await Promise.all([store.observe(target,{source:'initial',contextDigest:'context'}),store.saveDraft(target,draft)]);
@@ -49,7 +49,7 @@ test('corrupt state and source hash mismatch fail closed preserving bytes',async
 test('rejects linked files, linked store directory and parent replacement',async t=>{
  const {root,store,target}=await fixture(t);await store.observe(target,{source:'initial',contextDigest:'context'});const file=store.filename(target);const other=path.join(root,'other');await fs.writeFile(other,'private');await fs.unlink(file);await fs.symlink(other,file);
  await assert.rejects(store.saveDraft(target,draft),{code:'VERSION_STORE_INVALID'});assert.equal(await fs.readFile(other,'utf8'),'private');await fs.unlink(file);await fs.link(other,file);await assert.rejects(store.read(target),{code:'VERSION_STORE_INVALID'});await fs.unlink(file);
- const moved=path.join(root,'moved');await fs.rename(path.dirname(file),moved);await fs.symlink(moved,path.dirname(file));await assert.rejects(store.read(target),{code:'VERSION_STORE_INVALID'});
+ const moved=path.join(root,'moved');await fs.rename(path.dirname(file),moved);await fs.symlink(moved,path.dirname(file),process.platform==='win32'?'junction':'dir');await assert.rejects(store.read(target),{code:'VERSION_STORE_INVALID'});
  await fs.unlink(path.dirname(file));await fs.mkdir(path.dirname(file));await assert.rejects(store.saveDraft(target,draft),{code:'VERSION_STORE_INVALID'});
 });
 test('bounds source and revision count before modifying saved state',async t=>{

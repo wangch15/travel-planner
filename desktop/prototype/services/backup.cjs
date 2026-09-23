@@ -54,7 +54,9 @@ class BackupService {
     }
     if (values.get('core.hookspath') !== '.githooks') throw fail('TRUSTED_HOOK_REQUIRED', '需要安裝並核對專案的私人備份 pre-push 保護。');
     if (values.get('core.worktree') && path.resolve(root, values.get('core.worktree')) !== root) throw fail('UNSAFE_GIT_CONFIG');
-    if ((await this.git(root, ['rev-parse', '--show-toplevel'])).trim() !== root) throw fail('UNSAFE_PATH');
+    // Git for Windows prints forward slashes even when realpath uses native separators.
+    // Keep the canonical root check above; normalize only Git's path representation.
+    if (path.resolve((await this.git(root, ['rev-parse', '--show-toplevel'])).trim()) !== root) throw fail('UNSAFE_PATH');
     const hookStat = await fs.lstat(path.join(root, '.githooks/pre-push'));
     if (process.platform !== 'win32' && !(hookStat.mode & 0o111)) throw fail('TRUSTED_HOOK_REQUIRED', '備份保護 hook 未啟用，請先修復安裝。');
     const entries = await fs.readdir(path.join(root, '.githooks'));

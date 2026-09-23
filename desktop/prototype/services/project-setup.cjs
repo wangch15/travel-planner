@@ -84,7 +84,8 @@ class ProjectSetupService {
     if (typeof root !== 'string' || !path.isAbsolute(root)) throw fail('UNSAFE_PROJECT_PATH');
     const owned = await anchor(root), dotGit = await fs.lstat(path.join(owned.canonical, '.git'));
     if (dotGit.isSymbolicLink() || (!dotGit.isFile() && !dotGit.isDirectory())) throw fail('UNSAFE_PROJECT_PATH');
-    if (String(await this.git(['rev-parse', '--show-toplevel'], { cwd: owned.canonical })).trim() !== owned.canonical) throw fail('UNSAFE_PROJECT_PATH');
+    // Git for Windows prints forward slashes even when realpath uses native separators.
+    if (path.resolve(String(await this.git(['rev-parse', '--show-toplevel'], { cwd: owned.canonical })).trim()) !== owned.canonical) throw fail('UNSAFE_PROJECT_PATH');
     const common = String(await this.git(['rev-parse', '--git-common-dir'], { cwd: owned.canonical })).trim();
     const metadata = await anchor(path.resolve(owned.canonical, common)), configFile = path.join(metadata.canonical, 'config');
     const configDigest = createHash('sha256').update(await regularBytes(configFile, 256 * 1024)).digest('hex');

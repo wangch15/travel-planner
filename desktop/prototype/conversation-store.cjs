@@ -38,7 +38,13 @@ class ConversationStore {
       this.anchor ||= {stat,canonical};return true;
     } catch(e) { if(e.code==='ENOENT'&&!this.anchor)return false;throw fail(); }
   }
-  async read(target) {
+  read(target) {
+    // Readers share the mutation queue: our own atomic rename must not look like
+    // an external inode replacement between lstat and open.
+    const operation=this.queue.then(()=>this.load(target));
+    this.queue=operation.catch(()=>{});return operation;
+  }
+  async load(target) {
     const file=this.filename(target);
     if(!await this.checkDirectory())return empty();
     let handle;
@@ -58,14 +64,14 @@ class ConversationStore {
   }
   update(target, change) {
     const operation=this.queue.then(async()=>{
-      const state=await this.read(target);change(state);if(!valid(state))throw fail();
+      const state=await this.load(target);change(state);if(!valid(state))throw fail();
       const bytes=JSON.stringify(state)+'\n';if(Buffer.byteLength(bytes)>MAX_BYTES)throw fail();
       await fs.mkdir(this.directory,{recursive:true,mode:0o700});await this.checkDirectory();
       const temp=path.join(this.directory,`.chat-${randomUUID()}.tmp`);let owned;
       try {
         const handle=await fs.open(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
         try {owned=await handle.stat();await this.checkDirectory();await handle.writeFile(bytes);await handle.sync();} finally {await handle.close();}
-        await this.read(target);await this.checkDirectory();
+        await this.load(target);await this.checkDirectory();
         const stat=await fs.lstat(temp);if(!regular(stat)||!same(owned,stat))throw fail();
         await fs.rename(temp,this.filename(target));await this.checkDirectory();return state;
       } finally {

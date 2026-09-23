@@ -34,3 +34,14 @@ test('refuses linked parent and invalid/oversized records',async t=>{
  await fs.mkdir(path.join(root,'other'));await fs.symlink(path.join(root,'other'),path.join(root,'conversations'));
  await assert.rejects(store.update(target,s=>{s.draft='secret';}));
 });
+
+test('reads wait for an in-flight atomic write instead of seeing stale data or a replaced inode',async t=>{
+ const {store,target}=await fixture(t);await store.update(target,s=>{s.draft='before';});
+ const rename=fs.rename;let release,entered;
+ const gate=new Promise(resolve=>{release=resolve;}),atRename=new Promise(resolve=>{entered=resolve;});
+ t.mock.method(fs,'rename',async(...args)=>{entered();await gate;return rename(...args);});
+ const write=store.update(target,s=>{s.draft='after';});await atRename;
+ const read=store.read(target);
+ release();await write;
+ assert.equal((await read).draft,'after');
+});

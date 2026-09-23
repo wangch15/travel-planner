@@ -155,12 +155,15 @@ for (const timing of ['after-realpath', 'after-open', 'after-read']) test('rejec
   const outside = path.join(root, 'outside');
   await fs.cp(photos, outside, { recursive: true });
   await fs.writeFile(path.join(outside, 'yamadera-1.jpg'), 'OUTSIDE_BYTES');
-  let replaced = false;
+  let attempted = false, replaced = false, replacementError = null;
   const replace = async () => {
-    if (replaced) return;
-    replaced = true;
-    await fs.rename(photos, path.join(root, 'original-photos'));
-    await fs.symlink(outside, photos);
+    if (attempted) return;
+    attempted = true;
+    try {
+      await fs.rename(photos, path.join(root, 'original-photos'));
+      await fs.symlink(outside, photos, process.platform === 'win32' ? 'junction' : 'dir');
+      replaced = true;
+    } catch (error) { replacementError = error; throw error; }
   };
   const realpath = fs.realpath;
   const open = fs.open;
@@ -172,7 +175,10 @@ for (const timing of ['after-realpath', 'after-open', 'after-read']) test('rejec
   else t.mock.method(fs, 'open', async (filename, ...args) => {
     const handle = await open(filename, ...args);
     if (filename === path.join(photos, 'yamadera-1.jpg')) {
-      if (timing === 'after-open') await replace();
+      if (timing === 'after-open') {
+        try { await replace(); }
+        catch (error) { await handle.close(); throw error; }
+      }
       else {
         const read = handle.read.bind(handle);
         handle.read = async (...readArgs) => { const result = await read(...readArgs); await replace(); return result; };
@@ -180,8 +186,17 @@ for (const timing of ['after-realpath', 'after-open', 'after-read']) test('rejec
     }
     return handle;
   });
-  await assert.rejects(readTripSnapshot(dir, { includePhotoBytes: true }), { code: 'SOURCE_CHANGED' });
-  assert.equal(replaced, true);
+  await assert.rejects(readTripSnapshot(dir, { includePhotoBytes: true }), error => {
+    // Windows can deny the directory rename while the photo handle is open.
+    // Only that observed OS denial may produce the generic read error.
+    assert.ok(error.code === 'SOURCE_CHANGED' ||
+      (process.platform === 'win32' && timing !== 'after-realpath' &&
+        ['EPERM', 'EACCES', 'EBUSY'].includes(replacementError?.code) && error.code === 'READ_FAILED'),
+    `unexpected error: ${error.code}`);
+    return true;
+  });
+  assert.equal(attempted, true);
+  assert.equal(replaced, !replacementError);
 });
 
 test('version context excludes editable days but includes other source data, theme and photos',async t=>{

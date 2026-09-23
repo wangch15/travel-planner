@@ -86,7 +86,9 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       setTimeout(() => send({ id: message.id, result: 'late response' }), 60);
       break;
     case 'close-output':
-      process.stdout.end();
+      // End the OS pipe itself. Writable.end() can leave the inherited Windows
+      // stdout handle open while stdin keeps this fake server alive.
+      require('node:fs').closeSync(1);
       break;
     case 'stderr':
       process.stderr.write('private fixture data'.repeat(65536), () => send({ id: message.id, result: true }));
