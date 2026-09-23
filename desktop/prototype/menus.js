@@ -9,7 +9,7 @@
     close(false);trigger=anchor;anchor.setAttribute('aria-expanded','true');
     menu=document.createElement('div');menu.className='action-menu';menu.setAttribute('popover','manual');menu.setAttribute('role','menu');menu.setAttribute('aria-label',anchor.getAttribute('aria-label')||'更多操作');
     for(const item of items){if(item.separator){const line=document.createElement('div');line.className='menu-separator';line.setAttribute('role','separator');menu.append(line);continue;}
-      const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitem');b.disabled=Boolean(item.disabled);b.tabIndex=-1;if(item.danger)b.className='danger';
+      const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitem');b.disabled=Boolean(item.disabled);b.tabIndex=-1;if(item.title)b.title=item.title;if(item.danger)b.className='danger';
       if(item.icon){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('icon');svg.setAttribute('aria-hidden','true');const use=document.createElementNS(svg.namespaceURI,'use');use.setAttribute('href','#i-'+item.icon);svg.append(use);b.append(svg);}
       const text=document.createElement('span');text.textContent=item.label;b.append(text);b.onclick=()=>{close();Promise.resolve().then(item.action).catch(e=>window.notify?.(e.message||'操作未完成'));};menu.append(b);
     }

@@ -109,7 +109,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   updater.on('changed',updateChanged);
   let providerId=codexAccount?'codex':restored.state.aiProvider||'codex';
   let defaultsQueue=Promise.resolve();
-  let aiDefaults=restored.state.aiDefaults||{provider:restored.state.aiProvider||'codex',models:{}};
+  let aiDefaults={provider:restored.state.aiDefaults?.provider||restored.state.aiProvider||'codex',models:restored.state.aiDefaults?.models||{},effort:restored.state.aiDefaults?.effort??'medium'};
   const createAI=id=>id==='codex'?{account:codexAccount||new CodexAccount(stateDirectory)}:makeProvider(id,stateDirectory,{resolveCommand:tool=>toolSupport.resolveCommand(tool)});
   const providerBundles=new Map(),providerListeners=new Map(),providerLoginURLs=new Map(),providerAuthBusy=new Set();
   let bundle=createAI(providerId);bundle.editor ||= makeEditor(bundle.account);providerBundles.set(providerId,bundle);
@@ -132,7 +132,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   listenProvider(providerId,bundle);
   async function activateProvider(id){if(id===providerId)return;const next=getProvider(id);await store.setAIProvider(id);providerId=id;bundle=next;account=next.account;editor=next.editor;pendingLoginURL=providerLoginURLs.get(id)||null;autoTarget=null;accountChanged(account.account);}
   function sessionProvider(state){if(state.provider)return state.provider;const tagged=['claude','gemini'].find(id=>state.thread?.id?.startsWith(id+':'));if(tagged)return tagged;if(state.thread)return 'codex';if(/^(?:auto-)?gemini/.test(state.model||''))return 'gemini';if(/^(?:claude-|sonnet|opus|haiku)/.test(state.model||''))return 'claude';if(/^(?:gpt-|codex|o[1-9])/.test(state.model||''))return 'codex';return providerId;}
-  function assignSessionProvider(state){if(!state.provider){state.provider=state.thread||state.messages.length?sessionProvider(state):aiDefaults.provider;if(!state.model)state.model=aiDefaults.models[state.provider]||'';}}
+  function assignSessionProvider(state){if(!state.provider){state.provider=state.thread||state.messages.length?sessionProvider(state):aiDefaults.provider;if(!state.model)state.model=aiDefaults.models[state.provider]||'';if(!state.started&&!state.messages.length&&!state.effort&&state.provider==='codex')state.effort=aiDefaults.effort;}}
 
   win.setMenuBarVisibility(false);
   win.webContents.on('will-navigate', event => event.preventDefault());
@@ -420,7 +420,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   function sessionPayload(state){return Object.fromEntries(sessionFields.filter(key=>state[key]!==undefined).map(key=>[key,structuredClone(state[key])]));}
   function ensureSessions(state){state.conversationId ||= randomUUID();state.conversationTitle ||= '旅程討論';state.archives ||= [];}
   function stashSession(state,archived=false){ensureSessions(state);const payload=sessionPayload(state);if(archived&&payload.job){payload.job.autoResume=false;payload.job.claimId=null;if(payload.job.status!=='completed')payload.job.status='paused';payload.job.reason='conversation-archived';}state.archives.push({id:state.conversationId,title:state.conversationTitle,archived,payload});if(state.archives.length>50)throw Error('CONVERSATION_LIMIT');}
-  function freshSession(state,title){state.conversationId=randomUUID();state.conversationTitle=title;state.started=false;state.messages=[];state.draft='';state.thread=null;state.run=null;state.job=null;state.handoff=null;state.pendingProposal=false;state.lastOutcome='新的 AI 對話，以最新行程為準。';state.provider=aiDefaults.provider;state.model=aiDefaults.models[state.provider]||'';state.effort='';}
+  function freshSession(state,title){state.conversationId=randomUUID();state.conversationTitle=title;state.started=false;state.messages=[];state.draft='';state.thread=null;state.run=null;state.job=null;state.handoff=null;state.pendingProposal=false;state.lastOutcome='新的 AI 對話，以最新行程為準。';state.provider=aiDefaults.provider;state.model=aiDefaults.models[state.provider]||'';state.effort=state.provider==='codex'?aiDefaults.effort:'';}
   feature('conversations-list',async input=>{const state=await conversations.update(selectedTarget(input),ensureSessions);return {currentId:state.conversationId,items:[{id:state.conversationId,title:state.conversationTitle,archived:false,current:true},...state.archives.map(({id,title,archived})=>({id,title,archived,current:false}))]};});
   feature('conversation-new',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});const target=selectedTarget(input);const state=await conversations.update(target,s=>{assignSessionProvider(s);stashSession(s);freshSession(s,'新的討論');});await activateProvider(state.provider);return {conversation:displayConversation(state)};},{exclusive:true});
   feature('conversation-switch',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});const target=selectedTarget(input);const state=await conversations.update(target,s=>{ensureSessions(s);if(s.conversationId===input.id)return;const index=s.archives.findIndex(c=>c.id===input.id);if(index<0)throw Error('CONVERSATION_NOT_FOUND');const chosen=s.archives.splice(index,1)[0];stashSession(s);for(const field of sessionFields)delete s[field];for(const field of sessionFields)if(Object.hasOwn(chosen.payload,field))s[field]=structuredClone(chosen.payload[field]);s.conversationId=chosen.id;s.conversationTitle=chosen.title;s.pendingProposal=false;s.lastOutcome='切換到既有對話；本轮仍以最新行程為準，過去提案不代表目前已保存。';});await activateProvider(sessionProvider(state));autoTarget=target;return {conversation:displayConversation(state)};},{exclusive:true});
@@ -473,8 +473,9 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   feature('provider-models',async input=>({models:await getProvider(input.id).account.models()}));
   feature('ai-defaults-set',async input=>{
     const operation=defaultsQueue.then(async()=>{
-    const item=getProvider(input.provider);const next={provider:input.provider,models:{...aiDefaults.models}};
+    const item=getProvider(input.provider);const next={provider:input.provider,models:{...aiDefaults.models},effort:aiDefaults.effort};
     if(input.model!==undefined){if(typeof input.model!=='string'||input.model.length>200)throw Error('INVALID_MODEL');if(input.model&&!(await item.account.models()).some(model=>model.id===input.model))throw Object.assign(Error('MODEL_UNAVAILABLE'),{code:'MODEL_UNAVAILABLE'});next.models[input.provider]=input.model;}
+    if(input.effort!==undefined){if(input.provider!=='codex'||typeof input.effort!=='string')throw Error('INVALID_INPUT');const models=await item.account.models(),model=models.find(m=>m.id===next.models.codex)||models.find(m=>m.isDefault)||models[0];const allowed=(model?.effort||[]).map(e=>typeof e==='string'?e:e.reasoningEffort);if(!allowed.includes(input.effort))throw Object.assign(Error('EFFORT_UNAVAILABLE'),{code:'EFFORT_UNAVAILABLE'});next.effort=input.effort;}
     await store.setAIDefaults(next);aiDefaults=next;return {defaults:aiDefaults};
     });defaultsQueue=operation.catch(()=>{});return operation;
   });
@@ -484,7 +485,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     let conversation=null;if(currentProject&&activeSlug){const state=await conversations.update({root:currentProject.root,slug:activeSlug},s=>{
       assignSessionProvider(s);if(sessionStarted(s)&&input.newConversation!==true)throw Object.assign(Error('SESSION_PROVIDER_LOCKED'),{code:'SESSION_PROVIDER_LOCKED'});
       if(input.newConversation===true){stashSession(s);freshSession(s,'新的討論');}
-      s.provider=input.id;s.model=aiDefaults.models[input.id]||'';s.effort='';
+      s.provider=input.id;s.model=aiDefaults.models[input.id]||'';s.effort=input.id==='codex'?aiDefaults.effort:'';
     });conversation=displayConversation(state);}
     await activateProvider(input.id);return {provider:providerId,account:providerView(providerId),conversation};
   },{exclusive:true});

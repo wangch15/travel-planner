@@ -25,8 +25,8 @@
   async function loadConversations(){if(!selected||selected.demo||!window.travelDesktop)return;const request=++conversationRequest;const result=await api('conversations-list',target());if(request!==conversationRequest)return;conversationItems=result.items;currentConversation=result.currentId;navigation();}
   function conversationMenu(item){const disabled=aiBusy||Boolean(pendingProposal)||materializedCandidate;return [
     {label:'命名對話',icon:'chat',disabled,action:()=>{renameConversationId=item.id;$('conversation-name').value=item.title;$('conversation-name-dialog').showModal();}},
-    {label:'複製對話',icon:'chat',disabled,action:async()=>{await api('conversation-copy',{...target(),id:item.id});notify('對話已複製。');}},
-    {label:item.archived?'取消封存':'封存對話',icon:'folder',disabled,action:()=>changeConversation('conversation-archive',{id:item.id,archived:!item.archived})}
+    {label:'複製對話',icon:'chat',disabled:aiBusy,action:async()=>{await api('conversation-copy',{...target(),id:item.id});notify('對話文字已複製；可能含私人資訊，請留意貼上的位置。');}},
+    {label:pendingProposal||materializedCandidate?'封存對話（請先處理提案）':item.archived?'取消封存':'封存對話',icon:'folder',disabled,title:pendingProposal||materializedCandidate?'請先確認或放棄目前提案，再封存對話':'',action:()=>changeConversation('conversation-archive',{id:item.id,archived:!item.archived})}
   ];}
   function renderConversations(){
     $('conversation-list').replaceChildren();for(const item of conversationItems.filter(c=>showArchived||!c.archived)){
@@ -37,12 +37,13 @@
   window.renderSidebarConversations=renderConversations;
   window.populateTripConversations=async(trip,container)=>{
     const projectId=project?.projectId;try{const result=await api('conversations-list',{projectId,slug:trip.slug});if(!container.isConnected||project?.projectId!==projectId)return;
-      for(const item of result.items.filter(c=>showArchived||!c.archived)){const activate=async()=>{await selectTrip(trip);await selectionReady;return selected?.trip===trip;};const row=el('div',undefined,'conversation-row'),b=button(item.title,async()=>{if(await activate())await changeConversation('conversation-switch',{id:item.id});});b.className='conversation-button';b.prepend(icon('chat'));const items=()=>conversationMenu(item).map(entry=>entry.action?{...entry,action:async()=>{if(await activate())return entry.action();}}:entry);const more=moreButton(item.title+'的更多操作',items);row.append(b,more);row.oncontextmenu=e=>openActionMenu(more,items(),e);container.append(row);}
+      for(const item of result.items.filter(c=>showArchived||!c.archived)){const activate=async()=>{if(selected?.trip===trip)return true;if(pendingProposal||materializedCandidate||aiBusy)return false;await selectTrip(trip);await selectionReady;return selected?.trip===trip;};const row=el('div',undefined,'conversation-row'),b=button(item.title,async()=>{if(await activate())await changeConversation('conversation-switch',{id:item.id});});b.className='conversation-button';b.prepend(icon('chat'));const items=()=>conversationMenu(item).map(entry=>entry.action?{...entry,disabled:entry.disabled||((pendingProposal||materializedCandidate)&&selected?.trip!==trip),action:async()=>{if(await activate())return entry.action();}}:entry);const more=moreButton(item.title+'的更多操作',items);row.append(b,more);row.oncontextmenu=e=>openActionMenu(more,items(),e);container.append(row);}
     }catch{if(container.isConnected)container.append(el('small','無法載入對話，請選取旅程重試。'));}
   };
   window.newTripConversation=async trip=>{if(selected?.trip!==trip){await selectTrip(trip);await selectionReady;}if(selected?.trip===trip)await changeConversation('conversation-new');};
   $('conversation-new').onclick=()=>changeConversation('conversation-new');
-  $('conversation-copy').onclick=()=>action('conversation-copy',async()=>{await api('conversation-copy',target());notify('對話文字已複製；可能含私人資訊，請留意貼上的位置。');});
+  const copyCurrentConversation=()=>action('conversation-copy',async()=>{await api('conversation-copy',{...target(),id:currentConversation});notify('對話文字已複製；可能含私人資訊，請留意貼上的位置。');});
+  $('conversation-copy').onclick=copyCurrentConversation;
   $('conversation-rename').onclick=()=>{renameConversationId=currentConversation;$('conversation-name').value=conversationItems.find(c=>c.id===currentConversation)?.title||'';$('conversation-name-dialog').showModal();};$('close-conversation-name').onclick=()=>$('conversation-name-dialog').close();
   $('conversation-name-form').onsubmit=async event=>{event.preventDefault();try{useConversation(await api('conversation-rename',{...target(),id:renameConversationId||currentConversation,title:$('conversation-name').value}));$('conversation-name-dialog').close();await loadConversations();}catch(e){notify(e.message);}};
   $('conversation-archive').onclick=()=>changeConversation('conversation-archive',{id:currentConversation});
@@ -62,7 +63,8 @@
   function newProviderConversation(){
     if(aiBusy||pendingProposal||materializedCandidate)return;
     const select=$('provider-switch-choice');for(const option of select.options)option.disabled=option.value===activeProvider;
-    nextProvider=[...select.options].find(option=>!option.disabled).value;select.value=nextProvider;
+    const available=[...select.options].find(option=>!option.hidden&&!option.disabled);if(!available){notify('目前沒有其他已連接的 AI；請先到 AI 設定連接服務。');return;}
+    nextProvider=available.value;select.value=nextProvider;
     $('provider-switch-description').textContent='目前對話、設定與草稿都會保留。新對話使用所選服務，不會自動收到舊對話內容。';$('provider-switch-dialog').showModal();select.focus();
   }
   $('chat-provider').onchange=e=>requestProvider(e.target.value);$('cancel-provider-switch').onclick=()=>$('provider-switch-dialog').close();
@@ -72,10 +74,10 @@
     {label:'使用其他 AI 開新對話…',icon:'plus',disabled:aiBusy||Boolean(pendingProposal)||materializedCandidate,action:newProviderConversation},
     {separator:true},
     {label:'命名對話',icon:'chat',disabled:aiBusy,action:()=>$('conversation-rename').click()},
-    {label:'複製對話',icon:'chat',disabled:aiBusy,action:()=>$('conversation-copy').click()},
+    {label:'複製對話',icon:'chat',disabled:aiBusy,action:copyCurrentConversation},
     {separator:true},{label:'交接到新對話…',icon:'chat',disabled:aiBusy||Boolean(pendingProposal),action:()=>$('handoff-open').click()},
     {label:'重新開始（保留紀錄）',icon:'chat',disabled:$('restart-conversation').disabled,action:()=>$('restart-conversation').click()},
-    {separator:true},{label:'封存對話',icon:'folder',disabled:aiBusy||Boolean(pendingProposal),action:()=>$('conversation-archive').click()}
+    {separator:true},{label:pendingProposal||materializedCandidate?'封存對話（請先處理提案）':'封存對話',icon:'folder',disabled:aiBusy||Boolean(pendingProposal)||materializedCandidate,title:pendingProposal||materializedCandidate?'請先確認或放棄目前提案，再封存對話':'',action:()=>changeConversation('conversation-archive',{id:currentConversation})}
   ]);
   $('journeys-more').onclick=e=>openActionMenu(e.currentTarget,[
     {label:showArchived?'隱藏已封存對話':'顯示已封存對話',icon:'chat',action:()=>{showArchived=!showArchived;navigation();}},
@@ -115,7 +117,8 @@
   window.setFeatureModels=value=>{models=value;window.refreshEffort();};
   window.refreshEffort=()=>{
     const model=models.find(m=>m.id===$('chat-model').value);const previous=selected?.trip.effort??featureState.effort??'';
-    $('chat-effort').replaceChildren();const automatic=el('option','預設思考強度');automatic.value='';$('chat-effort').append(automatic);
+    const names={none:'不額外思考',minimal:'最少',low:'低',medium:'中',high:'高',xhigh:'更高',max:'最高'};
+    $('chat-effort').replaceChildren();const automatic=el('option',model?.defaultEffort?`模型預設（${names[model.defaultEffort]||model.defaultEffort}）`:'模型預設（由服務決定）');automatic.value='';$('chat-effort').append(automatic);
     for(const item of model?.effort||[]){const value=typeof item==='string'?item:item.reasoningEffort;const option=el('option',({none:'不額外思考',minimal:'最少',low:'低',medium:'中',high:'高',xhigh:'更高',max:'最高'})[value]||value);option.value=value;$('chat-effort').append(option);}
     const allowed=[...$('chat-effort').options].some(o=>o.value===previous);$('chat-effort').value=allowed?previous:'';
     if(model&&selected&&!selected.demo&&!allowed)selected.trip.effort='';
@@ -123,7 +126,7 @@
   };
   $('chat-effort').onchange=()=>{if(selected){selected.trip.effort=$('chat-effort').value;queuePreferences();}};
   window.onFeatureAccount=account=>{window.updateProviderRow?.({...account,provider:activeProvider});const identity=JSON.stringify([activeProvider,account.label,account.plan]);if(account.state!=='connected'||identity!==lastAccount){references=[];selectedRefs.clear();referenceScope='';$('chat-effort').hidden=true;}lastAccount=identity;updateReferenceCount();};
-  window.renderFeatureState=state=>{featureState=state;currentConversation=state.conversationId;loadConversations().catch(()=>{});window.refreshEffort();renderJob();renderPlan();};
+  window.renderFeatureState=state=>{featureState=state;currentConversation=state.conversationId;if(conversationItems[0]?.id!==currentConversation){conversationItems=[];renderConversations();}loadConversations().catch(()=>{});window.refreshEffort();renderJob();renderPlan();};
   function renderPlan(){const planning=Boolean(realPreview?.planning);$('planning-actions').hidden=!planning;
     tell('planning-status',featureState.plan?.approvedDigest?'逐日草案已確認':'規劃草案 · 尚待確認');
     $('confirm-plan').disabled=!featureState.plan?.markdown||Boolean(featureState.plan?.approvedDigest)||aiBusy;
@@ -132,7 +135,8 @@
   }
   window.updateFeatureControls=({real,ready,busy,pending,planning})=>{
     document.querySelectorAll('#trips .conversation-button').forEach(b=>b.disabled=busy||Boolean(pending)||materializedCandidate);
-    $('conversation-sidebar').hidden=!real;for(const id of ['conversation-new','conversation-rename','conversation-archive','conversation-copy'])$(id).disabled=busy||Boolean(pending)||materializedCandidate;
+    $('conversation-sidebar').hidden=!real;for(const id of ['conversation-new','conversation-rename','conversation-archive'])$(id).disabled=busy||Boolean(pending)||materializedCandidate;
+    $('conversation-copy').disabled=busy;
     $('feature-workflow').hidden=!real;$('open-references').hidden=!real;
     $('open-references').disabled=busy||accountState.state!=='connected';$('chat-effort').disabled=busy||Boolean(pending);
     $('research-trip').disabled=!ready||busy||accountState.state!=='connected'||(planning&&!featureState.plan?.approvedDigest);

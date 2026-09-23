@@ -379,6 +379,8 @@ button.danger,.action-menu button.danger .icon { color:var(--error); }
 #tool-command { white-space:pre-wrap; overflow-wrap:anywhere; padding:12px; border:1px solid var(--line); border-radius:7px; font-size:11px; }
 #tool-setup-steps { padding-left:22px; line-height:1.9; font-size:13px; }
 #chat-provider { max-width:120px; font-size:12px; padding:3px 7px; color:var(--muted); background:transparent; border:0; border-radius:5px; }
+#chat-provider-locked { max-width:120px; padding:3px 7px; white-space:nowrap; }
+select option[hidden] { display:none; }
 .settings-nav-title { padding:0; }
 .journey-row .trip-button,.journey-conversations .conversation-button { justify-content:flex-start; }
 .conversation-heading { display:none; }

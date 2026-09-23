@@ -489,8 +489,11 @@ function updateComposer() {
   const hasModels = [...$('chat-model').options].some(o=>!o.disabled);
   const modelReady=hasModels&&Boolean($('chat-model').selectedOptions[0])&&!$('chat-model').selectedOptions[0].disabled;
   $('chat-model').hidden = !real || accountState.state !== 'connected' || !$('chat-model').options.length;
-  $('chat-provider').hidden=!real;
   const providerLocked=Boolean(selected&&!selected.demo&&selected.trip.featureState?.started);
+  $('chat-provider').hidden=!real||providerLocked;
+  $('chat-provider-locked').hidden=!real||!providerLocked;
+  $('chat-provider-locked').textContent=({codex:'Codex',claude:'Claude Code',gemini:'Gemini'})[activeProvider]||activeProvider;
+  window.refreshProviderOptions?.();
   $('chat-provider').disabled=providerLocked||aiBusy||Boolean(pendingProposal)||Boolean(window.hasMaterialization?.());
   $('chat-provider').title=providerLocked?'此對話的 AI 服務已固定；可從右上方選單使用其他 AI 開新對話':'選擇這段新對話的 AI 服務';
   $('chat-model').disabled = aiBusy || Boolean(pendingProposal);
@@ -681,7 +684,7 @@ if(window.travelDesktop){window.travelDesktop.feature('provider-status').then(re
 
 function renderCodexAccount(account) {
   if(account.provider&&account.provider!==activeProvider){activeProvider=account.provider;accountRequest++;}accountState = account;window.onFeatureAccount?.(account);
-  const providerName=({codex:'Codex',claude:'Claude Code',gemini:'Gemini'})[activeProvider];$('provider-heading').textContent=providerName;$('chat-provider').value=activeProvider;$('codex-connect').textContent='檢查 '+providerName;$('codex-login').textContent=activeProvider==='codex'?'連接 ChatGPT':'登入 '+providerName;
+  const providerName=({codex:'Codex',claude:'Claude Code',gemini:'Gemini'})[activeProvider];$('provider-heading').textContent=providerName;$('chat-provider').value=activeProvider;window.refreshProviderOptions?.();$('codex-connect').textContent='檢查 '+providerName;$('codex-login').textContent=activeProvider==='codex'?'連接 ChatGPT':'登入 '+providerName;
   document.querySelector('.prototype-label').textContent = account.state === 'checking'?'正在核對已保存的登入…':account.state === 'connected' ? '提案經確認後才保存' : '可在設定連接 AI 助手';
   const labels = { checking:'正在恢復連線', unavailable:'尚未安裝', error:'連線待確認', disconnected:'尚未連接', 'needs-login':'需要登入', connected:'已連接', 'waiting-login':'等待授權', 'login-failed':'登入未完成', switching:'正在更換帳號', 'switch-failed':'需要重新確認' };
   $('codex-badge').textContent = account.cachedAuth?'登入已保存':labels[account.state] || '需要確認';

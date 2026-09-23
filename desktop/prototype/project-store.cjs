@@ -4,7 +4,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const THEMES = new Set(['system', 'light', 'dark']);
 const providers=['codex','claude','gemini'];
-const defaultsOK=v=>v&&providers.includes(v.provider)&&v.models&&typeof v.models==='object'&&!Array.isArray(v.models)&&Object.entries(v.models).every(([id,model])=>providers.includes(id)&&typeof model==='string'&&model.length<=200);
+const defaultsOK=v=>v&&providers.includes(v.provider)&&v.models&&typeof v.models==='object'&&!Array.isArray(v.models)&&Object.entries(v.models).every(([id,model])=>providers.includes(id)&&typeof model==='string'&&model.length<=200)&&(v.effort===undefined||['none','minimal','low','medium','high','xhigh','max'].includes(v.effort));
 const empty = () => ({ schemaVersion: 1, theme: 'system', project: null });
 const slugOK = value => typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,100}$/.test(value);
 const projectOK = value => value && typeof value.id === 'string' && /^[a-zA-Z0-9-]{1,100}$/.test(value.id)
@@ -119,7 +119,7 @@ function createProjectStore(directory) {
       });
     },
     setDemoHidden: async demoHidden=>{if(typeof demoHidden!=='boolean')throw Error('invalid-demo-preference');return mutate(state=>({...state,demoHidden}));},
-    setAIDefaults:async value=>{if(!defaultsOK(value))throw Error('invalid-ai-defaults');return mutate(state=>({...state,aiDefaults:{provider:value.provider,models:{...value.models}}}));},
+    setAIDefaults:async value=>{if(!defaultsOK(value))throw Error('invalid-ai-defaults');return mutate(state=>({...state,aiDefaults:{provider:value.provider,models:{...value.models},effort:value.effort??'medium'}}));},
     setAIProvider: async aiProvider=>{if(!['codex','claude','gemini'].includes(aiProvider))throw Error('invalid-provider');return mutate(state=>({...state,aiProvider}));},
     clearSelection: async()=>mutate(state=>({...state,project:state.project?{...state.project,selectedSlug:null}:null})),
     setTheme: async theme => {
