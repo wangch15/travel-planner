@@ -109,7 +109,9 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   updater.on('changed',updateChanged);
   let providerId=codexAccount?'codex':restored.state.aiProvider||'codex';
   let defaultsQueue=Promise.resolve();
-  let aiDefaults={provider:restored.state.aiDefaults?.provider||restored.state.aiProvider||'codex',models:restored.state.aiDefaults?.models||{},effort:restored.state.aiDefaults?.effort??'medium'};
+  const savedDefaultProvider=restored.state.aiDefaults?.provider||restored.state.aiProvider||'codex';
+  // Keep saved Gemini preferences/history intact, but never start a new hidden Google conversation.
+  let aiDefaults={provider:savedDefaultProvider==='gemini'?'codex':savedDefaultProvider,models:restored.state.aiDefaults?.models||{},effort:restored.state.aiDefaults?.effort??'medium'};
   const createAI=id=>id==='codex'?{account:codexAccount||new CodexAccount(stateDirectory)}:makeProvider(id,stateDirectory,{resolveCommand:tool=>toolSupport.resolveCommand(tool)});
   const providerBundles=new Map(),providerListeners=new Map(),providerLoginURLs=new Map(),providerAuthBusy=new Set();
   let bundle=createAI(providerId);bundle.editor ||= makeEditor(bundle.account);providerBundles.set(providerId,bundle);
@@ -169,11 +171,11 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     assertSender(event);
     if (accountSwitching) return {ok:false,message:'正在更換帳號，請稍候。'};
     const requestedProvider=providerId,capabilities=bundle.capabilities||null;
-    try { return { ok: true, account: {...await action(),provider:requestedProvider,capabilities} }; }
+    try { if(requestedProvider==='gemini')throw Object.assign(Error('PROVIDER_UNAVAILABLE'),{code:'PROVIDER_UNAVAILABLE'});return { ok: true, account: {...await action(),provider:requestedProvider,capabilities} }; }
     catch (error) {
       const messages = {
         ENOENT: '尚未找到所選 AI 工具。請到「工具與更新」完成安裝。',
-        CLI_MISSING:'尚未找到所選 AI 工具，請到「工具與更新」完成安裝。',EXTERNAL_PROVIDER_POLICY:'這個工具的公司管理原則與 App 隔離設定不相容，原設定保持不變。Claude 目前支援 Pro／Max 帳號。',UNSUPPORTED_PROVIDER_VERSION:'舊版 Gemini CLI 接法無法驗證目前工具的安全限制；不會只因版本號而忽略限制。',SUBSCRIPTION_LOGIN_REQUIRED:'請使用這個服務的官方帳號登入；App 不會自動改用付費 API。',PROVIDER_AUTH_INVALID:'登入資料需要重新核對，請使用更多選單重新登入。',
+        CLI_MISSING:'尚未找到所選 AI 工具，請到「工具與更新」完成安裝。',PROVIDER_UNAVAILABLE:'Gemini 連線暫停；既有對話仍保留，請改用 Codex 或 Claude。',EXTERNAL_PROVIDER_POLICY:'這個工具的公司管理原則與 App 隔離設定不相容，原設定保持不變。Claude 目前支援 Pro／Max 帳號。',UNSUPPORTED_PROVIDER_VERSION:'舊版 Gemini CLI 接法無法驗證目前工具的安全限制；不會只因版本號而忽略限制。',SUBSCRIPTION_LOGIN_REQUIRED:'請使用這個服務的官方帳號登入；App 不會自動改用付費 API。',PROVIDER_AUTH_INVALID:'登入資料需要重新核對，請使用更多選單重新登入。',
         'login-already-pending': '登入正在進行，請完成瀏覽器授權，或先取消再重試。',
         'unexpected-login-url': '登入網址不符合預期，已停止連接。',
         'logout-not-confirmed': '尚未確認舊帳號已登出，請重新確認狀態後再試。',
@@ -230,6 +232,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   const workflowFailure = error => {
     const messages = {
       SESSION_PROVIDER_LOCKED:'這段對話的 AI 服務已固定，請回到原服務或使用其他 AI 開新對話。',
+      PROVIDER_UNAVAILABLE:'Gemini 連線暫停；既有對話仍保留，請改用 Codex 或 Claude 開新對話。',
       JOB_WAITING:'已有工作正在等待額度，請先取消等待再送出新要求。',
       PLAN_CONFIRMATION_REQUIRED:'請先確認逐日草案，再開始研究或建立正式資料。',
       RESEARCH_CONFIRMATION_REQUIRED:'請先完成來源查核並確認查核摘要。',
@@ -292,6 +295,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     return {summary:answer.summary,sources,unresolved:[...new Set(unresolved)],feasibility:answer.feasibility,sourceHash,proposalId:proposalId||null,confirmed:false};
   }
   async function runAI(input,target,{automatic=false}={}){
+    if(providerId==='gemini')return workflowFailure({code:'PROVIDER_UNAVAILABLE'});
     if(accountSwitching||versionBusy||generating||editor.active||proposals.saving||materialization)return workflowFailure({code:'AI_BUSY'});
     generating=true;activeGenerationTarget=target;const nonce=++generationNonce;const checkCanceled=()=>{if(nonce!==generationNonce||win.isDestroyed())throw Object.assign(Error('AI_CANCELED'),{code:'AI_CANCELED'});};let requestSaved=false,candidateCreated=false,editorStarted=false,job,completedAnswer=null;
     try{
@@ -451,8 +455,9 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   feature('trip-restore',async input=>{if(!currentProject)throw Object.assign(Error('NO_PROJECT'),{code:'NO_PROJECT'});const result=await trash.restore({root:currentProject.root,id:input.id});return {result,...await refreshProject(activeSlug)};},{exclusive:true});
   feature('demo-visibility',async input=>{await store.setDemoHidden(input.hidden===true);return {hidden:input.hidden===true};});
   feature('provider-status',async()=>({provider:providerId,account:providerView(providerId),defaults:aiDefaults,capabilities:bundle.capabilities||null}));
-  feature('provider-accounts',async()=>({accounts:['codex','claude','gemini'].map(id=>{getProvider(id);return providerView(id);}),defaults:aiDefaults}));
+  feature('provider-accounts',async()=>({accounts:['codex','claude'].map(id=>{getProvider(id);return providerView(id);}),defaults:aiDefaults}));
   feature('provider-account-action',async input=>{
+    if(input.id==='gemini')throw Object.assign(Error('PROVIDER_UNAVAILABLE'),{code:'PROVIDER_UNAVAILABLE'});
     const item=getProvider(input.id),id=input.id;
     if(!['check','login','cancel','switch','copy-link'].includes(input.action))throw Error('INVALID_ACTION');
     if(input.action==='copy-link'){const url=providerLoginURLs.get(id)||(id===providerId?pendingLoginURL:null);if(!url||item.account.account.state!=='waiting-login')throw Error('LOGIN_LINK_EXPIRED');copyLoginURL(url);return {account:providerView(id),copied:true};}
@@ -469,9 +474,10 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     }catch(error){const code=error.code||error.message;const messages={CLI_MISSING:'尚未安裝，請到工具與更新設定。',ENOENT:'尚未安裝，請到工具與更新設定。',UNSUPPORTED_PROVIDER_VERSION:'舊版 Gemini CLI 接法無法驗證目前工具的安全限制。',EXTERNAL_PROVIDER_POLICY:'帳號或公司管理原則與這版隔離設定不相容。',SUBSCRIPTION_LOGIN_REQUIRED:'請以官方訂閱帳號登入。'};return {account:{...providerView(id),state:['CLI_MISSING','ENOENT'].includes(code)?'unavailable':'error',message:messages[code]||'連線未完成，請重新檢查或重試。'}};}
     finally{providerAuthBusy.delete(id);}
   });
-  feature('provider-models',async input=>({models:await getProvider(input.id).account.models()}));
+  feature('provider-models',async input=>{if(input.id==='gemini')throw Object.assign(Error('PROVIDER_UNAVAILABLE'),{code:'PROVIDER_UNAVAILABLE'});return {models:await getProvider(input.id).account.models()};});
   feature('ai-defaults-set',async input=>{
     const operation=defaultsQueue.then(async()=>{
+    if(input.provider==='gemini')throw Object.assign(Error('PROVIDER_UNAVAILABLE'),{code:'PROVIDER_UNAVAILABLE'});
     const item=getProvider(input.provider);const next={provider:input.provider,models:{...aiDefaults.models},effort:aiDefaults.effort};
     if(input.model!==undefined){if(typeof input.model!=='string'||input.model.length>200)throw Error('INVALID_MODEL');if(input.model&&!(await item.account.models()).some(model=>model.id===input.model))throw Object.assign(Error('MODEL_UNAVAILABLE'),{code:'MODEL_UNAVAILABLE'});next.models[input.provider]=input.model;}
     if(input.effort!==undefined){if(input.provider!=='codex'||typeof input.effort!=='string')throw Error('INVALID_INPUT');const models=await item.account.models(),model=models.find(m=>m.id===next.models.codex)||models.find(m=>m.isDefault)||models[0];const allowed=(model?.effort||[]).map(e=>typeof e==='string'?e:e.reasoningEffort);if(!allowed.includes(input.effort))throw Object.assign(Error('EFFORT_UNAVAILABLE'),{code:'EFFORT_UNAVAILABLE'});next.effort=input.effort;}
@@ -479,6 +485,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     });defaultsQueue=operation.catch(()=>{});return operation;
   });
   feature('provider-select',async input=>{
+    if(input.id==='gemini')throw Object.assign(Error('PROVIDER_UNAVAILABLE'),{code:'PROVIDER_UNAVAILABLE'});
     getProvider(input.id);if(proposals.pending||materialization||editor.active)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});
     if(providerId===input.id&&input.newConversation!==true)return {provider:providerId,account:providerView(providerId)};
     let conversation=null;if(currentProject&&activeSlug){const state=await conversations.update({root:currentProject.root,slug:activeSlug},s=>{

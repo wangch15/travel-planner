@@ -1,6 +1,6 @@
 /* Settings distinguish future defaults, independent accounts and the active chat. */
 (() => {
-  const catalog={codex:{name:'Codex',hint:'使用 ChatGPT 帳號，登入保存在 App。'},claude:{name:'Claude Code',hint:'支援 Pro／Max 帳號，使用獨立登入。'},gemini:{name:'Gemini',hint:'使用 Google 帳號，登入保存在 App。'}};
+  const catalog={codex:{name:'Codex',hint:'使用 ChatGPT 帳號，登入保存在 App。'},claude:{name:'Claude Code',hint:'支援 Pro／Max 帳號，使用獨立登入。'}};
   const records=new Map(),busy=new Set();let defaults={provider:'codex',models:{}},modelRequest=0,loadingAccounts=false,savingDefaults=false;
   const api=async(action,input={})=>{if(!window.travelDesktop)throw Error('請在桌面 App 進行設定。');const result=await window.travelDesktop.feature(action,input);if(!result.ok)throw Error(result.message||'設定未完成，請重試。');return result;};
   const stateLabels={checking:'檢查中',disconnected:'尚未檢查','needs-login':'未連接',connected:'已連接','waiting-login':'等待授權','login-failed':'登入未完成','switch-failed':'需要確認',unavailable:'待安裝',error:'需要確認'};
@@ -19,7 +19,10 @@
     ]);more.dataset.providerAction='more';actions.append(connect,more);row.append(content,actions);if(old)old.replaceWith(row);else $('provider-accounts').append(row);if(focused)row.querySelector('[data-provider-action="'+focused+'"]')?.focus({preventScroll:true});
   }
   function syncProviderOptions(){
-    for(const id of Object.keys(catalog))for(const select of [$('chat-provider'),$('settings-provider'),$('provider-switch-choice')])select.querySelector(`option[value="${id}"]`).hidden=records.get(id)?.state!=='connected';
+    for(const select of [$('chat-provider'),$('settings-provider'),$('provider-switch-choice')]){
+      select.querySelector('option[value="gemini"]').hidden=true;
+      for(const id of Object.keys(catalog))select.querySelector(`option[value="${id}"]`).hidden=records.get(id)?.state!=='connected';
+    }
     $('chat-provider').value=records.get(activeProvider)?.state==='connected'?activeProvider:'';
     $('settings-provider').value=records.get(defaults.provider)?.state==='connected'?defaults.provider:'';
   }

@@ -472,7 +472,7 @@ function updateComposer() {
   $('versions-open').disabled=!ready||aiBusy;
   $('versions-open').textContent=realPreview?.version?`V${realPreview.version.number} · 版本紀錄`:'版本紀錄';
   $('ai-day-controls').hidden = !real;
-  $('connect-from-chat').hidden = accountState.state === 'connected';
+  $('connect-from-chat').hidden = accountState.state === 'connected' || activeProvider === 'gemini';
   const options = realPreview?.summary?.dayOptions || [];
   if (real) {
     const previous = $('edit-day').value;
@@ -492,7 +492,7 @@ function updateComposer() {
   const providerLocked=Boolean(selected&&!selected.demo&&selected.trip.featureState?.started);
   $('chat-provider').hidden=!real||providerLocked;
   $('chat-provider-locked').hidden=!real||!providerLocked;
-  $('chat-provider-locked').textContent=({codex:'Codex',claude:'Claude Code',gemini:'Gemini'})[activeProvider]||activeProvider;
+  $('chat-provider-locked').textContent=({codex:'Codex',claude:'Claude Code',gemini:'Gemini（暫停）'})[activeProvider]||activeProvider;
   window.refreshProviderOptions?.();
   $('chat-provider').disabled=providerLocked||aiBusy||Boolean(pendingProposal)||Boolean(window.hasMaterialization?.());
   $('chat-provider').title=providerLocked?'此對話的 AI 服務已固定；可從右上方選單使用其他 AI 開新對話':'選擇這段新對話的 AI 服務';
@@ -502,7 +502,7 @@ function updateComposer() {
   $('restart-conversation').hidden=!real;
   $('restart-conversation').disabled=aiBusy || Boolean(pendingProposal) || !ready;
   window.updateFeatureControls?.({real,ready,busy:aiBusy,pending:pendingProposal,planning:Boolean(realPreview?.planning)});
-  const canSend = demo || (ready && accountState.state === 'connected' && modelReady && !selected.trip.needsRestart);
+  const canSend = demo || (activeProvider !== 'gemini' && ready && accountState.state === 'connected' && modelReady && !selected.trip.needsRestart);
   $('message').disabled = !selected || conversationLoading || conversationError || aiBusy || Boolean(pendingProposal) || Boolean(window.hasMaterialization?.());
   $('send-message').disabled = !canSend || aiBusy || Boolean(pendingProposal) || Boolean(window.hasMaterialization?.());
   $('send-message').hidden = aiBusy; $('stop-generation').hidden = !aiBusy || savingProposal || proposalBusy;
@@ -510,9 +510,9 @@ function updateComposer() {
   $('codex-switch').disabled = aiBusy || Boolean(pendingProposal) || accountState.state === 'switching';
   $('codex-switch-help').hidden = accountState.state !== 'connected' || (!aiBusy && !pendingProposal);
   if (real) {
-    $('composer-model').textContent = accountState.state === 'connected' ? hasModels ? ({codex:'Codex',claude:'Claude Code',gemini:'Gemini'})[activeProvider] : '正在取得模型…' : '尚未連接 AI';
-    $('message').placeholder = !ready ? '先開啟右側預覽，驗證這趟行程' : accountState.state !== 'connected' ? '連接 AI 帳號後，就能提出修改' : $('edit-day').value === '' ? '例如：希望整趟行程更輕鬆，可以怎麼調整？' : '例如：把這一天的標題改成「悠閒出發」';
-    $('composer-note').textContent = conversationError ? '對話紀錄無法讀寫，暫停送出以免遺失。' : conversationLoading ? '正在恢復對話…' : selected.trip.needsRestart ? (selected.trip.featureState?.stopRequested?'可以先編輯草稿。停止狀態尚未確認，請先確認停止狀態。':selected.trip.featureState?.legacyStopped?'可以先編輯草稿。上次工作狀態尚未確認，請先確認上次狀態。':'可以先編輯草稿。上次回覆尚未確認，請先找回上次回覆或重新開始（保留紀錄）。') : selected.trip.stopped ? '上一輪已停止，可以在原對話繼續討論。' : !modelReady&&accountState.state==='connected'?'這段對話的模型目前不可用，請選擇其他模型。' : pendingProposal ? '請先確認或放棄提案，再進行下一次修改。' : $('edit-day').value === '' ? '沿用本旅程對話，提供最新整趟安排；這輪只討論，不會直接修改行程。' : '本輪提供這一天與相關地點，沿用本旅程對話；提案經你確認才保存。';
+    $('composer-model').textContent = activeProvider === 'gemini' ? 'Gemini 暫停提供' : accountState.state === 'connected' ? hasModels ? ({codex:'Codex',claude:'Claude Code'})[activeProvider] : '正在取得模型…' : '尚未連接 AI';
+    $('message').placeholder = activeProvider === 'gemini' ? 'Gemini 暫停提供，請用其他 AI 開新對話' : !ready ? '先開啟右側預覽，驗證這趟行程' : accountState.state !== 'connected' ? '連接 AI 帳號後，就能提出修改' : $('edit-day').value === '' ? '例如：希望整趟行程更輕鬆，可以怎麼調整？' : '例如：把這一天的標題改成「悠閒出發」';
+    $('composer-note').textContent = activeProvider === 'gemini' ? '舊 Gemini CLI 連線暫停；歷史紀錄保留。可從對話選單使用 Codex 或 Claude 開新對話。' : conversationError ? '對話紀錄無法讀寫，暫停送出以免遺失。' : conversationLoading ? '正在恢復對話…' : selected.trip.needsRestart ? (selected.trip.featureState?.stopRequested?'可以先編輯草稿。停止狀態尚未確認，請先確認停止狀態。':selected.trip.featureState?.legacyStopped?'可以先編輯草稿。上次工作狀態尚未確認，請先確認上次狀態。':'可以先編輯草稿。上次回覆尚未確認，請先找回上次回覆或重新開始（保留紀錄）。') : selected.trip.stopped ? '上一輪已停止，可以在原對話繼續討論。' : !modelReady&&accountState.state==='connected'?'這段對話的模型目前不可用，請選擇其他模型。' : pendingProposal ? '請先確認或放棄提案，再進行下一次修改。' : $('edit-day').value === '' ? '沿用本旅程對話，提供最新整趟安排；這輪只討論，不會直接修改行程。' : '本輪提供這一天與相關地點，沿用本旅程對話；提案經你確認才保存。';
   }
 }
 function renderProposal() {
@@ -686,27 +686,30 @@ function renderCodexAccount(account) {
   if(account.provider&&account.provider!==activeProvider){activeProvider=account.provider;accountRequest++;}accountState = account;window.onFeatureAccount?.(account);
   const providerName=({codex:'Codex',claude:'Claude Code',gemini:'Gemini'})[activeProvider];$('provider-heading').textContent=providerName;$('chat-provider').value=activeProvider;window.refreshProviderOptions?.();$('codex-connect').textContent='檢查 '+providerName;$('codex-login').textContent=activeProvider==='codex'?'連接 ChatGPT':'登入 '+providerName;
   document.querySelector('.prototype-label').textContent = account.state === 'checking'?'正在核對已保存的登入…':account.state === 'connected' ? '提案經確認後才保存' : '可在設定連接 AI 助手';
-  const labels = { checking:'正在恢復連線', unavailable:'尚未安裝', error:'連線待確認', disconnected:'尚未連接', 'needs-login':'需要登入', connected:'已連接', 'waiting-login':'等待授權', 'login-failed':'登入未完成', switching:'正在更換帳號', 'switch-failed':'需要重新確認' };
+  const labels = { checking:'正在恢復連線', paused:'暫停提供', unavailable:'尚未安裝', error:'連線待確認', disconnected:'尚未連接', 'needs-login':'需要登入', connected:'已連接', 'waiting-login':'等待授權', 'login-failed':'登入未完成', switching:'正在更換帳號', 'switch-failed':'需要重新確認' };
   $('codex-badge').textContent = account.cachedAuth?'登入已保存':labels[account.state] || '需要確認';
   $('sidebar-account-status').textContent = account.state==='connected' ? providerName+(account.cachedAuth?' · 登入已保存':' · 已連接') : labels[account.state] || '需要確認';
-  $('codex-status').textContent = account.state === 'checking'?'正在核對這台電腦已保存的登入，無需重新授權。':account.state === 'connected' ? `已連接 ${account.label || providerName+' 帳號'}${account.plan ? ` · ${account.plan}` : ''}` : account.state === 'waiting-login' ? '請在開啟的官方頁面完成登入，完成後會自動更新。' : account.state === 'needs-login' ? `${providerName} ${account.version} 已就緒，請完成官方登入。` : '尚未完成帳號連接，可從更多選單重新核對。';
+  $('codex-status').textContent = account.state === 'paused'?'舊 Gemini CLI 連接暫停；既有對話仍保留。':account.state === 'checking'?'正在核對這台電腦已保存的登入，無需重新授權。':account.state === 'connected' ? `已連接 ${account.label || providerName+' 帳號'}${account.plan ? ` · ${account.plan}` : ''}` : account.state === 'waiting-login' ? '請在開啟的官方頁面完成登入，完成後會自動更新。' : account.state === 'needs-login' ? `${providerName} ${account.version} 已就緒，請完成官方登入。` : '尚未完成帳號連接，可從更多選單重新核對。';
   $('codex-login').hidden = !['needs-login', 'login-failed'].includes(account.state);
   $('codex-cancel').hidden = account.state !== 'waiting-login';
   $('codex-refresh').hidden = !['waiting-login', 'connected', 'login-failed', 'switch-failed'].includes(account.state);
   $('codex-switch').hidden = account.state !== 'connected'||account.capabilities?.switchAccount===false;
   $('codex-copy-link').hidden = activeProvider!=='codex'||account.state !== 'waiting-login';
   $('codex-login-help').hidden = activeProvider!=='codex'||account.state !== 'waiting-login';
-  $('provider-capabilities').textContent=activeProvider==='codex'?'支援文字、圖片與原生對話續接。':(activeProvider==='claude'?'支援 Claude Pro／Max。':'Google 登入存於 App；送出時由官方工具核對。')+'目前支援文字、公開網址與來源研究；圖片與思考強度請使用 Codex。';
+  $('provider-capabilities').textContent=activeProvider==='gemini'?'Gemini 連線暫停，請使用 Codex 或 Claude。':activeProvider==='codex'?'支援文字、圖片與原生對話續接。':'支援 Claude Pro／Max。目前支援文字、公開網址與來源研究；圖片與思考強度請使用 Codex。';
   if (account.state !== 'connected') { modelRequest++; $('codex-model').replaceChildren(); $('chat-model').replaceChildren(); $('codex-model-row').hidden=true; }
   updateComposer();
   if (account.state === 'connected') loadModels();
 }
 async function restoreAIConnection(){
-  const request=++accountRequest,provider=activeProvider;renderCodexAccount({state:'checking'});
+  const request=++accountRequest,provider=activeProvider;
+  if(provider==='gemini'){renderCodexAccount({provider,state:'paused'});return;}
+  renderCodexAccount({state:'checking'});
   try{const result=await window.travelDesktop.connectCodex();if(request!==accountRequest||provider!==activeProvider)return;if(result.ok)renderCodexAccount(result.account);else{renderCodexAccount({state:result.code==='CLI_MISSING'?'unavailable':'error'});$('codex-message').textContent=result.message;$('codex-message').hidden=false;}}
   catch{if(request!==accountRequest||provider!==activeProvider)return;renderCodexAccount({state:'error'});$('codex-message').textContent='無法核對登入，請稍後重試；已保存的登入資料仍保留。';$('codex-message').hidden=false;}
 }
 async function codexAction(method) {
+  if(activeProvider==='gemini'){notify('Gemini 連線暫停；請用其他 AI 開新對話。');return;}
   if (!window.travelDesktop?.[method]) { notify('請在桌面 App 中連接 Codex。'); return; }
   const request=++accountRequest,provider=activeProvider;
   const buttons = [...document.querySelectorAll('.account-actions button')]; buttons.forEach(button => { button.disabled = true; });
