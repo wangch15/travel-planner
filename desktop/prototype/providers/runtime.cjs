@@ -4,7 +4,6 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { userInfo } = require('node:os');
 const { execFile } = require('node:child_process');
-const { promisify } = require('node:util');
 const { failure } = require('./process.cjs');
 
 const VERSIONS = { claude: '2.1.278 (Claude Code)', gemini: '0.46.0' };
@@ -25,9 +24,19 @@ async function assertNoExternalPolicy(provider) {
   }
   if (provider === 'claude' && process.platform === 'win32') {
     // Only ask whether a managed key exists; never read or return registry values.
-    const script = "$ErrorActionPreference='Stop'; if ((Test-Path -LiteralPath 'HKLM:\\SOFTWARE\\Policies\\ClaudeCode') -or (Test-Path -LiteralPath 'HKCU:\\SOFTWARE\\Policies\\ClaudeCode')) { 'present' } else { 'absent' }";
+    const script = "$ErrorActionPreference='Stop'; if ((Test-Path -LiteralPath 'HKLM:\\SOFTWARE\\Policies\\ClaudeCode') -or (Test-Path -LiteralPath 'HKCU:\\SOFTWARE\\Policies\\ClaudeCode')) { 'present' } else { 'absent' }; exit 0";
     let result;
-    try { result = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { timeout: 15000, maxBuffer: 1024, windowsHide: true }); }
+    try {
+      result = await new Promise((resolve, reject) => {
+        const child = execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script],
+          { timeout: 15000, maxBuffer: 1024, windowsHide: true },
+          (error, stdout) => error ? reject(error) : resolve({ stdout }));
+        // This is a one-shot query, never an interactive terminal. Give the
+        // Windows host EOF and an explicit exit instead of leaving stdin open.
+        child.stdin?.on('error', () => {});
+        child.stdin?.end();
+      });
+    }
     catch { throw failure('EXTERNAL_PROVIDER_POLICY'); }
     if (result.stdout.trim() !== 'absent') throw failure('EXTERNAL_PROVIDER_POLICY');
   }
