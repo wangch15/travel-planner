@@ -3,7 +3,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:
 const {EventEmitter}=require('node:events'),{app}=require('electron');
 const {createWindow,shutdown}=require('./main.cjs'),{createProjectStore}=require('./project-store.cjs'),{ConversationStore}=require('./conversation-store.cjs');
 app.on('window-all-closed',()=>{});
-let win,root,status=0,releaseIntentGate;
+let win,root,status=0,releaseIntentGate,activeConversations;
 const js=source=>win.webContents.executeJavaScript(source);
 async function until(source){for(let i=0;i<200;i++){if(await js(source))return;await new Promise(resolve=>setTimeout(resolve,30));}throw Error('Timed out: '+source);}
 app.whenReady().then(async()=>{
@@ -24,7 +24,7 @@ app.whenReady().then(async()=>{
     if(input.text==='競態新要求'){await input.onTurn('thread-one','turn-race-new');this.active={text:input.text,turnId:'turn-race-new'};try{await new Promise(resolve=>{releaseNew=resolve;});}finally{this.active=null;}return {summary:'競態新回覆',discussion:true,threadId:'thread-one',turnId:'turn-race-new',model:'fake-model'};}
     await input.onTurn('thread-one','turn-two');return {summary:'新的討論',discussion:true,threadId:'thread-one',turnId:'turn-two',model:'fake-model'};
   }};
-  const options={stateDirectory:state,codexAccount:account,makeEditor:()=>editor,makeConversations:directory=>{const conversations=new ConversationStore(directory),update=conversations.update.bind(conversations);conversations.update=async(target,change)=>{const result=await update(target,change);if(holdIntent&&intentWrites===0&&result.run?.status==='pending'&&result.run.stopRequested===true){intentWrites++;await holdIntent;}return result;};return conversations;}};
+  const options={stateDirectory:state,codexAccount:account,makeEditor:()=>editor,makeConversations:directory=>{const conversations=new ConversationStore(directory),update=conversations.update.bind(conversations);activeConversations=conversations;conversations.update=async(target,change)=>{const result=await update(target,change);if(holdIntent&&intentWrites===0&&result.run?.status==='pending'&&result.run.stopRequested===true){intentWrites++;await holdIntent;}return result;};return conversations;}};
   win=await createWindow(options);
   await until('realPreview?.status==="ready" && accountState.state==="connected" && !conversationLoading');
   await js('document.getElementById("message").value="第一輪討論";document.getElementById("chat-form").requestSubmit()');
@@ -33,7 +33,7 @@ app.whenReady().then(async()=>{
   assert.ok(editor.active);
   await js('document.getElementById("stop-generation").click()');
   await until('!aiBusy && selected.trip.stopped===true');
-  const saved=await new ConversationStore(state).read({root:project,slug:'sample'});
+  const saved=await activeConversations.read({root:project,slug:'sample'});
   assert.equal(saved.run.status,'stopped');assert.equal(saved.thread.id,'thread-one');assert.equal(saved.thread.lastTurnId,'turn-one');
   assert.equal(await js('document.getElementById("send-message").disabled'),false);
   assert.equal(await js('document.querySelectorAll("#job-card button").length'),0);
@@ -50,21 +50,21 @@ app.whenReady().then(async()=>{
   await js('[...document.querySelectorAll("#job-card button")].find(button=>button.textContent==="確認停止狀態").click()');
   await until('selected.trip.stopped===true && !selected.trip.needsRestart');
   assert.equal(reconciliations,1);
-  assert.equal((await new ConversationStore(state).read({root:project,slug:'sample'})).thread.lastTurnId,'turn-uncertain');
+  assert.equal((await activeConversations.read({root:project,slug:'sample'})).thread.lastTurnId,'turn-uncertain');
   await js('document.getElementById("message").value="模擬連線中斷";document.getElementById("chat-form").requestSubmit()');
   await until('!aiBusy && selected.trip.needsRestart && !document.getElementById("job-card").hidden');
   assert.equal(await js('selected.trip.stopped'),false);
   assert.equal(await js('document.getElementById("job-card").textContent.includes("找回上次回覆")'),true);
   assert.equal(await js('document.getElementById("job-card").textContent.includes("已停止這輪")'),false);
-  win.destroy();await new Promise(resolve=>setTimeout(resolve,80));
-  await new ConversationStore(state).update({root:project,slug:'sample'},s=>{s.run={id:s.job.id,status:'stopped'};s.job.status='paused';s.job.reason='AI_CANCELED';});
+  win.destroy();await activeConversations.flush();
+  await activeConversations.update({root:project,slug:'sample'},s=>{s.run={id:s.job.id,status:'stopped'};s.job.status='paused';s.job.reason='AI_CANCELED';});
   win=await createWindow(options);
   await until('realPreview?.status==="ready" && !conversationLoading && selected.trip.featureState.legacyStopped');
   assert.equal(await js('document.getElementById("job-card").textContent.includes("找回上次回覆")'),false);
   assert.equal(await js('document.getElementById("job-card").textContent.includes("確認上次狀態")'),true);
   await js('[...document.querySelectorAll("#job-card button")].find(button=>button.textContent==="確認上次狀態").click()');
   await until('!selected.trip.needsRestart && document.getElementById("send-message").disabled===false');
-  assert.equal((await new ConversationStore(state).read({root:project,slug:'sample'})).job.reason,'terminal-confirmed');
+  assert.equal((await activeConversations.read({root:project,slug:'sample'})).job.reason,'terminal-confirmed');
   assert.equal(reconciliations,2);
   holdIntent=new Promise(resolve=>{releaseIntentGate=resolve;});
   const previousStops=stopCalls;

@@ -40,7 +40,7 @@ async function run(root) {
 }
 
 (async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'travel-native-smoke-'));
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'travel-native-smoke-')));
   let result;
   try { result = await run(root); }
   finally { await fs.rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 200 }); }
