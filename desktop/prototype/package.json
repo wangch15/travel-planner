@@ -16,12 +16,12 @@
     "smoke:versions": "electron versions-smoke.cjs",
     "smoke:batch": "electron batch-smoke.cjs",
     "smoke:batch-safety": "electron batch-safety-smoke.cjs",
-    "smoke:updater": "electron updater-smoke.cjs",
-    "smoke:navigation": "electron navigation-smoke.cjs",
-    "smoke:menus": "electron menu-smoke.cjs",
-    "smoke:settings": "electron settings-smoke.cjs",
+    "smoke:updater": "node native-smoke-runner.cjs updater-smoke.cjs",
+    "smoke:navigation": "node native-smoke-runner.cjs navigation-smoke.cjs",
+    "smoke:menus": "node native-smoke-runner.cjs menu-smoke.cjs",
+    "smoke:settings": "node native-smoke-runner.cjs settings-smoke.cjs",
     "smoke:stop": "electron stop-continuation-smoke.cjs",
-    "smoke:session-settings": "electron session-settings-smoke.cjs"
+    "smoke:session-settings": "node native-smoke-runner.cjs session-settings-smoke.cjs"
   },
   "devDependencies": {
     "electron": "44.4.3"

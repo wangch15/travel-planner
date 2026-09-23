@@ -23,5 +23,10 @@
   // make the trigger's click reopen the same menu. Keep native top-layer placement.
   document.addEventListener('pointerdown',e=>{if(menu&&!menu.contains(e.target)&&!trigger?.contains(e.target))close(false);},true);
   document.addEventListener('keydown',e=>{if(menu&&e.key==='Escape'){e.preventDefault();e.stopPropagation();close();}},true);
-  window.addEventListener('resize',()=>close(false));document.addEventListener('scroll',()=>close(false),true);
+  window.addEventListener('resize',()=>close(false));
+  document.addEventListener('scroll',e=>{
+    // Other panes (for example chat auto-scroll) do not move this trigger.
+    // Keep menu scrolling usable; dismiss only when its anchor can move.
+    if(menu&&(!trigger?.isConnected||e.target===document||e.target?.contains?.(trigger)))close(false);
+  },true);
 })();
