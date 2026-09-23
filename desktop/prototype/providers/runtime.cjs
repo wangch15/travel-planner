@@ -27,7 +27,7 @@ async function assertNoExternalPolicy(provider) {
     // Only ask whether a managed key exists; never read or return registry values.
     const script = "$ErrorActionPreference='Stop'; if ((Test-Path -LiteralPath 'HKLM:\\SOFTWARE\\Policies\\ClaudeCode') -or (Test-Path -LiteralPath 'HKCU:\\SOFTWARE\\Policies\\ClaudeCode')) { 'present' } else { 'absent' }";
     let result;
-    try { result = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { timeout: 5000, maxBuffer: 1024, windowsHide: true }); }
+    try { result = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { timeout: 15000, maxBuffer: 1024, windowsHide: true }); }
     catch { throw failure('EXTERNAL_PROVIDER_POLICY'); }
     if (result.stdout.trim() !== 'absent') throw failure('EXTERNAL_PROVIDER_POLICY');
   }
