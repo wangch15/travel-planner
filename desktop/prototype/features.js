@@ -126,7 +126,7 @@
   };
   $('chat-effort').onchange=()=>{if(selected){selected.trip.effort=$('chat-effort').value;queuePreferences();}};
   window.onFeatureAccount=account=>{window.updateProviderRow?.({...account,provider:activeProvider});const identity=JSON.stringify([activeProvider,account.label,account.plan]);if(account.state!=='connected'||identity!==lastAccount){references=[];selectedRefs.clear();referenceScope='';$('chat-effort').hidden=true;}lastAccount=identity;updateReferenceCount();};
-  window.renderFeatureState=state=>{featureState=state;currentConversation=state.conversationId;if(conversationItems[0]?.id!==currentConversation){conversationItems=[];renderConversations();}loadConversations().catch(()=>{});window.refreshEffort();renderJob();renderPlan();};
+  window.renderFeatureState=state=>{featureState=state;currentConversation=state.conversationId;if(conversationItems.find(c=>c.current)?.id!==currentConversation){conversationItems=[];renderConversations();}loadConversations().catch(()=>{});window.refreshEffort();renderJob();renderPlan();};
   function renderPlan(){const planning=Boolean(realPreview?.planning);$('planning-actions').hidden=!planning;
     tell('planning-status',featureState.plan?.approvedDigest?'逐日草案已確認':'規劃草案 · 尚待確認');
     $('confirm-plan').disabled=!featureState.plan?.markdown||Boolean(featureState.plan?.approvedDigest)||aiBusy;

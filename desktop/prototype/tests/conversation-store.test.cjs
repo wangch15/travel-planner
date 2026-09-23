@@ -18,6 +18,15 @@ test('persists stop intent and confirmation but rejects malformed stop flags',as
  assert.deepEqual((await new ConversationStore(root).read(target)).run,{id:'request',status:'stopped',stopRequested:true,stopConfirmed:true});
  await assert.rejects(store.update(target,s=>{s.run.stopConfirmed='yes';}),{code:'CONVERSATION_STORE_INVALID'});
 });
+test('conversation order is persisted and cannot omit or duplicate sessions',async t=>{
+ const {store,target}=await fixture(t);
+ await store.update(target,s=>{s.conversationId='current';s.archives=[{id:'older',title:'Older',archived:false,payload:{messages:[],draft:'',model:'',dayId:null,thread:null,run:null}}];s.conversationOrder=['older','current'];});
+ assert.deepEqual((await store.read(target)).conversationOrder,['older','current']);
+ for(const order of [['current','current'],['current'],['current','unknown']]){
+   await assert.rejects(store.update(target,s=>{s.conversationOrder=order;}),{code:'CONVERSATION_STORE_INVALID'});
+ }
+ assert.deepEqual((await store.read(target)).conversationOrder,['older','current']);
+});
 test('serialized mutations preserve simultaneous draft and reply writes',async t=>{
  const {store,target}=await fixture(t);
  await Promise.all([store.update(target,s=>{s.draft='draft';}),store.update(target,s=>{s.messages.push({role:'assistant',text:'reply'});})]);
