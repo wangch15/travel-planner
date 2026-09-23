@@ -61,7 +61,7 @@ Claude 登入結果現在會查官方 auth status，而非只看登入子程序�
 - 正式旅程經確認後移至原私人專案被 Git 忽略的 `.local/desktop-trash`，保留全部資料／照片／私人筆記。可重開後還原；同名目錄存在就拒絕覆蓋。沒有永久刪除、遠端 Git 或線上網站操作。
 - App 啟動自動核對保存的登入，顯示檢查中／需登入／工具缺少等狀態。切換服務時隔離舊回覆，保留舊對話並建立新對話。設定頁依 Orca 參考整理為設定列、狀態與漸進展開的維護區。
 - 工具與更新提供具體安裝引導。GH 可下載官方二進位檔並校驗至 App 工具目錄；其他固定安裝流程在使用者確認後開啟 Terminal／PowerShell，完成後重新檢查。Wrangler 內建，可直接進 Cloudflare 登入。測試沒有實際執行安裝。
-- Codex、Claude Code、Gemini 可在聊天／設定切換。Claude2.1.278與Gemini0.46.0透過官方 CLI、獨立 OAuth/profile 運作，六種文字模式均有實作。來源、介面與限制見 [providers/PROTOCOL.md](providers/PROTOCOL.md)。Claude 僅 Pro／Max；Gemini 尚無 App 內換帳號；這兩個 provider 不支援圖片、effort、自動額度等待或不確定結果的原生恢復。模型選項是官方 CLI 別名，可用性仍由帳號決定。
+- Codex、Claude Code、Gemini 可在聊天／設定切換。Claude Code 透過官方 CLI 與 App 專屬登入運作，版本號只供診斷；現有 Gemini 選項仍接 Gemini CLI 0.46.0，尚未改接 `agy`。六種文字模式均有實作。來源、介面與限制見 [providers/PROTOCOL.md](providers/PROTOCOL.md)。Claude 僅 Pro／Max；Gemini 尚無 App 內換帳號；這兩個 provider 不支援圖片、effort、自動額度等待或不確定結果的原生恢復。模型選項是官方 CLI 別名，可用性仍由帳號決定。
 - 這兩個新 provider 的自動驗證使用假程序，另驗了實際已安裝 CLI 的無登入啟動／狀態與未認證 ACP 初始化；没有發送真實模型請求或完成使用者授權。
 
 驗證：root501 + engine92 + desktop198 =791項單元測試；原生 navigation、workflow、batch、版本、安全、版面、startup、preview、updater 回歸通過。navigation 驗證選單鍵盤與右鍵、示範刪除重開、旅程回收還原、切換／恢復 provider、安裝確認。Windows 真機仍待使用者後續安排。
@@ -86,7 +86,7 @@ npm run desktop:prototype
 
 1. **設定 → 專案管理 → 選擇資料夾**：唯讀辨識現有行程，記住專案及選取旅程。重開會重新檢查，找不到目錄時請人重選，不自動建立替代專案。
 2. **右側預覽**：靜態解析原資料、驗證後，用同一套引擎產生完整 HTML。可互動查看行程與照片；預覽沒有 Node／IPC，外部連結不自動開啟。
-3. **設定 → AI 助手**：檢查 Codex 0.155.1；由使用者在官方頁面連接 ChatGPT。App 使用獨立 profile 與 OS keyring，沒有讀入其他工具的登入資料或 API key。「更換帳號」先登出目前 App 帳號、確認登出後重啟登入；一次只保留一個。官方頁面若自動使用舊帳號，可複製登入連結到無痕視窗。AI 工作或待確認提案期間不能更換。
+3. **設定 → AI 助手**：檢查 Codex 是否可用；版本號僅供診斷，不要求固定版號。由使用者在官方頁面連接 ChatGPT。App 使用獨立 profile 與 OS keyring，沒有讀入其他工具的登入資料或 API key。「更換帳號」先登出目前 App 帳號、確認登出後重啟登入；一次只保留一個。官方頁面若自動使用舊帳號，可複製登入連結到無痕視窗。AI 工作或待確認提案期間不能更換。
 4. **選定一天、送出修改**：本輪提供這一天和被引用地點的名稱／類別／備註，沿用同一旅程先前的 Codex 對話上下文。模型可在聊天輸入框直接切換，與設定頁同步，清單由已連接的帳號回傳；每次送出檢查設定及一般額度許可，未知不猜、不切付費 API、不自動重送。
 5. **候選預覽 → 確認保存**：資料通過驗證後顯示提案；原始內容未變、來源仍確認為私人 repo，才保存選取的修改並建立版本。保留本機還原副本，並嘗試追加既有私人 status.md。沒有自動 commit、push 或部署，UI 分開回報本機保存與異地備份。
 
