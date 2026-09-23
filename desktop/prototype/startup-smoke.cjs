@@ -64,6 +64,8 @@ function getTargets(port) {
     const forceKill = setTimeout(() => child.kill('SIGKILL'), 2000);
     await exited;
     clearTimeout(forceKill);
-    await fs.rm(stateDirectory, { recursive: true, force: true });
+    // Windows can retain Chromium DB handles briefly after the main process
+    // exits. Wait for lock release; a persistent lock still fails the test.
+    await fs.rm(stateDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

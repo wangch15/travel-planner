@@ -1,7 +1,7 @@
 /* One top-layer action menu shared by sidebar, context and chat actions. */
 (() => {
   let menu, trigger;
-  const close=(restore=true)=>{if(!menu)return;menu.hidePopover();menu.remove();menu=null;if(trigger?.isConnected){trigger.setAttribute('aria-expanded','false');if(restore)trigger.focus();}trigger=null;};
+  const close=(restore=true)=>{if(!menu)return;menu.hidePopover();menu.remove();menu=null;if(trigger?.isConnected){trigger.setAttribute('aria-expanded','false');if(restore)trigger.focus({preventScroll:true});}trigger=null;};
   window.closeActionMenu=close;
   window.openActionMenu=(anchor,items,event)=>{
     event?.preventDefault();
@@ -15,8 +15,8 @@
     }
     document.body.append(menu);menu.showPopover();const rect=anchor.getBoundingClientRect();const x=event?.type==='contextmenu'?event.clientX:rect.right-menu.offsetWidth;const y=event?.type==='contextmenu'?event.clientY:rect.bottom+5;
     menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
-    const buttons=()=>[...menu.querySelectorAll('button:not(:disabled)')];buttons()[0]?.focus();
-    menu.onkeydown=e=>{const all=buttons(),i=all.indexOf(document.activeElement);if(e.key==='Escape'){e.preventDefault();close();}else if(e.key==='Tab'){close(false);}else if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const index=e.key==='Home'?0:e.key==='End'?all.length-1:(i+(e.key==='ArrowDown'?1:-1)+all.length)%all.length;all[index]?.focus();}};
+    const buttons=()=>[...menu.querySelectorAll('button:not(:disabled)')];buttons()[0]?.focus({preventScroll:true});
+    menu.onkeydown=e=>{const all=buttons(),i=all.indexOf(document.activeElement);if(e.key==='Escape'){e.preventDefault();close();}else if(e.key==='Tab'){close(false);}else if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const index=e.key==='Home'?0:e.key==='End'?all.length-1:(i+(e.key==='ArrowDown'?1:-1)+all.length)%all.length;all[index]?.focus({preventScroll:true});}};
     const openedMenu=menu;openedMenu.addEventListener('toggle',e=>{if(e.newState==='closed'&&menu===openedMenu){menu=null;openedMenu.remove();trigger?.setAttribute('aria-expanded','false');trigger=null;}});
   };
   // Own dismissal so the browser cannot light-dismiss on pointerdown and then
