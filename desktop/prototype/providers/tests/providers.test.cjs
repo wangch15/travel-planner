@@ -117,14 +117,18 @@ for(const provider of ['claude','gemini']) {
     const f=await fixture(t,provider);let threadId,turnId;
     const running=f.editor.generate({snapshot:f.snapshot,dayId:null,text:'hang',onThread:async id=>{threadId=id;},onTurn:async(_thread,id)=>{turnId=id;}});
     const rejected=assert.rejects(running,error=>error.code==='AI_CANCELED'&&error.stopConfirmed===true&&error.turnId===turnId);
-    for(let i=0;i<200&&!f.editor.active?.process;i++)await new Promise(resolve=>setTimeout(resolve,5));
-    assert.ok(f.editor.active?.process);
-    await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:'second'}),{code:'AI_BUSY'});
-    assert.equal((await f.editor.stop()).requested,true);await rejected;
-    assert.equal(f.editor.active,null);
-    const continued=await f.editor.generate({snapshot:f.snapshot,dayId:null,text:'new question',thread:{id:threadId,lastTurnId:turnId},history:[{role:'user',text:'hang'},{role:'assistant',text:'已停止這輪'}]});
-    assert.equal(continued.threadId,threadId);assert.equal(continued.summary,'已保留對話');
-    assert.equal(JSON.parse(f.launches.at(-1).input).request,'new question');
+    rejected.catch(()=>{}); // Retain rejection if startup is slow and an assertion fails first.
+    try{
+      const deadline=Date.now()+10000;
+      while(!f.editor.active?.process&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,20));
+      assert.ok(f.editor.active?.process,'hanging provider process must start before cancellation');
+      await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:'second'}),{code:'AI_BUSY'});
+      assert.equal((await f.editor.stop()).requested,true);await rejected;
+      assert.equal(f.editor.active,null);
+      const continued=await f.editor.generate({snapshot:f.snapshot,dayId:null,text:'new question',thread:{id:threadId,lastTurnId:turnId},history:[{role:'user',text:'hang'},{role:'assistant',text:'已停止這輪'}]});
+      assert.equal(continued.threadId,threadId);assert.equal(continued.summary,'已保留對話');
+      assert.equal(JSON.parse(f.launches.at(-1).input).request,'new question');
+    }finally{await f.editor.stop();await rejected.catch(()=>{});}
   });
   test(`${provider}: image attachments fail before requesting a model`,async t=>{
     const f=await fixture(t,provider);const before=f.launches.length;

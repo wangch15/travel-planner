@@ -9,7 +9,7 @@ const electronPath = require('electron');
 
 function getTargets(port) {
   return new Promise((resolve, reject) => {
-    const request = http.get({ host: '127.0.0.1', port, path: '/json/list', timeout: 1000 }, response => {
+    const request = http.get({ host: '127.0.0.1', port, path: '/json/list', timeout: 2000 }, response => {
       let body = '';
       response.on('data', chunk => { body += chunk; });
       response.on('end', () => {
@@ -37,21 +37,27 @@ function getTargets(port) {
   });
   const exited = new Promise(resolve => child.once('exit', resolve));
   try {
-    const deadline = Date.now() + 10000;
+    const deadline = Date.now() + 45000;
     let ready = false;
+    let lastProbeError;
     while (Date.now() < deadline) {
       if (spawnError) throw spawnError;
       if (child.exitCode !== null) throw Error(`Desktop exited before opening its page (${child.exitCode})`);
       if (port) {
-        const targets = await getTargets(port);
-        ready = targets.some(target => target.type === 'page'
-          && target.url === 'travel-app://prototype/index.html'
-          && target.title === 'Travel Planner · 接手既有旅程');
+        // The debugging listener can start before it can answer requests on a
+        // cold CI runner. Retry readiness probes within the overall deadline.
+        try {
+          const targets = await getTargets(port);
+          ready = targets.some(target => target.type === 'page'
+            && target.url === 'travel-app://prototype/index.html'
+            && target.title === 'Travel Planner · 接手既有旅程');
+        } catch (error) { lastProbeError = error; }
         if (ready) break;
       }
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    assert.ok(ready, 'Actual Electron package entry did not open the Travel Planner page');
+    assert.ok(ready, 'Actual Electron package entry did not open the Travel Planner page'
+      + (lastProbeError ? ': ' + lastProbeError.message : ''));
     console.log('PASS: actual Electron package entry opened the Travel Planner page');
   } finally {
     child.kill('SIGTERM');

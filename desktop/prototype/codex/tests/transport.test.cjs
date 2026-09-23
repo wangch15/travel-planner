@@ -155,7 +155,17 @@ test('drains and discards large stderr without blocking requests', async (t) => 
 test('a disconnected stdout rejects pending requests without waiting for their timeout', async (t) => {
   const server = transport(t);
   await server.start();
-  await assert.rejects(server.request('close-output'), { code: 'CHILD_DISCONNECTED' });
+  if (process.platform === 'win32') {
+    // Node's inherited stdout handle may remain open after the child closes fd 1
+    // on Windows. Inject EOF into the live pipe to verify transport's response.
+    const pending = server.request('hang');
+    server._record.child.stdout.push(null);
+    await assert.rejects(pending, { code: 'CHILD_DISCONNECTED' });
+  } else {
+    await assert.rejects(server.request('close-output'), { code: 'CHILD_DISCONNECTED' });
+  }
+  await server.stop();
+  assert.equal(server.state, 'stopped');
 });
 
 test('late responses after timeout do not resolve newer requests', async (t) => {

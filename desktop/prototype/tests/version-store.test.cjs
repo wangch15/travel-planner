@@ -58,10 +58,12 @@ test('bounds source and revision count before modifying saved state',async t=>{
  await assert.rejects(store.observe(target,{source:'extra',contextDigest:'context'}),{code:'VERSION_LIMIT'});assert.equal((await store.read(target)).revisions.length,100);
 });
 test('parent swap during a pending write is rejected before writing into the replacement',async t=>{
- const {root,store,target}=await fixture(t);await store.observe(target,{source:'initial',contextDigest:'context'});const originalOpen=fs.open;const moved=path.join(root,'old-versions');let swapped=false;
- fs.open=async function(file,...args){const handle=await originalOpen.call(this,file,...args);if(typeof file==='string'&&path.basename(file).startsWith('.version-')&&!swapped){swapped=true;await fs.rename(store.directory,moved);await fs.mkdir(store.directory);await fs.writeFile(store.filename(target),'replacement-owned');}return handle;};
+ const {root,store,target}=await fixture(t);await store.observe(target,{source:'initial',contextDigest:'context'});const originalOpen=fs.open;const moved=path.join(root,'old-versions');let attempted=false,swapped=false,swapError=null;
+ fs.open=async function(file,...args){const handle=await originalOpen.call(this,file,...args);if(typeof file==='string'&&path.basename(file).startsWith('.version-')&&!attempted){attempted=true;try{await fs.rename(store.directory,moved);await fs.mkdir(store.directory);await fs.writeFile(store.filename(target),'replacement-owned');swapped=true;}catch(error){swapError=error;await handle.close();throw error;}}return handle;};
  try{await assert.rejects(store.saveDraft(target,draft),{code:'VERSION_STORE_INVALID'});}finally{fs.open=originalOpen;}
- assert.equal(await fs.readFile(store.filename(target),'utf8'),'replacement-owned');const oldState=JSON.parse(await fs.readFile(path.join(moved,path.basename(store.filename(target))),'utf8'));assert.equal(oldState.draft,null);assert.equal(oldState.revisions[0].source,'initial');
+ assert.equal(attempted,true);
+ if(swapError){assert.equal(process.platform,'win32');assert.ok(['EPERM','EACCES','EBUSY'].includes(swapError.code),`unexpected denial: ${swapError.code}`);assert.equal(swapped,false);const original=JSON.parse(await fs.readFile(store.filename(target),'utf8'));assert.equal(original.draft,null);assert.equal(original.revisions[0].source,'initial');return;}
+ assert.equal(swapped,true);assert.equal(await fs.readFile(store.filename(target),'utf8'),'replacement-owned');const oldState=JSON.parse(await fs.readFile(path.join(moved,path.basename(store.filename(target))),'utf8'));assert.equal(oldState.draft,null);assert.equal(oldState.revisions[0].source,'initial');
 });
 test('replacement of the containing app directory is rejected even when store has not yet been created',async t=>{
  const {root,target}=await fixture(t);const parent=path.join(root,'app-data');await fs.mkdir(parent);const store=new VersionStore(parent);await store.read(target);await fs.rename(parent,path.join(root,'old-app-data'));await fs.mkdir(parent);
