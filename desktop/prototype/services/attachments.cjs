@@ -54,4 +54,4 @@ class AttachmentStore{
   async read(target,id){const m=await this.meta(target,id);const dir=await this.ready(target);const bytes=await safeRead(path.join(dir,id+'.bin'),MAX_FILE);await this.ready(target);if(bytes.length!==m.size||createHash('sha256').update(bytes).digest('hex')!==m.sha256)throw fail('ATTACHMENT_CHANGED');return {...m,...(m.kind==='image'?{imagePath:path.join(dir,id+'.bin')}:{text:decode(bytes)})};}
   remove(target,id){return this.run(async()=>{await this.read(target,id);const dir=await this.ready(target);await fs.unlink(path.join(dir,id+'.json'));await this.ready(target);await fs.unlink(path.join(dir,id+'.bin'));return true;});}
 }
-module.exports={AttachmentStore,fetchPublicReference};
+module.exports={AttachmentStore,fetchPublicReference,publicIPv4};

@@ -12,6 +12,8 @@ const { CodexEditor } = require('./codex/editor.cjs');
 const {JobController}=require('./services/jobs.cjs');
 const {NewTripService}=require('./services/new-trip.cjs');
 const {AttachmentStore,fetchPublicReference}=require('./services/attachments.cjs');
+const {createResearchTools}=require('./services/research-tools.cjs');
+const {findPrivateData,appendPrivateNotes,privateMarkers}=require('./services/private-guard.cjs');
 const {AuthTools}=require('./services/auth-tools.cjs');
 const {LocalArchiveService}=require('./services/local-archive.cjs');
 const {ToolSupport}=require('./services/tool-support.cjs');
@@ -35,7 +37,7 @@ protocol.registerSchemesAsPrivileged(['travel-app', 'travel-preview'].map(scheme
 app.setName('Travel Planner');
 app.setPath('userData', process.env.TRAVEL_PLANNER_STATE_DIR || path.join(app.getPath('appData'), 'travel-planner-prototype'));
 
-async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickArchivePath,pickProjectParent,makeToolSupport=(dir,options)=>new ToolSupport(dir,options),makeTrash=()=>new TripTrashService(),makeProvider=(id,directory,options)=>require('./providers/index.cjs').createProvider(id,directory,options),makeProjectSetup=()=>new ProjectSetupService(),fetchReference=fetchPublicReference,referenceOptions,
+async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickArchivePath,pickProjectParent,makeToolSupport=(dir,options)=>new ToolSupport(dir,options),makeTrash=()=>new TripTrashService(),makeProvider=(id,directory,options)=>require('./providers/index.cjs').createProvider(id,directory,options),makeProjectSetup=()=>new ProjectSetupService(),fetchReference=fetchPublicReference,referenceOptions,makeResearch=options=>createResearchTools(options),
   makeArchive=()=>new LocalArchiveService(),makeAuth=options=>new AuthTools(options),makeUpdater=options=>new UpdateManager(options),environmentService, stateDirectory = app.getPath('userData'), codexAccount,
   makeNewTrips = () => new NewTripService({checkPrivate:verifyPrivateProject}),
   makeBackup = () => new BackupService(), makePublisher = directory => new PublishingService(directory),
@@ -48,6 +50,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   const store = createProjectStore(stateDirectory);
   const versions=makeVersions(stateDirectory);chatStores.add(versions);
   const conversations = makeConversations(stateDirectory); chatStores.add(conversations);
+  const researchKit=makeResearch({electron:{BrowserWindow,session},stateDirectory});
   const jobs=new JobController(conversations),newTrips=makeNewTrips(),attachments=new AttachmentStore(stateDirectory),backup=makeBackup(),publisher=makePublisher(stateDirectory),archives=makeArchive(),projectSetup=makeProjectSetup(),trash=makeTrash();
   let pendingTripRemoval=null,materialization=null,previewSeenURL=null,autoTarget=null,polling=false,windowClosing=false;
   const restored = await store.read();
@@ -238,7 +241,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       RESEARCH_CONFIRMATION_REQUIRED:'請先完成來源查核並確認查核摘要。',
       INVALID_MATERIALIZATION:'完整候選資料尚不齊全，請讓 AI 補齊 schema 要求的資料後再試，原草稿仍保留。',
       INVALID_TRIP:'候選資料未通過完整驗證，請要求 AI 核對日期、座標、交通與必填欄位；原資料未修改。',
-      MODEL_NO_IMAGES:'目前模型不支援圖片，請改選支援圖片的模型或取消圖片附件。',
+      MODEL_NO_IMAGES:'目前模型不支援圖片，請改選支援圖片的模型或取消圖片附件。',PRIVATE_DATA_IN_TRIP:'候選內容含有訂房確認碼或私人網站網址，不能寫進會公開的行程檔，已擋下。請再請 AI 修改一次。',
       EFFORT_UNAVAILABLE:'這個模型不支援選取的思考強度，請重新選擇。',
       QUOTA_EXHAUSTED:'這輪因一般額度不足而停止，可以選擇等待恢復後繼續。',
       VERSION_STORE_INVALID:'版本紀錄無法安全讀寫，原紀錄已保留，請檢查本機儲存空間。',
@@ -282,17 +285,24 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   }
   const sameTarget=(a,b)=>Boolean(a&&b&&a.root===b.root&&a.slug===b.slug&&a.projectId===b.projectId);
   function researchBinding(target,baseline,proposal){return createHash('sha256').update(JSON.stringify([target.root,target.slug,baseline.digest,proposal?.contextDigest||null,proposal?createHash('sha256').update(proposal.source).digest('hex'):null])).digest('hex');}
+  // Private codes (from docs/private-notes.md) and connected private sites must never reach public trip files.
+  async function assertNoPrivateData(target,texts){const markers=await privateMarkers(path.join(target.root,'trips',target.slug),researchKit.sources.list().map(s=>s.host));const reason=findPrivateData(texts,markers);if(reason)throw Object.assign(Error('PRIVATE_DATA_IN_TRIP'),{code:'PRIVATE_DATA_IN_TRIP',reason});}
+  async function assertPendingClean(target){if(!proposals.pending)return;try{await assertNoPrivateData(target,[proposals.pending.fullSource||proposals.pending.source||'']);}catch(error){proposals.discard();throw error;}}
   async function checkResearch(answer,sourceHash,proposalId,checkCanceled=()=>{}){
-    const sources=[];const unresolved=[...answer.unresolved];
+    const sources=[];const unresolved=[...answer.unresolved];let renders=0;
     for(const source of answer.sources){
       checkCanceled();
-      try{const checked=await fetchReference(source.url);checkCanceled();const normalize=s=>s.replace(/\s+/g,' ').trim();const quote=normalize(source.evidence);
+      try{const normalize=s=>String(s).replace(/\s+/g,'');const quote=normalize(source.evidence);
+        // Text the App's research browser rendered while the agent read the page beats a fresh plain fetch.
+        const seen=researchKit.findPage(source.url);let checked=seen&&normalize(seen.text).includes(quote)?seen:null;
+        if(!checked){try{checked=await fetchReference(source.url);}catch(error){if(!seen)throw error;checked=seen;}}checkCanceled();
+        if(quote.length>=15&&!normalize(checked.text).includes(quote)&&!researchKit.sources.allows(source.url)&&renders++<8){try{const rendered=await researchKit.publicBrowser.open(source.url);if(normalize(rendered.text).includes(quote))checked=rendered;}catch{}}checkCanceled();
         const verified=quote.length>=15&&normalize(checked.text).includes(quote);
         sources.push({...source,url:checked.url,checkedAt:checked.checkedAt,verified});if(!verified)unresolved.push(`來源短摘未能核對：${source.title}`);
       }catch(error){if(error.code==='AI_CANCELED')throw error;sources.push({...source,checkedAt:new Date().toISOString(),verified:false});unresolved.push(`來源未能取得：${source.title}`);}
     }
     if(!sources.length)unresolved.push('尚未取得可核對來源。');
-    return {summary:answer.summary,sources,unresolved:[...new Set(unresolved)],feasibility:answer.feasibility,sourceHash,proposalId:proposalId||null,confirmed:false};
+    return {summary:answer.summary,sources,unresolved:[...new Set(unresolved)],feasibility:answer.feasibility,privateNotes:answer.privateNotes||'',sourceHash,proposalId:proposalId||null,confirmed:false};
   }
   async function runAI(input,target,{automatic=false}={}){
     if(providerId==='gemini')return workflowFailure({code:'PROVIDER_UNAVAILABLE'});
@@ -324,8 +334,9 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
         planningContext={...planningContext,schema:Object.fromEntries(docs),requiredDeployName:target.slug};
       }
       checkCanceled();
+      const researchTools=['research','materialize'].includes(mode)?await researchKit.endpoint().catch(()=>null):null;
       editorStarted=true;
-      const answer=await editor.generate({snapshot:sourceSnapshot,dayId:input.dayId??null,text:input.text,model:input.model,effort:input.effort||undefined,mode,attachments:refs,planningDraft:planningContext,handoff:conversation.handoff,history:conversation.thread?conversation.messages:[],requestId:job.id,thread:conversation.thread,lastOutcome:conversation.lastOutcome,
+      const answer=await editor.generate({researchTools,snapshot:sourceSnapshot,dayId:input.dayId??null,text:input.text,model:input.model,effort:input.effort||undefined,mode,attachments:refs,planningDraft:planningContext,handoff:conversation.handoff,history:conversation.thread?conversation.messages:[],requestId:job.id,thread:conversation.thread,lastOutcome:conversation.lastOutcome,
         onThread:async id=>{await conversations.update(target,s=>{s.thread={id,accountKey:binding,lastTurnId:conversation.thread?.lastTurnId||null};});await jobs.checkpoint(target,job.id,id);},
         onTurn:(threadId,turnId)=>jobs.checkpoint(target,job.id,threadId,turnId),
         onProgress:message=>{if(!win.isDestroyed())win.webContents.send('ai:progress',{projectId:target.projectId,slug:target.slug,message});},
@@ -335,10 +346,10 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       let proposal={changed:false,summary:answer.summary},research=null;
       if(answer.research)research=await checkResearch(answer,boundSource,proposals.pending?.id,checkCanceled);
       else if(answer.materialize){
-        const preparation=await newTrips.prepareMaterialization(target.root,target.slug,{files:answer.files});
+        await assertNoPrivateData(target,Object.values(answer.files));const preparation=await newTrips.prepareMaterialization(target.root,target.slug,{files:answer.files});
         let candidate;try{candidate=await buildPreview(preparation.root,preparation.slug);checkCanceled();}catch(e){await newTrips.discardMaterialization(preparation.token);throw e;}materialization={...preparation,target,artifact:candidate,planDigest:conversation.plan.approvedDigest,seen:false};artifact=candidate;previewSeenURL=null;previewAttempt++;
         proposal={changed:false,summary:answer.summary,materialization:true,previewUrl:candidate.url,previewSummary:candidate.summary};
-      }else if(!answer.discussion&&!answer.planning){proposal=proposals.create(target,baseline,input.dayId,answer);if(proposal.changed){candidateCreated=true;await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}}
+      }else if(!answer.discussion&&!answer.planning){proposal=proposals.create(target,baseline,input.dayId,answer);if(proposal.changed)await assertPendingClean(target);if(proposal.changed){candidateCreated=true;await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}}
       checkCanceled();
       const updated=await conversations.update(target,s=>{s.messages.push({role:'assistant',text:answer.summary+(answer.planning?'\n\n'+answer.planMarkdown:''),generation:{provider:providerId,model:answer.model||input.model||'',effort:input.effort||'',...(!input.effort&&answer.resolvedEffort?{resolvedEffort:answer.resolvedEffort}:{})}});s.run={id:job.id,status:'complete'};s.thread={id:answer.threadId,accountKey:binding,lastTurnId:answer.turnId};s.model=answer.model;s.pendingProposal=Boolean(proposals.pending);s.lastOutcome=proposals.pending?'提案尚未保存。':'上一輪沒有修改原檔。';if(answer.planning)s.plan={markdown:answer.planMarkdown,approvedDigest:null};if(research)s.research=research;});
       await jobs.finish(target,job.id);return {ok:true,proposal,research,planning:Boolean(planning),model:answer.model,conversation:displayConversation({...updated,job:{...job,status:'completed',autoResume:false}})};
@@ -396,6 +407,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     versionBusy=true;
     try {
       const target=selectedTarget(input);
+      await assertPendingClean(target);
       const result=await proposals.apply(input.proposalId,target);
       artifact=null; previewAttempt++;
       let conversationWarning=false;
@@ -413,7 +425,8 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       try{return {ok:true,...await handler(input)};}catch(error){const failure=workflowFailure(error);return {...failure,message:featureMessage(error)};}finally{if(exclusive)versionBusy=false;}});
   };
   function featureMessage(error){
-    const texts={SESSION_PROVIDER_LOCKED:'這段對話的 AI 服務已固定，請使用「使用其他 AI 開新對話」。',WAIT_UNSUPPORTED:'此 AI 服務目前不支援自動等待額度。請稍後自行重試，不會自動轉用其他付費方式。',TRIP_CHANGED:'旅程已變動，請重新核對移除內容。',TRASH_NOT_IGNORED:'此專案尚未忽略本機回收區，請先檢查 .gitignore，旅程未移除。',TRIP_EXISTS:'原位置已有同名旅程，無法覆蓋還原。',GIT_IDENTITY_REQUIRED:'Git 尚未設定提交者名稱與電子郵件。請使用下方「設定備份署名」後再重新核對備份；原檔未變。',PRIVATE_REPO_REQUIRED:'請先連接 GitHub，並確認這是你有權存取的私人專案。',INVALID_REPOSITORY:'請填寫正確的 GitHub 擁有者／專案名稱。',NESTED_PROJECT:'請選擇 Git 專案以外的存放位置。',DESTINATION_EXISTS:'目的地資料夾已存在，請選擇其他位置。',STALE_CONFIRMATION:'確認已過期，請重新核對。',CONVERSATION_LIMIT:'這趟旅程已達50段對話上限，舊紀錄完整保留。可先複製重要紀錄，暫時繼續使用既有對話。',NO_PROJECT:'請先從專案管理連接你的私人專案。',PRIVATE_PROJECT_REQUIRED:'建立旅程需要可確認的私人專案。',UNSUPPORTED_ATTACHMENT_TYPE:'目前支援文字、Markdown、JSON、PNG、JPEG 與 WebP；PDF/OCR 尚未支援。',ATTACHMENT_LIMIT:'附件數量已達上限，請先移除不需要的附件。',UNSAFE_REFERENCE_ADDRESS:'參考網址必須是公開網站，不能讀取本機或內部網路。',REFERENCE_TIMEOUT:'網站未在時間內回應，請稍後重試或附上文字。',REFERENCE_HTTP_ERROR:'未能讀取這個網站，請檢查網址或使用文字附件。',PLAN_CONFIRMATION_REQUIRED:'請先確認最新逐日草案。',RESEARCH_CONFIRMATION_REQUIRED:'請先完成查核並確認摘要。',RESEARCH_INCOMPLETE:'仍有未核對的來源或待確認事項，請補充來源並重新查核。',DRAFT_CHANGED:'草稿或候選資料已變動，請重新建立預覽。',PREVIEW_CONFIRMATION_REQUIRED:'請先查看這份候選預覽。',ADOPTION_REQUIRED:'網站已存在，請先查核並明確接管，避免覆蓋其他網站。',TRUSTED_HOOK_REQUIRED:'專案的備份保護尚未安裝，請先完成 Git hook 設定。',UNTRUSTED_HOOK:'專案含未知的 Git hook，請先核對，App 不會執行。',UNSAFE_GIT_CONFIG:'Git 設定包含未知的外部指令，請先核對。',STAGED_CHANGES:'已有其他暫存修改，請先處理再備份。',NO_WAITING_JOB:'目前沒有可自動等待的工作。',STALE_JOB:'工作已更新，請重新載入。',MISSING_TOOL:'所需工具尚未安裝，請查看工具與更新。',UNSAFE_ATTACHMENT:'這個檔案無法加入：可能超過 8MB（文字 1MB），或檔名不正確。',INVALID_IMAGE:'無法辨識這張圖片，或尺寸超過 8192px；請換成 PNG、JPEG 或 WebP 截圖。',INVALID_TEXT:'文字檔不是 UTF-8 文字，請另存為純文字後再加入。'};
+    const texts={SESSION_PROVIDER_LOCKED:'這段對話的 AI 服務已固定，請使用「使用其他 AI 開新對話」。',WAIT_UNSUPPORTED:'此 AI 服務目前不支援自動等待額度。請稍後自行重試，不會自動轉用其他付費方式。',TRIP_CHANGED:'旅程已變動，請重新核對移除內容。',TRASH_NOT_IGNORED:'此專案尚未忽略本機回收區，請先檢查 .gitignore，旅程未移除。',TRIP_EXISTS:'原位置已有同名旅程，無法覆蓋還原。',GIT_IDENTITY_REQUIRED:'Git 尚未設定提交者名稱與電子郵件。請使用下方「設定備份署名」後再重新核對備份；原檔未變。',PRIVATE_REPO_REQUIRED:'請先連接 GitHub，並確認這是你有權存取的私人專案。',INVALID_REPOSITORY:'請填寫正確的 GitHub 擁有者／專案名稱。',NESTED_PROJECT:'請選擇 Git 專案以外的存放位置。',DESTINATION_EXISTS:'目的地資料夾已存在，請選擇其他位置。',STALE_CONFIRMATION:'確認已過期，請重新核對。',CONVERSATION_LIMIT:'這趟旅程已達50段對話上限，舊紀錄完整保留。可先複製重要紀錄，暫時繼續使用既有對話。',NO_PROJECT:'請先從專案管理連接你的私人專案。',PRIVATE_PROJECT_REQUIRED:'建立旅程需要可確認的私人專案。',UNSUPPORTED_ATTACHMENT_TYPE:'目前支援文字、Markdown、JSON、PNG、JPEG 與 WebP；PDF/OCR 尚未支援。',ATTACHMENT_LIMIT:'附件數量已達上限，請先移除不需要的附件。',UNSAFE_REFERENCE_ADDRESS:'參考網址必須是公開網站，不能讀取本機或內部網路。',REFERENCE_TIMEOUT:'網站未在時間內回應，請稍後重試或附上文字。',REFERENCE_HTTP_ERROR:'未能讀取這個網站，請檢查網址或使用文字附件。',PLAN_CONFIRMATION_REQUIRED:'請先確認最新逐日草案。',RESEARCH_CONFIRMATION_REQUIRED:'請先完成查核並確認摘要。',RESEARCH_INCOMPLETE:'仍有未核對的來源或待確認事項，請補充來源並重新查核。',DRAFT_CHANGED:'草稿或候選資料已變動，請重新建立預覽。',PREVIEW_CONFIRMATION_REQUIRED:'請先查看這份候選預覽。',ADOPTION_REQUIRED:'網站已存在，請先查核並明確接管，避免覆蓋其他網站。',TRUSTED_HOOK_REQUIRED:'專案的備份保護尚未安裝，請先完成 Git hook 設定。',UNTRUSTED_HOOK:'專案含未知的 Git hook，請先核對，App 不會執行。',UNSAFE_GIT_CONFIG:'Git 設定包含未知的外部指令，請先核對。',STAGED_CHANGES:'已有其他暫存修改，請先處理再備份。',NO_WAITING_JOB:'目前沒有可自動等待的工作。',STALE_JOB:'工作已更新，請重新載入。',MISSING_TOOL:'所需工具尚未安裝，請查看工具與更新。',PRIVATE_DATA_IN_TRIP:'候選內容含有訂房確認碼或私人網站網址，不能寫進會公開的行程檔，已擋下。請再請 AI 修改一次。',UNSAFE_PRIVATE_NOTES:'這趟的 docs 資料夾狀態異常（可能是捷徑），私人筆記沒有寫入。',PRIVATE_SITE_NOT_CONNECTED:'這個網站尚未連接，請先在「資料來源」連接。',TOOL_CHECKSUM_MISMATCH:'下載的檔案和官方檢查碼不符，已停止安裝，電腦沒有被改動。請稍後重試。',TOOL_INSTALL_UNVERIFIED:'安裝跑完了，但 App 沒找到可用的工具。請按「重新檢查」，或稍後重試。',TOOL_DOWNLOAD_FAILED:'下載失敗，請確認網路連線後重試。',TOOL_DOWNLOAD_TIMEOUT:'下載太久沒有完成，請確認網路連線後重試。',TOOL_INSTALL_BUSY:'另一個工具正在安裝，請等它完成。',PRIVATE_SITE_INVALID:'網站資料不正確，請重新整理後再試。',UNSAFE_ATTACHMENT:'這個檔案無法加入：可能超過 8MB（文字 1MB），或檔名不正確。',INVALID_IMAGE:'無法辨識這張圖片，或尺寸超過 8192px；請換成 PNG、JPEG 或 WebP 截圖。',INVALID_TEXT:'文字檔不是 UTF-8 文字，請另存為純文字後再加入。'};
+    if(/^PRIVATE_SITE_/.test(error.code||'')&&error.hint)return error.hint;
     return texts[error.code]||workflowFailure(error).message;
   }
   async function refreshProject(slug){
@@ -498,6 +511,22 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   feature('trip-create',async input=>{if(!currentProject)throw Object.assign(Error('NO_PROJECT'),{code:'NO_PROJECT'});if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});const created=await newTrips.create(currentProject.root,input);return {...await refreshProject(created.slug),draft:created.draft};},{exclusive:true});
   feature('trip-draft',async input=>({draft:await planningFor(selectedTarget(input))}));
   feature('plan-confirm',async input=>{const target=selectedTarget(input);const state=await conversations.read(target);if(!state.plan?.markdown)throw Object.assign(Error('PLAN_CONFIRMATION_REQUIRED'),{code:'PLAN_CONFIRMATION_REQUIRED'});const digest=createHash('sha256').update(state.plan.markdown).digest('hex');if(input.digest!==digest)throw Object.assign(Error('DRAFT_CHANGED'),{code:'DRAFT_CHANGED'});const updated=await conversations.update(target,s=>{s.plan.approvedDigest=digest;s.research=null;s.messages.push({role:'assistant',text:'逐日草案已由你確認，接下來可以進行來源查核。'});});return {conversation:displayConversation(updated)};},{exclusive:true});
+  function openPrivateLogin(url){
+    researchKit.privateBrowser.configure();
+    const secure={partition:'persist:tp-private',sandbox:true,contextIsolation:true,nodeIntegration:false};
+    const login=new BrowserWindow({parent:win,width:1100,height:820,title:'登入後關閉這個視窗',autoHideMenuBar:true,webPreferences:secure});
+    login.webContents.setWindowOpenHandler(()=>({action:'allow',overrideBrowserWindowOptions:{parent:login,autoHideMenuBar:true,webPreferences:secure}}));
+    login.loadURL(url).catch(()=>{});
+  }
+  async function clearPrivateSite(host){
+    const ses=session.fromPartition('persist:tp-private');
+    for(const cookie of await ses.cookies.get({})){const domain=String(cookie.domain||'').replace(/^\./,'');if(domain===host||domain.endsWith('.'+host))await ses.cookies.remove(`https://${domain}${cookie.path||'/'}`,cookie.name).catch(()=>{});}
+    await ses.clearStorageData({origin:'https://'+host}).catch(()=>{});
+  }
+  feature('private-sources',async()=>({items:await researchKit.ready()}));
+  feature('private-source-add',async input=>{await researchKit.ready();const {host}=await researchKit.sources.add(input.url);openPrivateLogin('https://'+host);return {host,items:researchKit.sources.list()};});
+  feature('private-source-login',async input=>{await researchKit.ready();if(!researchKit.sources.list().some(s=>s.host===input.host))throw Object.assign(Error('PRIVATE_SITE_NOT_CONNECTED'),{code:'PRIVATE_SITE_NOT_CONNECTED'});openPrivateLogin('https://'+input.host);return {};});
+  feature('private-source-remove',async input=>{await researchKit.ready();if(typeof input.host!=='string')throw Object.assign(Error('PRIVATE_SITE_INVALID'),{code:'PRIVATE_SITE_INVALID'});await researchKit.sources.remove(input.host);await clearPrivateSite(input.host);return {items:researchKit.sources.list()};});
   feature('references-list',async input=>({items:await attachments.list({...selectedTarget(input),accountKey:accountKey()})}));
   feature('references-add',async input=>{const target=selectedTarget(input);const selected=await (pickReferences?pickReferences():dialog.showOpenDialog(win,{title:'加入參考資料',properties:['openFile','multiSelections'],filters:[{name:'文字與圖片',extensions:['txt','md','json','png','jpg','jpeg','webp']}]}));if(selected.canceled)return {canceled:true};const items=[];for(const file of selected.filePaths.slice(0,12))items.push(await attachments.add({...target,accountKey:accountKey()},file));return {items};},{exclusive:true});
   feature('references-add-bytes',async input=>{const target=selectedTarget(input);if(!(input.bytes instanceof Uint8Array))throw Object.assign(Error('UNSAFE_ATTACHMENT'),{code:'UNSAFE_ATTACHMENT'});return {item:await attachments.addBytes({...target,accountKey:accountKey()},{name:input.name,bytes:input.bytes})};},{exclusive:true});
@@ -508,7 +537,8 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     const {baseline}=await aiBaseline(target,state);if(proposals.pending&&!sameTarget(proposals.pending.target,target))throw Object.assign(Error('STALE_PROPOSAL'),{code:'STALE_PROPOSAL'});
     const bound=researchBinding(target,baseline,proposals.pending);
     if(bound!==report.sourceHash||report.proposalId!==(proposals.pending?.id||null))throw Object.assign(Error('CONTENT_CHANGED'),{code:'CONTENT_CHANGED'});
-    const updated=await conversations.update(target,s=>{s.research.confirmed=true;s.messages.push({role:'assistant',text:'你已確認來源與可行性查核摘要。內容仍需經預覽後確認保存。'});});
+    const savedNotes=await appendPrivateNotes(path.join(target.root,'trips',target.slug),report.privateNotes);
+    const updated=await conversations.update(target,s=>{s.research.confirmed=true;if(savedNotes)s.research.privateNotes='';s.messages.push({role:'assistant',text:'你已確認來源與可行性查核摘要。內容仍需經預覽後確認保存。'+(savedNotes?'查核時讀到的訂單號等私人資訊已記到這趟的 docs/private-notes.md，不會進公開網站。':'')});});
     if(proposals.pending){proposals.pending.requiresResearch=false;proposals.pending.seen=false;previewSeenURL=null;}
     return {conversation:displayConversation(updated),proposal:proposals.view()};
   },{exclusive:true});
@@ -545,8 +575,8 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       const answer=result.answer;let proposal={changed:false,summary:answer.summary},recoveredResearch=null;
       if(proposals.pending&&!sameTarget(proposals.pending.target,target))throw Object.assign(Error('STALE_PROPOSAL'),{code:'STALE_PROPOSAL'});
       if(answer.research){const bound=researchBinding(target,baseline,proposals.pending);if(bound!==job.input.researchSourceHash)throw Object.assign(Error('CONTENT_CHANGED'),{code:'CONTENT_CHANGED'});recoveredResearch=await checkResearch(answer,bound,proposals.pending?.id);}
-      if(answer.materialize){if(!planning||!state.plan?.approvedDigest||!state.research?.confirmed)throw Object.assign(Error('PLAN_CONFIRMATION_REQUIRED'),{code:'PLAN_CONFIRMATION_REQUIRED'});const prep=await newTrips.prepareMaterialization(target.root,target.slug,{files:answer.files});let candidate;try{candidate=await buildPreview(prep.root,prep.slug);}catch(e){await newTrips.discardMaterialization(prep.token);throw e;}materialization={...prep,target,artifact:candidate,planDigest:state.plan.approvedDigest};artifact=candidate;previewSeenURL=null;proposal={...proposal,materialization:true,previewUrl:candidate.url,previewSummary:candidate.summary};}
-      if(answer.replacementDay||answer.replacementDays){proposal=proposals.create(target,baseline,job.input.dayId,answer);if(proposal.changed){await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}}
+      if(answer.materialize){if(!planning||!state.plan?.approvedDigest||!state.research?.confirmed)throw Object.assign(Error('PLAN_CONFIRMATION_REQUIRED'),{code:'PLAN_CONFIRMATION_REQUIRED'});await assertNoPrivateData(target,Object.values(answer.files));const prep=await newTrips.prepareMaterialization(target.root,target.slug,{files:answer.files});let candidate;try{candidate=await buildPreview(prep.root,prep.slug);}catch(e){await newTrips.discardMaterialization(prep.token);throw e;}materialization={...prep,target,artifact:candidate,planDigest:state.plan.approvedDigest};artifact=candidate;previewSeenURL=null;proposal={...proposal,materialization:true,previewUrl:candidate.url,previewSummary:candidate.summary};}
+      if(answer.replacementDay||answer.replacementDays){proposal=proposals.create(target,baseline,job.input.dayId,answer);if(proposal.changed)await assertPendingClean(target);if(proposal.changed){await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}}
       const updated=await conversations.update(target,s=>{s.run={id:job.id,status:'complete'};s.thread={id:answer.threadId,lastTurnId:answer.turnId,accountKey:job.accountKey};s.messages.push({role:'assistant',text:'已核對上次完成的回覆，沒有重送。\n\n'+answer.summary,generation:{provider:providerId,model:answer.model||job.input.model||'',effort:job.input.effort||''}});if(answer.planning)s.plan={markdown:answer.planMarkdown,approvedDigest:null};if(recoveredResearch)s.research=recoveredResearch;});await jobs.finish(target,job.id);return {status:'completed',proposal,research:recoveredResearch,conversation:displayConversation(await conversations.read(target))};
     }
     if(['interrupted','failed'].includes(result.status)){const updated=await conversations.update(target,s=>{s.run={id:job.id,status:'failed'};if(s.thread)s.thread.lastTurnId=result.turnId;s.messages.push({role:'assistant',text:'已確認上一輪停止。可以在原對話送出新的要求，沒有自動重送。'});});await jobs.patch(target,job.id,{status:'paused',autoResume:false,claimId:null,reason:'terminal-confirmed'});return {status:result.status,conversation:displayConversation(await conversations.read(target))};}
@@ -797,6 +827,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     for(const [id,item] of providerBundles){item.account.removeListener('changed',providerListeners.get(id));item.account.stop().catch(()=>{}).finally(()=>clients.delete(item.account));}
     artifact = null; previewAttempt += 1;
     browserPreview.close();
+    researchKit.close().catch(()=>{});
     nativeTheme.removeListener('updated', applyNativeIcon);
     isolatedSession.protocol.unhandle('travel-app');
     isolatedSession.protocol.unhandle('travel-preview');

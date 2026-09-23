@@ -109,3 +109,22 @@ test('late old-account read and model list cannot revive the previous account du
   assert.equal(account.account.state,'waiting-login');assert.equal(account.account.label,null);
   await account.stop();
 });
+test('research mode adds only the App research MCP server with its token in the environment', async () => {
+  const launches = [];
+  const account = new CodexAccount('/fake', options({ makeTransport: config => { launches.push(config); return new FakeTransport(); } }));
+  const endpoint = { name: 'travel_research', url: 'http://127.0.0.1:43210/mcp', token: 'fixture-token', tools: ['research_open'] };
+  await account.ensureMode('research', endpoint);
+  const args = launches.at(-1).args;
+  assert.ok(args.includes('mcp_servers.travel_research.url="http://127.0.0.1:43210/mcp"'));
+  assert.ok(args.includes('mcp_servers.travel_research.bearer_token_env_var="TP_RESEARCH_TOKEN"'));
+  assert.equal(args.join(' ').includes('fixture-token'), false);
+  assert.equal(launches.at(-1).env.TP_RESEARCH_TOKEN, 'fixture-token');
+  await account.ensureMode('research', endpoint);
+  assert.equal(launches.length, 1);
+  await account.ensureMode('research', { ...endpoint, url: 'http://127.0.0.1:43211/mcp' });
+  assert.equal(launches.length, 2);
+  await account.ensureMode('normal');
+  assert.equal(launches.at(-1).args.some(a => a.startsWith('mcp_servers.')), false);
+  assert.equal(launches.at(-1).env.TP_RESEARCH_TOKEN, undefined);
+  await account.stop();
+});

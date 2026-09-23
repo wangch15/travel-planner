@@ -17,11 +17,13 @@ class CodexAccount extends EventEmitter {
     this.mode='normal';this.modeSwitch=null;this.cliVersion=null;
     this.account = { state: 'disconnected', label: null, version: null };
   }
-  async ensureMode(mode){
+  // Research mode may also attach the App's own loopback research server; a changed endpoint restarts app-server.
+  async ensureMode(mode,researchTools=null){
     if(!['normal','research'].includes(mode))throw Error('invalid-runtime-mode');
     if(this.modeSwitch)await this.modeSwitch;
-    if(this.mode===mode)return this.connect();
-    this.modeSwitch=(async()=>{await this.stop();this.mode=mode;return this.connect();})();
+    const endpoint=mode==='research'&&researchTools?{name:researchTools.name,url:researchTools.url,token:researchTools.token}:null;
+    if(this.mode===mode&&JSON.stringify(this.researchEndpoint||null)===JSON.stringify(endpoint))return this.connect();
+    this.modeSwitch=(async()=>{await this.stop();this.mode=mode;this.researchEndpoint=endpoint;return this.connect();})();
     try{return await this.modeSwitch;}finally{this.modeSwitch=null;}
   }
   connect() {
@@ -41,7 +43,10 @@ class CodexAccount extends EventEmitter {
     try { version=/^codex-cli (\d+\.\d+\.\d+(?:-[\w.-]{1,50})?)$/.exec(await this.readVersion(runtime))?.[1]||null; } catch (error) { if (error.code === 'ENOENT') throw error; }
     if (generation !== this.generation) throw Error('connection-canceled');
     this.cliVersion=version;
-    const transport = this.makeTransport({ command: this.command, args: ['app-server','--stdio','--strict-config',...(this.mode==='research'?['-c','web_search="live"','-c','features.search_tool=true','-c','features.code_mode=true','-c','features.code_mode_host=true']:[])], env: runtime.env, cwd: runtime.work, maxLineBytes: 4 * 1024 * 1024, requestTimeoutMs: 20000 });
+    const research=this.mode==='research'?this.researchEndpoint:null;
+    const mcpArgs=research?['-c',`mcp_servers.${research.name}.url=${JSON.stringify(research.url)}`,'-c',`mcp_servers.${research.name}.bearer_token_env_var="TP_RESEARCH_TOKEN"`]:[];
+    const env={...runtime.env};if(research)env.TP_RESEARCH_TOKEN=research.token;else delete env.TP_RESEARCH_TOKEN;
+    const transport = this.makeTransport({ command: this.command, args: ['app-server','--stdio','--strict-config',...(this.mode==='research'?['-c','web_search="live"','-c','features.search_tool=true','-c','features.code_mode=true','-c','features.code_mode_host=true',...mcpArgs]:[])], env, cwd: runtime.work, maxLineBytes: 4 * 1024 * 1024, requestTimeoutMs: 20000 });
     this.transport = transport;
     transport.on('notification', (method, params) => {
       if (transport !== this.transport || generation !== this.generation) return;

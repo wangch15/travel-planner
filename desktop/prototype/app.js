@@ -165,7 +165,7 @@ function settingTab(section, rememberPosition=true) {
   const content=document.querySelector('.settings-content');
   if(rememberPosition)settingsScroll[ui.setting]=content.scrollTop;
   ui.setting = section;
-  for (const name of ['projects','appearance','ai','about','sync','tools']) $(`setting-${name}`).hidden = section !== name;
+  for (const name of ['projects','appearance','ai','sources','about','sync','tools']) $(`setting-${name}`).hidden = section !== name;
   document.querySelectorAll('[data-setting]').forEach(button => {
     if (button.dataset.setting === section) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
@@ -244,7 +244,25 @@ document.addEventListener('keydown',event=>{
 });
 
 const settingsOpenTrips=new Set();
+// First-run guidance: what a new user still needs, each with a button to the right place.
+function renderSetupChecklist() {
+  const list = $('setup-checklist'); if (!list) return;
+  const hasProject = Boolean(project && window.travelDesktop), state = accountState?.state, aiReady = state === 'connected';
+  list.hidden = !window.travelDesktop || (hasProject && aiReady); list.replaceChildren();
+  const steps = [
+    { done: hasProject, title: '連接或建立你的私人專案', hint: '行程資料會存在你自己的私人 GitHub 專案，換電腦也不會不見。', label: '前往專案管理', go: () => openSettings('projects') },
+    { done: aiReady, title: '安裝並連接 AI（Codex 或 Claude）', hint: state === 'unavailable' ? '這台電腦還沒有 AI 工具，App 可以幫你下載安裝。' : '用你的 ChatGPT 或 Claude 帳號登入一次。', label: state === 'unavailable' ? '安裝 AI 工具' : '連接 AI', go: () => { openSettings(state === 'unavailable' ? 'tools' : 'ai'); if (state === 'unavailable') window.openToolSetup?.(activeProvider === 'claude' ? 'claude' : 'codex'); } },
+    { optional: true, title: '要分享給同行朋友時，再連接 Cloudflare', hint: '發布網站前才需要，現在可以先跳過。', label: '了解發布', go: () => { openSettings('sync'); settingTab('publish'); } },
+  ];
+  for (const step of steps) {
+    const item = el('li', undefined, step.done ? 'done' : step.optional ? 'optional' : '');
+    item.append(el('strong', step.title), el('small', step.done ? '已完成' : step.hint));
+    if (!step.done) { const b = el('button', step.label); b.type = 'button'; b.onclick = step.go; item.append(b); }
+    list.append(item);
+  }
+}
 function renderProject() {
+  renderSetupChecklist();
   $('project-empty').hidden=Boolean(project);$('project-summary').hidden=!project;
   $('sync-trip-name').textContent=selected&&!selected.demo?selected.trip.title:'請先在工作台選擇旅程';
   if(!project)return;
@@ -439,10 +457,11 @@ $('choose-project').onclick = async () => {
   } catch { notify('檢查未完成，請重新選擇資料夾。'); }
   finally { aiBusy=false;proposalBusy=false;updateComposer();button.disabled = false; button.textContent = '選擇本機資料夾'; }
 };
-function newTripModal() { if (aiBusy || pendingProposal || window.hasMaterialization?.()) { notify('請先處理目前的修改提案。'); return; } $('new-form').reset();$('new-kind').value=project&&window.travelDesktop?'real':'demo'; $('new-error').hidden = true; $('new-dialog').showModal(); $('new-title').focus(); }
+function newTripModal() { if (aiBusy || pendingProposal || window.hasMaterialization?.()) { notify('請先處理目前的修改提案。'); return; } $('new-form').reset();$('new-kind').value=project&&window.travelDesktop?'real':'demo';$('new-demo-note').hidden=Boolean(project&&window.travelDesktop)||!window.travelDesktop;$('new-kind').querySelector('option[value=real]').disabled=!(project&&window.travelDesktop); $('new-error').hidden = true; $('new-dialog').showModal(); $('new-title').focus(); }
 $('new-demo').onclick = newTripModal;
 $('welcome-new').onclick = newTripModal;
 $('cancel-new').onclick = () => $('new-dialog').close();
+$('new-connect-project').onclick = () => { $('new-dialog').close(); openSettings('projects'); };
 $('cancel-new-x').onclick = () => $('new-dialog').close();
 $('new-form').onsubmit = async event => {
   event.preventDefault();
@@ -683,6 +702,7 @@ initializeWorkspace();
 if(window.travelDesktop){window.travelDesktop.feature('provider-status').then(result=>{if(result.ok&&result.provider)activeProvider=result.provider;}).catch(()=>{}).finally(restoreAIConnection);}
 
 function renderCodexAccount(account) {
+  queueMicrotask(renderSetupChecklist);
   if(account.provider&&account.provider!==activeProvider){activeProvider=account.provider;accountRequest++;}accountState = account;window.onFeatureAccount?.(account);
   const providerName=({codex:'Codex',claude:'Claude Code',gemini:'Gemini'})[activeProvider];$('provider-heading').textContent=providerName;$('chat-provider').value=activeProvider;window.refreshProviderOptions?.();$('codex-connect').textContent='檢查 '+providerName;$('codex-login').textContent=activeProvider==='codex'?'連接 ChatGPT':'登入 '+providerName;
   document.querySelector('.prototype-label').textContent = account.state === 'checking'?'正在核對已保存的登入…':account.state === 'connected' ? '提案經確認後才保存' : '可在設定連接 AI 助手';

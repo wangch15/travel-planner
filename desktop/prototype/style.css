@@ -69,6 +69,17 @@ body[data-platform="win32"] .app-header,body[data-platform="linux"] .app-header 
 .composer:focus-within { outline:1px solid var(--focus); }
 textarea::placeholder,input::placeholder { color:var(--subtle); opacity:1; }
 .composer-footer { display:flex; align-items:center; justify-content:space-between; gap:15px; margin-top:10px; }
+.setup-checklist { list-style:none; margin:28px auto 0; padding:0; max-width:460px; text-align:left; display:grid; gap:10px; counter-reset:setup; }
+.setup-checklist li { display:grid; grid-template-columns:28px 1fr auto; gap:4px 12px; align-items:center; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+.setup-checklist li::before { counter-increment:setup; content:counter(setup); grid-row:span 2; display:grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--surface); color:var(--muted); font-size:12px; font-weight:600; }
+.setup-checklist li.done::before { content:'✓'; background:var(--button); color:var(--on-button); }
+.setup-checklist li.optional::before { content:'…'; }
+.setup-checklist strong { font-size:13px; }
+.setup-checklist small { grid-column:2; color:var(--muted); font-size:12px; line-height:1.5; }
+.setup-checklist button { grid-row:1 / span 2; grid-column:3; font-size:12px; }
+.setup-checklist li.done { opacity:.7; }
+.dialog-note { margin:0 0 14px; padding:10px 12px; border-radius:10px; background:var(--surface); font-size:12px; line-height:1.6; }
+.dialog-note .text-button { padding:0; font-size:12px; text-decoration:underline; }
 .composer.drop-target { outline:2px dashed var(--focus); outline-offset:-2px; }
 .composer-attachments { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; padding:0; list-style:none; }
 .composer-attachment { display:flex; align-items:center; gap:8px; max-width:220px; padding:4px 4px 4px 6px; border:1px solid var(--line); border-radius:10px; background:var(--bg); font-size:12px; color:var(--muted); }

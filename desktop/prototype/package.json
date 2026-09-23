@@ -11,6 +11,7 @@
     "smoke:preview": "electron real-preview-smoke.cjs",
     "smoke:workflow": "electron workflow-smoke.cjs",
     "smoke:paste": "electron paste-smoke.cjs",
+    "smoke:research": "electron research-smoke.cjs",
     "test": "node --test --test-concurrency=2 tests/*.test.cjs codex/tests/*.test.cjs providers/tests/*.test.cjs",
     "icons": "electron export-icons.cjs",
     "preview:web": "node serve.cjs",

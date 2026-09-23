@@ -42,12 +42,16 @@ if (args.includes('--acp')) {
     if(payload.mode==='edit-all')answer.replacementDaysJson=JSON.stringify(payload.days.map(d=>({...d,title:'Changed'})));
     if(payload.mode==='planning')answer.planMarkdown='# 草案';
     if(payload.mode==='materialize')answer.filesJson=JSON.stringify({'data.js':'export const DAYS = [];'});
-    if(payload.mode==='research')Object.assign(answer,{sources:[{url:'https://example.invalid/official',title:'Official fixture',evidence:'Fixture evidence'}],unresolved:[],feasibility:'待人工核對'});
+    if(payload.mode==='research')Object.assign(answer,{sources:[{url:'https://example.invalid/official',title:'Official fixture',evidence:'Fixture evidence'}],unresolved:[],feasibility:'待人工核對',privateNotes:''});
     if(payload.request==='invalid-answer')answer.extra='unrequested';
     if(images.length)answer.summary='圖片:'+images.map(b=>b.source.type+'/'+b.source.media_type+'/'+Buffer.from(b.source.data,'base64').length).join(',');
     const sid='11111111-1111-4111-8111-111111111111';
     if(provider==='claude') {
-      send({type:'system',subtype:'init',session_id:sid,tools:[],mcp_servers:[]});
+      const mcpAt=args.indexOf('--mcp-config'),mcp=mcpAt>=0?JSON.parse(args[mcpAt+1]).mcpServers:{};
+      const allowed=args.includes('--allowedTools')?args[args.indexOf('--allowedTools')+1].split(','):[];
+      send({type:'system',subtype:'init',session_id:sid,tools:allowed.filter(t=>t.startsWith('mcp__')),mcp_servers:[...Object.keys(mcp).map(name=>({name,status:'connected'})),...(payload.request==='rogue-mcp'?[{name:'rogue',status:'connected'}]:[])],plugins:payload.request==='user-plugin'?[{name:'x',source:'x@market'}]:[{name:'telemetry',source:'telemetry@builtin'}],skills:[]});
+      if(payload.request==='mcp-call')send({type:'assistant',message:{content:[{type:'tool_use',name:'mcp__travel_research__research_open',input:{url:'https://example.invalid'}}]}});
+      if(payload.request==='other-mcp-call')send({type:'assistant',message:{content:[{type:'tool_use',name:'mcp__travel_research__shell',input:{}}]}});
       if(payload.request==='forbidden-tool')send({type:'assistant',message:{content:[{type:'tool_use',name:'Bash',input:{command:'never executed'}}]}});
       send({type:'stream_event',event:{type:'content_block_delta',delta:{type:'text_delta',text:'chunk'}}});
       send({type:'result',subtype:'success',is_error:false,session_id:sid,structured_output:answer});
@@ -348,3 +352,31 @@ test('cancel during delayed Claude status reconciliation cannot publish an older
 });
 
 test('an authorize URL does not turn a network or unspecified login failure into a callback error',async t=>{const directory=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'tp-auth-category-')));t.after(()=>fs.rm(directory,{recursive:true,force:true}));for(const [extra,category] of [['Login failed: fetch failed ECONNRESET','network'],['','login-command']]){const script=path.join(directory,'fake.cjs');await fs.writeFile(script,'process.stderr.write('+JSON.stringify('Open https://example.invalid/authorize?redirect_uri=callback&token=private-secret\n'+extra+'\n')+');process.exit(1);');const task=startProcess(process.execPath,[script],{work:directory,env:process.env},{input:'',classifyAuthFailure:true});await assert.rejects(task.done,error=>{assert.equal(error.authFailure,category);assert.equal(JSON.stringify(error).includes('private-secret'),false);return true;});}});
+
+const RESEARCH_TOOLS={name:'travel_research',url:'http://127.0.0.1:43210/mcp',token:'fixture-token',tools:['research_open','maps_route','research_screenshot']};
+
+test('claude research gets exactly the App research server without safe mode',async t=>{
+  const f=await fixture(t,'claude');
+  const answer=await f.editor.generate({snapshot:f.snapshot,dayId:null,text:'mcp-call',mode:'research',researchTools:RESEARCH_TOOLS});
+  assert.equal(answer.sources[0].title,'Official fixture');
+  const launch=f.launches.at(-1);
+  assert.equal(launch.args.includes('--safe-mode'),false);assert.equal(launch.config.env.CLAUDE_CODE_SAFE_MODE,undefined);
+  for(const flag of ['--restricted','--strict-mcp-config','--disable-slash-commands','--no-chrome'])assert.ok(launch.args.includes(flag),flag);
+  const mcp=JSON.parse(launch.args[launch.args.indexOf('--mcp-config')+1]).mcpServers;
+  assert.deepEqual(mcp,{travel_research:{type:'http',url:RESEARCH_TOOLS.url,headers:{Authorization:'Bearer fixture-token'}}});
+  assert.deepEqual(launch.args[launch.args.indexOf('--allowedTools')+1].split(','),['WebSearch','mcp__travel_research__research_open','mcp__travel_research__maps_route','mcp__travel_research__research_screenshot']);
+});
+
+test('claude ordinary modes keep safe mode and no MCP even when research tools exist',async t=>{
+  const f=await fixture(t,'claude');
+  await f.editor.generate({snapshot:f.snapshot,dayId:null,text:'hello',mode:'discussion',researchTools:RESEARCH_TOOLS});
+  const launch=f.launches.at(-1);
+  assert.ok(launch.args.includes('--safe-mode'));assert.equal(launch.args[launch.args.indexOf('--mcp-config')+1],'{"mcpServers":{}}');
+});
+
+test('claude research rejects extra MCP servers, unknown MCP tools and non-builtin plugins',async t=>{
+  const f=await fixture(t,'claude');
+  for(const request of ['rogue-mcp','other-mcp-call','user-plugin'])
+    await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:request,mode:'research',researchTools:RESEARCH_TOOLS}),{code:'POLICY_MISMATCH'},request);
+  await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:'mcp-call',mode:'research'}),{code:'POLICY_MISMATCH'});
+});

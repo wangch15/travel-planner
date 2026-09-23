@@ -15,3 +15,31 @@ test('Codex and Claude commands remain detectable when --version is unavailable 
  for(const id of ['codex','claude']){const item=tools.find(tool=>tool.id===id);assert.equal(item.status,'ready');assert.equal(item.version,null);assert.equal(item.requiredVersion,null);}
 });
 test('installed Codex and Claude versions are diagnostic only, while legacy Gemini remains guarded',async t=>{const outputs={claude:'2.1.280 (Claude Code)',gemini:'0.60.0',codex:'codex-cli 0.156.3',node:'v24.16.0',git:'git version 2.50.0',gh:'gh version 2.100.0',wrangler:'4.135.0'};const {service}=await fixture(t,{run:async command=>({stdout:outputs[command]})});service.resolveCommand=async id=>({command:id,args:[],env:{},source:'system'});const tools=(await service.inspect()).tools;assert.equal(tools.find(t=>t.id==='claude').requiredVersion,null);assert.equal(tools.find(t=>t.id==='claude').status,'ready');assert.equal(tools.find(t=>t.id==='codex').version,'0.156.3');assert.equal(tools.find(t=>t.id==='codex').requiredVersion,null);assert.equal(tools.find(t=>t.id==='gemini').requiredVersion,'0.46.0');assert.equal(tools.find(t=>t.id==='gemini').status,'unsupported');assert.equal(tools.find(t=>t.id==='codex').status,'ready');});
+function nodeDownloads(corrupt=false){const bytes=Buffer.from('official node archive'),digest=createHash('sha256').update(bytes).digest('hex');const name='node-v24.9.0-darwin-arm64.tar.gz';const seen=[];const fn=async url=>{seen.push(url);if(url==='https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt')return Buffer.from('0000  node-v24.9.0-darwin-x64.tar.gz\n'+digest+'  '+name+'\n');if(url==='https://nodejs.org/dist/v24.9.0/'+name)return corrupt?Buffer.from('tampered'):bytes;throw Error('unexpected '+url);};fn.seen=seen;return fn;}
+function nodeFixture(root,calls){return {platform:'darwin',arch:'arm64',env:{PATH:'/usr/bin:/bin'},
+  extract:async(_archive,destination)=>{const base=path.join(destination,'node-v24.9.0-darwin-arm64');await fs.mkdir(path.join(base,'bin'),{recursive:true});await fs.writeFile(path.join(base,'bin','node'),'node-binary');await fs.mkdir(path.join(base,'lib/node_modules/npm/bin'),{recursive:true});await fs.writeFile(path.join(base,'lib/node_modules/npm/bin/npm-cli.js'),'cli');},
+  run:async(command,args=[],options={})=>{calls.push({command,args,options});if(command===process.execPath)return {stdout:'4.135.0'};if(command.endsWith(path.join('bin','node'))&&args[0]==='--version')return {stdout:'v24.9.0'};if(command.endsWith(path.join('bin','node'))&&args.includes('install')){const bin=path.join(root,'tools/npm/node_modules/.bin');await fs.mkdir(bin,{recursive:true});await fs.writeFile(path.join(bin,'codex'),'#!/usr/bin/env node');return {stdout:'added 2 packages'};}if(command.endsWith(path.join('.bin','codex')))return {stdout:'codex-cli 0.156.1'};throw Object.assign(Error('missing'),{code:'ENOENT'});}};}
+
+test('Codex installs in the background with an App-downloaded, checksum-verified Node.js — no Homebrew or terminal',async t=>{
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'tool-node-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));const calls=[],terminal=[];const download=nodeDownloads();
+  const service=new ToolSupport(root,{...nodeFixture(root,calls),home:path.join(root,'home'),download,openTerminal:async v=>{terminal.push(v);}});service.systemNode=async()=>null;
+  const plan=await service.prepare('codex');
+  assert.equal(plan.method,'managed-npm');assert.doesNotMatch(plan.commandPreview+plan.steps.join(''),/brew|Homebrew|sudo/);assert.match(plan.commandPreview,/@openai\/codex\b/);
+  const result=await service.install(plan.token,{confirmed:true});
+  assert.equal(result.state,'installed');assert.equal(result.toolStatus.status,'ready');assert.equal(terminal.length,0);
+  const install=calls.find(c=>c.args.includes('install'));
+  assert.equal(install.args[0],path.join(root,'tools/node/24.9.0-darwin-arm64/lib/node_modules/npm/bin/npm-cli.js'));
+  assert.ok(install.args.includes('@openai/codex'));assert.ok(install.args.includes('--prefix'));assert.equal(install.options.cwd,path.join(root,'tools/npm'));
+  assert.ok(install.options.env.PATH.startsWith(path.join(root,'tools/node/24.9.0-darwin-arm64/bin')));
+  assert.deepEqual(download.seen,['https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt','https://nodejs.org/dist/v24.9.0/node-v24.9.0-darwin-arm64.tar.gz']);
+  assert.ok((await service.environment()).PATH.split(':').includes(path.join(root,'tools/node/24.9.0-darwin-arm64/bin')));
+  const node=(await service.prepare('node'));assert.equal(node.method,'managed-node');
+});
+
+test('a tampered Node.js download is never extracted, and Codex is not reported installed',async t=>{
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'tool-node-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));const calls=[];
+  const service=new ToolSupport(root,{...nodeFixture(root,calls),home:path.join(root,'home'),download:nodeDownloads(true),extract:async()=>{throw Error('must not extract');}});service.systemNode=async()=>null;
+  const plan=await service.prepare('codex');
+  await assert.rejects(service.install(plan.token,{confirmed:true}),{code:'TOOL_CHECKSUM_MISMATCH'});
+  assert.equal(calls.some(c=>c.args.includes('install')),false);
+});

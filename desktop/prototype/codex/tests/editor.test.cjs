@@ -225,6 +225,17 @@ test('research runtime enables only the read-only search dispatcher while local 
  const safe=f.transport.request;f.transport.request=async(method,params)=>{const value=await safe(method,params);if(method==='config/read')value.config.features.shell_tool=true;return value;};
  await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,mode:'research',text:'check sources'}),{code:'POLICY_MISMATCH'});
 });
+test('research with App tools requires exactly the App research MCP server in effective config',async()=>{
+ const tools={name:'travel_research',url:'http://127.0.0.1:43210/mcp',token:'t',tools:['research_open']};
+ const make=servers=>{const f=fixture({answer:{summary:'Research',sources:[],unresolved:['No source'],feasibility:'Unknown',privateNotes:'訂單 ABC123456'}});const original=f.transport.request;let seen;
+  f.editor.account.ensureMode=async(mode,endpoint)=>{seen={mode,endpoint};};
+  f.transport.request=async(method,params)=>{const value=await original(method,params);if(method==='config/read'){value.config.web_search='live';for(const key of ['search_tool','code_mode','code_mode_host'])value.config.features[key]=true;value.config.mcp_servers=servers;}return value;};return {f,seen:()=>seen};};
+ const ok=make({travel_research:{url:tools.url,bearer_token_env_var:'TP_RESEARCH_TOKEN'}});
+ const result=await ok.f.editor.generate({snapshot:ok.f.snapshot,dayId:null,mode:'research',text:'check',researchTools:tools});
+ assert.deepEqual(ok.seen(),{mode:'research',endpoint:tools});assert.equal(result.privateNotes,'訂單 ABC123456');
+ for(const servers of [{},{travel_research:{url:'http://127.0.0.1:1/mcp'}},{travel_research:{url:tools.url},other:{url:'https://x.example/mcp'}}]){
+  const bad=make(servers);await assert.rejects(bad.f.editor.generate({snapshot:bad.f.snapshot,dayId:null,mode:'research',text:'check',researchTools:tools}),{code:'POLICY_MISMATCH'});}
+});
 test('automatic effort explicitly restores the advertised model default after a stronger turn',async()=>{
  const f=fixture();f.editor.account.models=async()=>[{id:'server-model',isDefault:true,effort:['low','medium','high'],defaultEffort:'medium'}];const original=f.transport.request,sent=[];
  f.transport.request=async(method,params)=>{if(method==='turn/start')sent.push(params.effort);if(method==='thread/read')return {thread:{id:'thread',cwd:'/fake',modelProvider:'openai',status:{type:'idle'},turns:[{id:'turn',status:'completed'}]}};if(method==='thread/resume')return {thread:{id:'thread',status:{type:'idle'}},modelProvider:'openai',approvalPolicy:'never'};return original(method,params);};

@@ -128,9 +128,13 @@ async function prepareRuntime(directory, provider) {
   return { root, home, work, env, settings, researchSettings, loginSettings, normalPolicy, researchPolicy, assertPolicy };
 }
 
-function claudeFlags(runtime) {
-  return ['--safe-mode', '--restricted', '--setting-sources', '', '--settings', runtime.settings,
-    '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--disable-slash-commands', '--no-chrome'];
+// Safe mode also disables --mcp-config servers, so research turns that use the App's own
+// research server drop it; restricted mode, empty setting sources, strict MCP and the
+// App-only config directory still keep user customizations out.
+function claudeFlags(runtime, researchTools = null) {
+  const mcp = researchTools ? { mcpServers: { [researchTools.name]: { type: 'http', url: researchTools.url, headers: { Authorization: 'Bearer ' + researchTools.token } } } } : { mcpServers: {} };
+  return [...(researchTools ? [] : ['--safe-mode']), '--restricted', '--setting-sources', '', '--settings', runtime.settings,
+    '--strict-mcp-config', '--mcp-config', JSON.stringify(mcp), '--disable-slash-commands', '--no-chrome'];
 }
 function geminiFlags(runtime, research = false) {
   return ['--extensions', 'none', '--approval-mode', 'default', '--admin-policy', research ? runtime.researchPolicy : runtime.normalPolicy];

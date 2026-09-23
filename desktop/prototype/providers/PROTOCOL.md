@@ -27,6 +27,18 @@ sent; the entire request is limited to 512 KB. Native session resume is disabled
 Recovery returns `unknown`, so the host must never automatically replay an
 uncertain request. Effort controls are explicitly unsupported.
 
+Research tools: when the host passes `researchTools` in research/materialize
+mode, Claude gets `--mcp-config` with exactly the App's loopback server
+(`travel_research`, HTTP, bearer header) and `--allowedTools` listing
+`WebSearch` plus `mcp__travel_research__<tool>`. These turns omit
+`--safe-mode`/`CLAUDE_CODE_SAFE_MODE` because safe mode disables `--mcp-config`
+servers (verified 2026-09-23, Claude Code 2.1.280); `--restricted`, empty
+setting sources, `--strict-mcp-config`, slash-command and Chrome disabling and
+the App-only config directory remain. The init event must list exactly that one
+connected server, only `@builtin` plugins and no skills; any other MCP tool call
+fails closed. Research turns allow 40 turns and a 10-minute timeout. Ordinary
+modes keep safe mode and an empty MCP config.
+
 Images: Claude accepts up to six PNG/JPEG/WebP attachments (8 MiB each). The
 host passes each stored attachment's `mime`, `size` and absolute `localPath`;
 the adapter re-checks type, size and file identity, then sends one
