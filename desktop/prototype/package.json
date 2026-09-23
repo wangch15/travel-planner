@@ -1,0 +1,36 @@
+{
+  "name": "@travel-planner/desktop",
+  "version": "0.3.3",
+  "private": true,
+  "description": "Travel planning desktop workspace with local history, research, backup and publishing",
+  "main": "boot.cjs",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron smoke.cjs",
+    "smoke:startup": "node startup-smoke.cjs",
+    "smoke:preview": "electron real-preview-smoke.cjs",
+    "smoke:workflow": "electron workflow-smoke.cjs",
+    "test": "node --test tests/*.test.cjs codex/tests/*.test.cjs providers/tests/*.test.cjs",
+    "icons": "electron export-icons.cjs",
+    "preview:web": "node serve.cjs",
+    "smoke:versions": "electron versions-smoke.cjs",
+    "smoke:batch": "electron batch-smoke.cjs",
+    "smoke:batch-safety": "electron batch-safety-smoke.cjs",
+    "smoke:updater": "electron updater-smoke.cjs",
+    "smoke:navigation": "electron navigation-smoke.cjs",
+    "smoke:menus": "electron menu-smoke.cjs",
+    "smoke:settings": "electron settings-smoke.cjs",
+    "smoke:stop": "electron stop-continuation-smoke.cjs",
+    "smoke:session-settings": "electron session-settings-smoke.cjs"
+  },
+  "devDependencies": {
+    "electron": "44.4.3"
+  },
+  "dependencies": {
+    "@travel-planner/engine": "1.1.0",
+    "electron-updater": "6.8.9"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

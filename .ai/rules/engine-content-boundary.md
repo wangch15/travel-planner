@@ -11,7 +11,7 @@
 
 | | 路徑 | 誰維護 |
 |---|---|---|
-| 引擎 | `src/`、`scripts/`、`tools/`、`.ai/`、`.githooks/`、`docs/`、`public/`、`package.json` | 模板作者 |
+| 引擎 | `src/`、`scripts/`、`packages/`、`desktop/`、`tools/`、`.ai/`、`.githooks/`、`docs/`、`public/`、套件與 workspace 設定 | 模板作者 |
 | 內容 | `trips/<slug>/` 底下全部 | 行程擁有者 |
 | 產物 | `dist/` | 誰都不維護，整個 gitignore |
 

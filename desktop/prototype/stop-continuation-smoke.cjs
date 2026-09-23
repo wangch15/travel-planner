@@ -1,0 +1,86 @@
+// Native stop/continue regression with a fake model and a temporary sample project.
+const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
+const {EventEmitter}=require('node:events'),{app}=require('electron');
+const {createWindow,shutdown}=require('./main.cjs'),{createProjectStore}=require('./project-store.cjs'),{ConversationStore}=require('./conversation-store.cjs');
+app.on('window-all-closed',()=>{});
+let win,root,status=0,releaseIntentGate;
+const js=source=>win.webContents.executeJavaScript(source);
+async function until(source){for(let i=0;i<200;i++){if(await js(source))return;await new Promise(resolve=>setTimeout(resolve,30));}throw Error('Timed out: '+source);}
+app.whenReady().then(async()=>{
+  root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'travel-stop-')));
+  const project=path.join(root,'project'),state=path.join(root,'state');
+  await fs.mkdir(path.join(project,'scripts'),{recursive:true});
+  await fs.writeFile(path.join(project,'package.json'),'{}');
+  for(const file of ['check.js','build.js'])await fs.writeFile(path.join(project,'scripts',file),'throw Error("must not run")');
+  await fs.cp(path.resolve(__dirname,'../../trips/_example'),path.join(project,'trips/sample'),{recursive:true});
+  const store=createProjectStore(state);await store.connect({id:'stop-sample',root:project});await store.select('stop-sample','sample');
+  const account=new EventEmitter();account.account={state:'connected',label:'fake-account'};account.connect=async()=>account.account;account.models=async()=>[{id:'fake-model',isDefault:true,name:'Fake model'}];account.stop=async()=>{};
+  const inputs=[];let rejectFirst,releaseNew,holdIntent=null,intentWrites=0,stopCalls=0;
+  let reconciliations=0;
+  const editor={active:null,async stop(){stopCalls++;if(!this.active)return {requested:false};const uncertain=this.active.uncertain;const fail=Object.assign(Error(uncertain?'AI_RESULT_UNKNOWN':'AI_CANCELED'),uncertain?{code:'AI_RESULT_UNKNOWN'}:{code:'AI_CANCELED',stopConfirmed:true,turnId:this.active.turnId});rejectFirst(fail);return {requested:true};},async recover(input){assert.equal(input.metadataOnly,true);reconciliations++;return {status:'interrupted',threadId:'thread-one',turnId:input.turnId};},async generate(input){
+    inputs.push({text:input.text,thread:input.thread});await input.onThread('thread-one');
+    if(inputs.length===1||input.text==='未確認停止'||input.text==='競態舊要求'){const turnId=inputs.length===1?'turn-one':input.text==='未確認停止'?'turn-uncertain':'turn-race-old';await input.onTurn('thread-one',turnId);this.active={uncertain:input.text==='未確認停止',text:input.text,turnId};try{await new Promise((resolve,reject)=>{rejectFirst=reject;});}finally{this.active=null;}}
+    if(input.text==='模擬連線中斷'){await input.onTurn('thread-one','turn-three');throw Object.assign(Error('AI_RESULT_UNKNOWN'),{code:'AI_RESULT_UNKNOWN'});}
+    if(input.text==='競態新要求'){await input.onTurn('thread-one','turn-race-new');this.active={text:input.text,turnId:'turn-race-new'};try{await new Promise(resolve=>{releaseNew=resolve;});}finally{this.active=null;}return {summary:'競態新回覆',discussion:true,threadId:'thread-one',turnId:'turn-race-new',model:'fake-model'};}
+    await input.onTurn('thread-one','turn-two');return {summary:'新的討論',discussion:true,threadId:'thread-one',turnId:'turn-two',model:'fake-model'};
+  }};
+  const options={stateDirectory:state,codexAccount:account,makeEditor:()=>editor,makeConversations:directory=>{const conversations=new ConversationStore(directory),update=conversations.update.bind(conversations);conversations.update=async(target,change)=>{const result=await update(target,change);if(holdIntent&&intentWrites===0&&result.run?.status==='pending'&&result.run.stopRequested===true){intentWrites++;await holdIntent;}return result;};return conversations;}};
+  win=await createWindow(options);
+  await until('realPreview?.status==="ready" && accountState.state==="connected" && !conversationLoading');
+  await js('document.getElementById("message").value="第一輪討論";document.getElementById("chat-form").requestSubmit()');
+  await until('document.getElementById("stop-generation").hidden===false');
+  for(let i=0;i<200&&!editor.active;i++)await new Promise(resolve=>setTimeout(resolve,30));
+  assert.ok(editor.active);
+  await js('document.getElementById("stop-generation").click()');
+  await until('!aiBusy && selected.trip.stopped===true');
+  const saved=await new ConversationStore(state).read({root:project,slug:'sample'});
+  assert.equal(saved.run.status,'stopped');assert.equal(saved.thread.id,'thread-one');assert.equal(saved.thread.lastTurnId,'turn-one');
+  assert.equal(await js('document.getElementById("send-message").disabled'),false);
+  assert.equal(await js('document.querySelectorAll("#job-card button").length'),0);
+  await js('document.getElementById("message").value="接著討論新問題";document.getElementById("chat-form").requestSubmit()');
+  await until('document.getElementById("messages").textContent.includes("新的討論") && !aiBusy');
+  assert.deepEqual(inputs.map(item=>item.text),['第一輪討論','接著討論新問題']);
+  assert.deepEqual(inputs[1].thread,{id:'thread-one',accountKey:saved.thread.accountKey,lastTurnId:'turn-one'});
+  await js('document.getElementById("message").value="未確認停止";document.getElementById("chat-form").requestSubmit()');
+  for(let i=0;i<200&&!editor.active;i++)await new Promise(resolve=>setTimeout(resolve,30));
+  assert.ok(editor.active);await js('document.getElementById("stop-generation").click()');
+  await until('!aiBusy && selected.trip.featureState.stopRequested && selected.trip.needsRestart');
+  assert.equal(await js('selected.trip.stopped'),false);
+  assert.equal(await js('document.getElementById("job-card").textContent.includes("確認停止狀態")'),true);
+  await js('[...document.querySelectorAll("#job-card button")].find(button=>button.textContent==="確認停止狀態").click()');
+  await until('selected.trip.stopped===true && !selected.trip.needsRestart');
+  assert.equal(reconciliations,1);
+  assert.equal((await new ConversationStore(state).read({root:project,slug:'sample'})).thread.lastTurnId,'turn-uncertain');
+  await js('document.getElementById("message").value="模擬連線中斷";document.getElementById("chat-form").requestSubmit()');
+  await until('!aiBusy && selected.trip.needsRestart && !document.getElementById("job-card").hidden');
+  assert.equal(await js('selected.trip.stopped'),false);
+  assert.equal(await js('document.getElementById("job-card").textContent.includes("找回上次回覆")'),true);
+  assert.equal(await js('document.getElementById("job-card").textContent.includes("已停止這輪")'),false);
+  win.destroy();await new Promise(resolve=>setTimeout(resolve,80));
+  await new ConversationStore(state).update({root:project,slug:'sample'},s=>{s.run={id:s.job.id,status:'stopped'};s.job.status='paused';s.job.reason='AI_CANCELED';});
+  win=await createWindow(options);
+  await until('realPreview?.status==="ready" && !conversationLoading && selected.trip.featureState.legacyStopped');
+  assert.equal(await js('document.getElementById("job-card").textContent.includes("找回上次回覆")'),false);
+  assert.equal(await js('document.getElementById("job-card").textContent.includes("確認上次狀態")'),true);
+  await js('[...document.querySelectorAll("#job-card button")].find(button=>button.textContent==="確認上次狀態").click()');
+  await until('!selected.trip.needsRestart && document.getElementById("send-message").disabled===false');
+  assert.equal((await new ConversationStore(state).read({root:project,slug:'sample'})).job.reason,'terminal-confirmed');
+  assert.equal(reconciliations,2);
+  holdIntent=new Promise(resolve=>{releaseIntentGate=resolve;});
+  const previousStops=stopCalls;
+  await js('document.getElementById("message").value="競態舊要求";document.getElementById("chat-form").requestSubmit()');
+  for(let i=0;i<200&&editor.active?.text!=='競態舊要求';i++)await new Promise(resolve=>setTimeout(resolve,30));
+  assert.equal(editor.active?.text,'競態舊要求');
+  await js('document.getElementById("stop-generation").click()');
+  for(let i=0;i<200&&!intentWrites;i++)await new Promise(resolve=>setTimeout(resolve,30));
+  assert.equal(intentWrites,1);assert.equal(stopCalls,previousStops+1,'stop must capture the old editor operation before waiting for storage');
+  await until('!aiBusy && selected.trip.stopped===true');
+  await js('document.getElementById("message").value="競態新要求";document.getElementById("chat-form").requestSubmit()');
+  for(let i=0;i<200&&editor.active?.text!=='競態新要求';i++)await new Promise(resolve=>setTimeout(resolve,30));
+  assert.equal(editor.active?.text,'競態新要求');
+  releaseIntentGate();holdIntent=null;
+  await new Promise(resolve=>setTimeout(resolve,100));
+  assert.equal(editor.active?.text,'競態新要求');assert.equal(stopCalls,previousStops+1);
+  releaseNew();await until('!aiBusy && document.getElementById("messages").textContent.includes("競態新回覆")');
+  console.log(JSON.stringify({passed:true,confirmedStopCanContinue:true,uncertainStopReconciledWithoutReplay:true,legacyStopReconciledWithoutReplay:true,lateStopCannotCancelNewTurn:true,oldPromptNotReplayed:true,transportLossNotUserStop:true}));
+}).catch(error=>{releaseIntentGate?.();console.error(error);status=1;}).finally(async()=>{win?.destroy();await shutdown();if(root)await fs.rm(root,{recursive:true,force:true});app.exit(status);});

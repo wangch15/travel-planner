@@ -235,7 +235,7 @@ test('README 指令分成行程級與 repo 級，不能一概帶 slug', () => {
   assert.ok(r.includes('### Repo 級指令'), '缺 repo 級指令分類');
   const trip = r.split('### 行程級指令')[1].split('### Repo 級指令')[0];
   const repo = r.split('### Repo 級指令')[1].split('## ')[0];
-  const repoCommands = ['trips', 'update-check', 'contrib-check', 'sync:agent-assets', 'prepare', 'test'];
+  const repoCommands = ['trips', 'update-check', 'contrib-check', 'sync:agent-assets', 'prepare', 'test', 'desktop:prototype', 'desktop:setup'];
   for (const c of Object.keys(JSON.parse(read('package.json')).scripts)) {
     const command = c === 'test' ? 'npm test' : `npm run ${c}`;
     assert.ok((repoCommands.includes(c) ? repo : trip).includes(command), `${command} 分類錯誤或缺漏`);
