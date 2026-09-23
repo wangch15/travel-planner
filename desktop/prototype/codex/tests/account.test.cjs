@@ -26,6 +26,16 @@ test('stop during preparation prevents a late transport start and awaits cancell
   assert.equal(transport.starts, 0);
   assert.equal(transport.state, 'stopped');
 });
+test('a newer installed Codex version connects when the app-server protocol works', async () => {
+ const account=new CodexAccount('/fake',options({readVersion:async()=> 'codex-cli 0.156.3',makeTransport:()=>new FakeTransport()}));
+ assert.equal((await account.connect()).version,'0.156.3');
+ await account.stop();
+});
+test('missing Codex executable still reports missing instead of masking it as a protocol failure',async()=>{
+ const missing=Object.assign(Error('not found'),{code:'ENOENT'});
+ const account=new CodexAccount('/fake',options({readVersion:async()=>{throw missing;},makeTransport:()=>{throw Error('must not launch');}}));
+ await assert.rejects(account.connect(),{code:'ENOENT'});
+});
 test('closing a transport clears its pending login and permits a fresh login', async () => {
   const transports = [];
   const account = new CodexAccount('/fake', options({ makeTransport: () => { const transport = new FakeTransport(); transports.push(transport); return transport; } }));

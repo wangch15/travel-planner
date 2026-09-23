@@ -173,8 +173,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     catch (error) {
       const messages = {
         ENOENT: '尚未找到所選 AI 工具。請到「工具與更新」完成安裝。',
-        CLI_MISSING:'尚未找到所選 AI 工具，請到「工具與更新」完成安裝。',EXTERNAL_PROVIDER_POLICY:'這個工具的公司管理原則與 App 隔離設定不相容，原設定保持不變。Claude 目前支援 Pro／Max 帳號。',UNSUPPORTED_PROVIDER_VERSION:'這個 AI 工具版本尚未通過相容性核對，請從「工具與更新」安裝支援版本。',SUBSCRIPTION_LOGIN_REQUIRED:'請使用這個服務的官方帳號登入；App 不會自動改用付費 API。',PROVIDER_AUTH_INVALID:'登入資料需要重新核對，請使用更多選單重新登入。',
-        'unsupported-codex-version': '目前需要 Codex 0.155.1，請確認版本後重試。',
+        CLI_MISSING:'尚未找到所選 AI 工具，請到「工具與更新」完成安裝。',EXTERNAL_PROVIDER_POLICY:'這個工具的公司管理原則與 App 隔離設定不相容，原設定保持不變。Claude 目前支援 Pro／Max 帳號。',UNSUPPORTED_PROVIDER_VERSION:'舊版 Gemini CLI 接法無法驗證目前工具的安全限制；不會只因版本號而忽略限制。',SUBSCRIPTION_LOGIN_REQUIRED:'請使用這個服務的官方帳號登入；App 不會自動改用付費 API。',PROVIDER_AUTH_INVALID:'登入資料需要重新核對，請使用更多選單重新登入。',
         'login-already-pending': '登入正在進行，請完成瀏覽器授權，或先取消再重試。',
         'unexpected-login-url': '登入網址不符合預期，已停止連接。',
         'logout-not-confirmed': '尚未確認舊帳號已登出，請重新確認狀態後再試。',
@@ -467,7 +466,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       else result=await item.account.switchAccount();
       if(result?.authUrl){providerLoginURLs.set(id,result.authUrl);if(id===providerId)pendingLoginURL=result.authUrl;await openLoginURL(result.authUrl);}
       return {account:providerView(id)};
-    }catch(error){const code=error.code||error.message;const messages={CLI_MISSING:'尚未安裝，請到工具與更新設定。',ENOENT:'尚未安裝，請到工具與更新設定。',UNSUPPORTED_PROVIDER_VERSION:'請從工具與更新安裝支援版本。','unsupported-codex-version':'需要 Codex 0.155.1，請在工具與更新設定。',EXTERNAL_PROVIDER_POLICY:'帳號或公司管理原則與這版隔離設定不相容。',SUBSCRIPTION_LOGIN_REQUIRED:'請以官方訂閱帳號登入。'};return {account:{...providerView(id),state:['CLI_MISSING','ENOENT'].includes(code)?'unavailable':'error',message:messages[code]||'連線未完成，請重新檢查或重試。'}};}
+    }catch(error){const code=error.code||error.message;const messages={CLI_MISSING:'尚未安裝，請到工具與更新設定。',ENOENT:'尚未安裝，請到工具與更新設定。',UNSUPPORTED_PROVIDER_VERSION:'舊版 Gemini CLI 接法無法驗證目前工具的安全限制。',EXTERNAL_PROVIDER_POLICY:'帳號或公司管理原則與這版隔離設定不相容。',SUBSCRIPTION_LOGIN_REQUIRED:'請以官方訂閱帳號登入。'};return {account:{...providerView(id),state:['CLI_MISSING','ENOENT'].includes(code)?'unavailable':'error',message:messages[code]||'連線未完成，請重新檢查或重試。'}};}
     finally{providerAuthBusy.delete(id);}
   });
   feature('provider-models',async input=>({models:await getProvider(input.id).account.models()}));

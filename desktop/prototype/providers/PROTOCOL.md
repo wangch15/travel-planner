@@ -1,6 +1,6 @@
 # Claude Code / Gemini CLI providers
 
-Verified 2026-09-23. This directory is the provider boundary; project files and
+Verified 2026-09-23. The current Gemini CLI adapter is legacy pending the `agy` migration and proof of App-only keyring isolation; see `docs/plans/2026-09-23-desktop-native-cli-profiles.md`. This directory is the provider boundary; project files and
 credentials from other applications are never inputs to it.
 
 ## Host contract
@@ -32,9 +32,9 @@ materialize, research. Host validators and user preview/save gates still decide
 whether a decoded answer can become project data. These adapters never save
 project data. Models are official CLI aliases, not a live entitlement list.
 
-## Pinned protocols and restrictions
+## Audited protocols and restrictions
 
-Claude Code **2.1.278** uses `--print --output-format stream-json --verbose`,
+Claude Code **2.1.278** was used to audit the flags below. The installed Claude version is now diagnostic only: login requires a compatible official auth-status response and turns still require the effective tool policy and structured stream to match. Unknown behavior fails closed rather than requiring each new patch version to be allowlisted. Claude Code uses `--print --output-format stream-json --verbose`,
 `--json-schema`, and `result.structured_output`. Ordinary requests expose no
 built-in tools; research/materialize expose only `WebSearch`. `StructuredOutput`
 is accepted as the CLI's output mechanism. `--safe-mode`, `--restricted`, empty
@@ -89,7 +89,7 @@ The initial ACP probe with preselected OAuth entered a manual authorization
 prompt; it was stopped, no credential was obtained, and the separate login
 configuration was added and verified to initialize without authentication.
 
-This is a pinned CLI policy boundary, not an OS sandbox against a malicious same
+This is a capability-checked CLI policy boundary (the legacy Gemini adapter remains pinned to 0.46.0), not an OS sandbox against a malicious same
 user replacing executables or App state during execution. Transport failure,
 unexpected tools, config changes, unsupported versions, or invalid output reject
 the turn. The host must show that result without applying a proposal.

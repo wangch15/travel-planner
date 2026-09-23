@@ -38,7 +38,7 @@ It excludes trips, app account profiles, chat/attachment state, local backups, `
 
 `services/environment.cjs` exports:
 
-- `inspectEnvironment()` reports availability/version of pinned Codex, Git, GitHub CLI and bundled Wrangler, plus official setup links. It never installs anything and does not expose raw failed command output.
+- `inspectEnvironment()` reports installed Codex version for diagnosis (not as an allowlist), Git, GitHub CLI and bundled Wrangler, plus official setup links. It never installs anything and does not expose raw failed command output.
 - `checkForUpdates()` reads only the public `wangch15/travel-planner` releases API, accepts stable tags named `desktop-vX.Y.Z`, verifies each release/download URL belongs to that exact repository, and returns metadata. Engine-only releases are ignored. No automatic download or replacement occurs.
 
 ## Primary references

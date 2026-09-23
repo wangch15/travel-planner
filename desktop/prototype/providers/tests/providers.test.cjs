@@ -182,10 +182,15 @@ test('CLI at-file preprocessing never sees literal at signs from user input or h
   assert.equal(JSON.parse(payload).request,request);
 });
 
-test('unreviewed CLI versions and API-key authentication fail closed',async t=>{
+test('Claude newer CLI version retains App-only auth and protocol checks',async t=>{
   const f=await fixture(t,'claude');const script=path.join(f.directory,'fake.cjs');
-  await fs.writeFile(script,FAKE.replace('2.1.278 (Claude Code)','9.0.0 (Claude Code)'));
-  await assert.rejects(f.account.connect(),{code:'UNSUPPORTED_PROVIDER_VERSION'});
+  await fs.writeFile(script,FAKE.replace('2.1.278 (Claude Code)','2.1.280 (Claude Code)'));
+  assert.equal((await f.account.connect()).state,'connected');
+  assert.equal(f.account.account.version,'2.1.280 (Claude Code)');
+  assert.equal((await f.editor.generate({snapshot:f.snapshot,dayId:null,text:'hello'})).summary,'完成');
+});
+test('API-key and managed Claude accounts fail closed independently of CLI version',async t=>{
+  const f=await fixture(t,'claude');const script=path.join(f.directory,'fake.cjs');
   await fs.writeFile(script,FAKE.replace("authMethod:'claude.ai'","authMethod:'api_key'"));
   await assert.rejects(f.account.connect(),{code:'SUBSCRIPTION_LOGIN_REQUIRED'});
   await fs.writeFile(script,FAKE.replace("subscriptionType:'pro'","subscriptionType:'enterprise'"));

@@ -6,7 +6,7 @@ const { userInfo } = require('node:os');
 const { execFile } = require('node:child_process');
 const { failure } = require('./process.cjs');
 
-const VERSIONS = { claude: '2.1.278 (Claude Code)', gemini: '0.46.0' };
+const VERSIONS = { gemini: '0.46.0' }; // Legacy Gemini adapter only.
 async function assertNoExternalPolicy(provider) {
   const systemRoot = provider === 'gemini'
     ? process.platform === 'darwin' ? '/Library/Application Support/GeminiCli/policies' : process.platform === 'win32' ? 'C:\\ProgramData\\gemini-cli\\policies' : '/etc/gemini-cli/policies'
@@ -76,7 +76,7 @@ async function readConfig(file) {
 }
 
 async function prepareRuntime(directory, provider) {
-  if (!path.isAbsolute(directory) || !VERSIONS[provider]) throw failure('INVALID_INPUT');
+  if (!path.isAbsolute(directory) || !['claude','gemini'].includes(provider)) throw failure('INVALID_INPUT');
   await assertNoExternalPolicy(provider);
   await safeDirectory(directory);
   const root = await fs.realpath(directory);

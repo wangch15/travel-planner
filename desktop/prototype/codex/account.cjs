@@ -14,7 +14,7 @@ class CodexAccount extends EventEmitter {
     this.transport = null; this.connecting = null; this.loginId = null;
     this.generation = 0; this.stopping = null;
     this.authEpoch = 0; this.readSequence = 0; this.switchPromise = null;
-    this.mode='normal';this.modeSwitch=null;
+    this.mode='normal';this.modeSwitch=null;this.cliVersion=null;
     this.account = { state: 'disconnected', label: null, version: null };
   }
   async ensureMode(mode){
@@ -35,9 +35,12 @@ class CodexAccount extends EventEmitter {
   async _connect(generation) {
     const runtime = await this.prepare(this.directory);
     if (generation !== this.generation) throw Error('connection-canceled');
-    const version = await this.readVersion(runtime);
+    // The app-server handshake and per-turn policy checks decide compatibility;
+    // --version is diagnostic only, not a list of allowed releases.
+    let version=null;
+    try { version=/^codex-cli (\d+\.\d+\.\d+(?:-[\w.-]{1,50})?)$/.exec(await this.readVersion(runtime))?.[1]||null; } catch (error) { if (error.code === 'ENOENT') throw error; }
     if (generation !== this.generation) throw Error('connection-canceled');
-    if (version !== 'codex-cli 0.155.1') throw Error('unsupported-codex-version');
+    this.cliVersion=version;
     const transport = this.makeTransport({ command: this.command, args: ['app-server','--stdio','--strict-config',...(this.mode==='research'?['-c','web_search="live"','-c','features.search_tool=true','-c','features.code_mode=true','-c','features.code_mode_host=true']:[])], env: runtime.env, cwd: runtime.work, maxLineBytes: 4 * 1024 * 1024, requestTimeoutMs: 20000 });
     this.transport = transport;
     transport.on('notification', (method, params) => {
@@ -54,7 +57,7 @@ class CodexAccount extends EventEmitter {
       if (transport !== this.transport) return;
       this.authEpoch++;
       this.loginId = null;
-      this.account = { state: 'disconnected', label: null, version: '0.155.1' }; this.emit('changed', this.account);
+      this.account = { state: 'disconnected', label: null, version: this.cliVersion }; this.emit('changed', this.account);
     };
     transport.on('transportError', disconnected);
     transport.on('close', disconnected);
@@ -72,7 +75,7 @@ class CodexAccount extends EventEmitter {
     const response = await transport.request('account/read', { refreshToken: false });
     if (transport !== this.transport || epoch !== this.authEpoch || sequence !== this.readSequence) return this.account;
     if (response.account && response.account.type !== 'chatgpt') throw Error('unsupported-account-type');
-    this.account = { state: response.account ? 'connected' : 'needs-login', label: response.account?.email || null, plan: response.account?.planType || null, version: '0.155.1' };
+    this.account = { state: response.account ? 'connected' : 'needs-login', label: response.account?.email || null, plan: response.account?.planType || null, version: this.cliVersion };
     this.emit('changed', this.account);
     return this.account;
   }
@@ -117,7 +120,7 @@ class CodexAccount extends EventEmitter {
     const transport = this.transport, generation = this.generation;
     const assertCurrent = () => { if (transport !== this.transport || generation !== this.generation) throw Error('connection-canceled'); };
     this.authEpoch++;
-    this.account = {state:'switching',label:null,plan:null,version:'0.155.1'};
+    this.account = {state:'switching',label:null,plan:null,version:this.cliVersion};
     this.emit('changed',this.account);
     try {
       if (this.loginId) {
@@ -137,7 +140,7 @@ class CodexAccount extends EventEmitter {
       this.transport=null;
       return await this.login();
     } catch(error) {
-      this.account={state:'switch-failed',label:null,plan:null,version:'0.155.1'};
+      this.account={state:'switch-failed',label:null,plan:null,version:this.cliVersion};
       this.emit('changed',this.account);
       throw error;
     }

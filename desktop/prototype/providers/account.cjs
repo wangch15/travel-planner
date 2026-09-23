@@ -22,7 +22,7 @@ class CliAccount extends EventEmitter {
     this.loginStatusAttempts = options.loginStatusAttempts ?? 3;
     this.loginStatusIntervalMs = options.loginStatusIntervalMs ?? 400;
     this.runtime = null; this.connecting = null; this.loginProcess = null;
-    this.epoch = 0; this.account = { provider, state: 'disconnected', label: null, version: VERSIONS[provider] };
+    this.epoch = 0; this.account = { provider, state: 'disconnected', label: null, version: null };
   }
   changed(state) { this.account = { ...this.account, ...state }; this.emit('changed', this.account); return this.account; }
   connect() {
@@ -37,8 +37,18 @@ class CliAccount extends EventEmitter {
         if (typeof resolved.env?.PATH === 'string') this.runtime.env.PATH = resolved.env.PATH;
       }
       await this.runtime.assertPolicy();
-      const version = await this.run(['--version'], { timeoutMs: 10000, maxBytes: 16384 });
-      if (version.stdout.trim() !== VERSIONS[this.provider]) throw failure('UNSUPPORTED_PROVIDER_VERSION');
+      if (this.provider === 'gemini') {
+        // Legacy adapter: keep its audited protocol boundary until agy has proven isolated auth.
+        const version = await this.run(['--version'], { timeoutMs: 10000, maxBytes: 16384 });
+        if (version.stdout.trim() !== VERSIONS.gemini) throw failure('UNSUPPORTED_PROVIDER_VERSION');
+        this.account.version = version.stdout.trim();
+      } else {
+        // Claude compatibility is checked by auth/status and the tool/stream policy,
+        // not by an ever-changing release number.
+        let version = null;
+        try { version = /^(\d+\.\d+\.\d+ \(Claude Code\))$/.exec((await this.run(['--version'], { timeoutMs: 10000, maxBytes: 16384 })).stdout.trim())?.[1] || null; } catch {}
+        this.account.version = version;
+      }
       if (epoch !== this.epoch) throw failure('AI_CANCELED');
       return await this.refresh();
     })().finally(() => { this.connecting = null; });

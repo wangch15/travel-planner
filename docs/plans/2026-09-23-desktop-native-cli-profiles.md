@@ -1,0 +1,27 @@
+# Desktop local CLI providers and isolated accounts
+
+Confirmed design, 2026-09-23. The Desktop chat remains the interface; installed `codex`, `claude` and ultimately `agy` run as background processes. The App alone applies trip changes after preview and human confirmation. Every provider uses App-specific credentials and settings; switching or logging out in the App must not change the user's ordinary terminal account. No paid API key fallback, implicit installer, authorization, or model request is part of detection.
+
+## Compatibility rather than version gating
+
+Three approaches were considered: exact version allowlists (rejects harmless updates); accept all versions without protocol checks (allows changed tools and unexpected writes); and the chosen approach: resolve the local binary, report the version for diagnosis only, then check the exact capabilities and effective policy required by each operation. A version change alone is not a refusal. Missing protocol methods, unsupported output/flags, or inability to guarantee the no-write tool policy fail closed with actionable errors. Tests must cover newer versions with supported behavior and unchanged version numbers with changed behavior. The App does not install or downgrade an existing CLI automatically.
+
+Codex uses its own `CODEX_HOME` and isolated work directory, and validates app-server startup and the effective per-turn configuration. Claude uses its own `CLAUDE_CONFIG_DIR` and validates official auth status and the stream's tool declarations. Both still reject unsafe effective policies. Provider accounts must record the observed version, not an audited constant. Tool inventory must report installed version and compatibility separately; installer recipes must never present a pinned old version as a requirement or silently replace a newer system CLI.
+
+## Google migration: security gate
+
+The Google provider should use Google's official `agy` CLI, not assume `gemini` and `agy` speak the same protocol. Official headless mode documents `--output-format stream-json`, `--json-schema`, per-turn result events and explicit `--conversation`. It also documents that file reads/writes in the workspace may be auto-approved in headless mode. Therefore the App must avoid pointing it at the real trip as cwd and must validate pre-execution controls rather than rely on output inspection to stop a write after it happened. Preserve the existing proposal/preview/save gates. Do not inherit main-user config, hooks, MCP, custom agents, API keys, or paid-credit fallback.
+
+**Blocking prerequisite:** Official installation/auth documentation describes a native OS keyring, and `/logout` purges its tokens. A separate `HOME` is not evidence that keyring credentials are isolated. No documented profile/keyring namespace for the same `agy` executable has been established. Until App login can be shown to leave a separately logged-in terminal account unchanged (including App logout), do not launch an App OAuth flow, read the existing account, call logout, or advertise Google as independently connected. Do not use the user's primary account as a substitute. An OS-account-level isolation route would require explicit user provisioning and platform testing, not a hidden fallback.
+
+## Evidence and implementation sequence
+
+1. Test a different valid `codex --version`/Claude `--version` with a compatible fake protocol; test that malformed protocol and effective policy still reject. Remove exact-version gates in the account adapters and tool inventory only after red tests. Keep provider-specific profile directories and sanitized subprocess environment.
+2. Test independent CLI resolution, tool status text and install previews. Avoid unverified upgrades/downgrades; require human review for installers. Check macOS and Windows fixtures, renderer and Electron smoke tests.
+3. Before an `agy` adapter replaces Gemini, establish a documented or controlled, non-destructive proof of independent auth storage. Then test no cross-account read/logout, output-schema/result validation, tool policy *before* a turn, stale session/recovery, model entitlement, cancellation and failure handling using fakes before a human-led real sign-in. If proof is unavailable, stop at the gate and report Google as not migrated.
+
+Primary sources: https://antigravity.google/docs/cli/overview/ ; https://antigravity.google/docs/cli/headless/ ; https://antigravity.google/docs/cli/install/ ; https://antigravity.google/docs/cli/troubleshooting/ ; existing `desktop/prototype/providers/PROTOCOL.md` documents current Claude/Gemini behavior and its limits. No real login, model request or account mutation was used to author this design.
+
+## Current checkpoint
+
+Implemented the first phase for Codex and Claude only: fixed-version gates removed; observed version is diagnostic, isolated App profiles and protocol/policy checks remain. Tool setup no longer offers stale pinned Codex/Claude releases; tool inventory says the command was found, not that authentication or model turns succeeded. A newer fake CLI with the required behavior passes, malformed tool output and unsupported account modes still reject. The existing Google provider still uses Gemini CLI 0.46.0 with its old guard; it is **not** an `agy` integration. App-specific `agy` keyring separation remains unverified and is the blocking prerequisite. Neither `agy` auth nor real provider model turns were run.
