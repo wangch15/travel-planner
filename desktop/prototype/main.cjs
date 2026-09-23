@@ -144,7 +144,10 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('did-frame-finish-load', (_event, isMainFrame) => {
-    if(!isMainFrame&&artifact&&win.webContents.mainFrame.frames.some(frame=>frame.url===artifact.url))previewSeenURL=artifact.url;
+    if(!isMainFrame&&artifact&&win.webContents.mainFrame.frames.some(frame=>frame.url===artifact.url)){
+      previewSeenURL=artifact.url;
+      win.webContents.send('preview:viewed', { url: artifact.url });
+    }
     if (!isMainFrame && proposals.pending && win.webContents.mainFrame.frames.some(frame => frame.url === proposals.pending.artifact.url)) proposals.markViewed(proposals.pending.artifact.url);
   });
   const applyNativeIcon = () => {

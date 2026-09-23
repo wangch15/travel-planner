@@ -1,6 +1,6 @@
 /* Additional desktop flows use fixed main-process capabilities and explicit confirmations. */
 (() => {
-  let models=[],references=[],selectedRefs=new Set(),referenceScope='',lastAccount='',featureState={},materializedCandidate=false;
+  let models=[],references=[],selectedRefs=new Set(),referenceScope='',lastAccount='',featureState={},materializedCandidate=false,viewedPreviewURL=null;
   let conversationItems=[],currentConversation=null,showArchived=false,conversationRequest=0,renameConversationId=null;
   let backupToken=null,publishToken=null,adoptionToken=null,elapsedTimer=null,startedAt=0;
   const exclusive=new Set(['tool-prepare','tool-install','provider-select','trip-delete-prepare','trip-delete-confirm','trip-restore','project-setup-prepare','project-setup-confirm','git-identity-prepare','git-identity-confirm','trip-create','plan-confirm','references-add','references-url','references-remove','research-confirm','materialize-confirm','materialize-discard','job-wait','job-pause','job-recover','handoff','backup-prepare','backup-confirm','publish-prepare','publish-confirm','adoption-prepare','adoption-confirm','archive-export','archive-import','auth-start','auth-cancel','cloudflare-account','conversation-new','conversation-switch','conversation-rename','conversation-archive']);
@@ -140,16 +140,22 @@
     $('handoff-open').disabled=busy||Boolean(pending)||materializedCandidate;
     $('planning-actions').hidden=!planning;renderPlan();
     $('materialization-actions').hidden=!materializedCandidate;
-    if(materializedCandidate){$('message').disabled=true;$('send-message').disabled=true;$('versions-open').hidden=true;}
+    if(materializedCandidate){$('message').disabled=true;$('send-message').disabled=true;$('versions-open').hidden=true;$('confirm-materialization').disabled=busy||viewedPreviewURL!==realPreview?.url;}
     if(busy&&!elapsedTimer){startedAt=Date.now();elapsedTimer=setInterval(()=>{const node=document.querySelector('#ai-progress .message-meta');if(node)node.textContent=`處理中 · ${Math.floor((Date.now()-startedAt)/1000)} 秒`;},1000);}
     if(!busy&&elapsedTimer){clearInterval(elapsedTimer);elapsedTimer=null;}
   };
   window.acceptFeatureResult=result=>{
     if(result.research){featureState.research=result.research;$('show-research').hidden=false;}
-    if(result.proposal?.materialization){materializedCandidate=true;realPreview={status:'ready',planning:false,url:result.proposal.previewUrl,summary:result.proposal.previewSummary};setPreview(true);renderPreview();$('confirm-materialization').disabled=true;}
+    if(result.proposal?.materialization){materializedCandidate=true;viewedPreviewURL=null;realPreview={status:'ready',planning:false,url:result.proposal.previewUrl,summary:result.proposal.previewSummary};setPreview(true);renderPreview();$('confirm-materialization').disabled=true;}
     renderJob();renderPlan();
   };
-  $('preview').addEventListener('load',()=>{if(materializedCandidate)$('confirm-materialization').disabled=false;});
+  // iframe load can arrive before the main process records its receipt (or for
+  // an older document). Enable confirmation only after the host acknowledges it.
+  window.travelDesktop?.onPreviewViewed?.(({url})=>{
+    if(url!==realPreview?.url)return;
+    viewedPreviewURL=url;
+    if(materializedCandidate)$('confirm-materialization').disabled=aiBusy;
+  });
   async function specialized(mode,text){
     if(aiBusy||!selected||selected.demo)return;
     aiBusy=true;updateComposer();if(!await flushConversationDraft()){aiBusy=false;updateComposer();return;}

@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('travelDesktop', Object.freeze({
   onClosing: callback => {const listener=()=>callback();ipcRenderer.on('app:closing',listener);return ()=>ipcRenderer.removeListener('app:closing',listener);},
   onJobResult: callback => {const listener=(_event,value)=>callback(value);ipcRenderer.on('feature:job-result',listener);return ()=>ipcRenderer.removeListener('feature:job-result',listener);},
   openPreviewInBrowser: url => ipcRenderer.invoke('preview:open-browser', url),
+  onPreviewViewed: callback => {const listener=(_event,value)=>callback(value);ipcRenderer.on('preview:viewed',listener);return ()=>ipcRenderer.removeListener('preview:viewed',listener);},
   listVersions: input => ipcRenderer.invoke('versions:list',input),
   restoreVersion: input => ipcRenderer.invoke('versions:restore',input),
   selectProposalChanges: input => ipcRenderer.invoke('proposal:select',input),
