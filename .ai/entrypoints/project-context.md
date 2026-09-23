@@ -13,7 +13,7 @@ travel-planner 是一個**公開的旅程網頁模板**。使用者給你一份�
 
 ## 引擎與內容的邊界
 
-這個 repo 分兩半：**引擎**（`src/`、`scripts/`、`tools/`、`.ai/`、`docs/schema/`、
+這個 repo 分兩半：**引擎**（`src/`、`scripts/`、`packages/`、`desktop/`、`tools/`、`.ai/`、`docs/schema/`、
 `public/`）是模板作者維護的；**內容**（`trips/<slug>/`）是行程擁有者的。
 兩邊檔案集合不相交，所以 `git merge upstream/main` 拿引擎更新不會衝突。
 
@@ -53,7 +53,7 @@ git remote -v
 
 **有兩趟以上的時候，行程級指令都要帶 `-- <slug>`**——帶錯的話最糟的情況是
 `ship` 覆蓋掉另一趟的線上網站，而且不會有任何警告。
-Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`prepare`、`test` 不帶行程 slug；
+Repo 級的 `trips`、`update-check`、`contrib-check`、`sync:agent-assets`、`prepare`、`test`、`desktop:setup`、`desktop:prototype` 不帶行程 slug；
 `contrib-check` 的選填參數是 Git 比較基準，不是行程名稱。分類見 README 的指令表。
 
 **更危險的是檔案編輯：它不經過任何指令，沒有東西會擋你。**

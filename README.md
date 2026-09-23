@@ -212,6 +212,8 @@ npm run preview -- _example   # 開 http://localhost:4173 看實際頁面
 | `npm run contrib-check` | 檢查完整新增歷史的禁止路徑；可用 `npm run contrib-check -- <base>` 指定比較基準，預設 `upstream/main` |
 | `npm run sync:agent-assets` | 改過 `.ai/` 之後，重新產生 `AGENTS.md`、`CLAUDE.md` 與工具用 skills |
 | `npm run prepare` | npm install 會自動執行；安裝本 repo 的 pre-push，已有其他 hooksPath 不覆蓋 |
+| `npm run desktop:setup` | 明示安裝桌面與引擎 workspaces；一般行程的 `npm install` 不會安裝 Electron |
+| `npm run desktop:prototype` | 開啟桌面工作台：規劃／查核、AI 提案與版本回復、私人備份與發布；見[桌面說明](desktop/prototype/README.md) |
 | `npm test` | 引擎自己的測試 |
 
 ## Git 推送的最後一道檢查

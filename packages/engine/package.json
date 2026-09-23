@@ -1,0 +1,10 @@
+{
+  "name": "@travel-planner/engine",
+  "version": "1.1.0",
+  "private": true,
+  "main": "index.cjs",
+  "exports": { ".": "./index.cjs", "./schema": "./schema.cjs", "./render": "./render.cjs" },
+  "scripts": { "test": "node --test tests/*.test.cjs" },
+  "dependencies": { "acorn": "8.18.0" },
+  "engines": { "node": ">=20" }
+}

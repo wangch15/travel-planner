@@ -235,7 +235,7 @@ test('README 指令分成行程級與 repo 級，不能一概帶 slug', () => {
   assert.ok(r.includes('### Repo 級指令'), '缺 repo 級指令分類');
   const trip = r.split('### 行程級指令')[1].split('### Repo 級指令')[0];
   const repo = r.split('### Repo 級指令')[1].split('## ')[0];
-  const repoCommands = ['trips', 'update-check', 'contrib-check', 'sync:agent-assets', 'prepare', 'test'];
+  const repoCommands = ['trips', 'update-check', 'contrib-check', 'sync:agent-assets', 'prepare', 'test', 'desktop:prototype', 'desktop:setup'];
   for (const c of Object.keys(JSON.parse(read('package.json')).scripts)) {
     const command = c === 'test' ? 'npm test' : `npm run ${c}`;
     assert.ok((repoCommands.includes(c) ? repo : trip).includes(command), `${command} 分類錯誤或缺漏`);
@@ -501,4 +501,30 @@ test('有寫入權的人（模板作者、協作者）改引擎的流程要寫�
   assert.ok(/行程.*repo.*測試|tp-update/.test(section), '行程 repo 是測試場，改完要 tp-update 驗');
   assert.ok(/engine-changes/.test(section), '做行程時順手修引擎要記 engine-changes');
   assert.ok(/PR/.test(section) && /review/.test(section), 'PR 的價值是 review，不是權限');
+});
+
+test('引擎更新一律走完整閘門二，不得放寬成「agent 驗過就算」', () => {
+  const update = read('.ai/skills/tp-update/SKILL.md');
+  const i = update.indexOf('引擎更新一定算結構性變更');
+  assert.ok(i > 0, 'tp-update 必須保留「引擎更新一定算結構性變更」');
+  const section = update.slice(i, i + 500);
+  assert.ok(/一定要把網址給使用者|讓他在手機上看過/.test(section), '要明確要求給預覽網址');
+  // 這道閘門不能改成「agent 自己量過沒有可見變化就免了」——那是模型自己給自己許可，
+  // 而桌面 GUI 的信任邊界明文禁止（模型不能改 approved 欄位取得許可）。
+  assert.ok(!/(自己|agent).{0,12}(驗過|量過|確認過).{0,20}(免|不用|可直接)/.test(section),
+    '不得放寬成 agent 自我認證');
+  assert.ok(/不適用|不因/.test(section), '要明講「小修改自檢後直接 ship」那一條不適用');
+});
+
+test('render.js 與 app.js 的分工要寫進邊界規則', () => {
+  const rule = read('.ai/rules/engine-content-boundary.md');
+  const i = rule.indexOf('render.js');
+  assert.ok(i > 0, 'engine-content-boundary 要說明 render.js 與 app.js 的分工');
+  const section = rule.split('## 呈現邏輯與互動狀態')[1]?.split('## 為什麼重要')[0] || '';
+  assert.ok(/純函式|可測/.test(section), 'render.js 是可測的純函式層');
+  assert.ok(/DOM/.test(section), 'app.js 碰 DOM');
+  assert.ok(/互動狀態/.test(section) && /整合測試/.test(section), 'DOM 與互動狀態須由整合測試驗證');
+  assert.ok(/CLI 建置.*Node/.test(section) && /可信任/.test(section), 'CLI 建置會執行可信任的行程模組');
+  assert.ok(/靜態解析/.test(section) && /不執行匯入專案/.test(section), '桌面匯入的靜態解析邊界須明確');
+  assert.ok(/不可信|不受信任/.test(section), '產出的 HTML 與 app.js 屬於不可信執行環境');
 });

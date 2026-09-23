@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="614" height="592" viewBox="0 0 614 592" role="img" aria-labelledby="title desc">
+  <title id="title">Travel Planner — mark for light backgrounds, version 2</title>
+  <desc id="desc">Transparent-background map and location pin logo with a negative-space S-shaped route.</desc>
+  <defs>
+    <linearGradient id="mark" x1="245" y1="31" x2="340" y2="554" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#030303"/>
+      <stop offset=".46" stop-color="#191919"/>
+      <stop offset="1" stop-color="#515151"/>
+    </linearGradient>
+  </defs>
+  <g fill="url(#mark)" fill-rule="evenodd">
+    <path d="M307 31C259.5 31 221.5 69 221.5 116.5C221.5 165.5 268.5 205 302.7 237.8Q307 242 311.3 237.8C345.5 205 393.5 165.5 393.5 116.5C393.5 69 355 31 307 31ZM307 80A37.5 37.5 0 1 1 307 155A37.5 37.5 0 1 1 307 80Z"/>
+    <path d="M145 145C138 140 131 140 124 144L48 185C34 192 29 202 29 218V459C29 476 34 487 47 493C57 498 67 497 79 491L145 456L294 537C299 540 305 538 308 532C320 511 336 492 349 476C368 458 381 439 371 419C358 393 319 382 271 369C226 357 194 347 192 322C190 299 215 284 246 273C265 266 284 262 284 249C284 237 268 222 255 212Z"/>
+    <path d="M469 145C476 140 483 140 491 144L568 185C581 192 587 203 587 218V456C587 474 582 486 569 493C559 499 549 497 536 491L471 456L419 487C438 466 450 447 448 430C445 404 426 387 396 374C363 360 326 353 290 343C265 336 249 332 249 316C249 301 265 291 288 281C311 271 326 264 331 249C336 233 344 224 359 214Z"/>
+  </g>
+</svg>

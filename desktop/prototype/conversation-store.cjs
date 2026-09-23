@@ -1,0 +1,84 @@
+const fs = require('node:fs/promises');
+const { constants } = require('node:fs');
+const path = require('node:path');
+const { createHash, randomUUID } = require('node:crypto');
+const {validJob}=require('./services/jobs.cjs');
+const SESSION_FIELDS=Object.freeze(['provider','started','messages','draft','model','dayId','thread','run','effort','handoff','job']);
+const MAX_BYTES = 16 * 1024 * 1024;
+const fail = () => Object.assign(Error('CONVERSATION_STORE_INVALID'), {code:'CONVERSATION_STORE_INVALID'});
+const same = (a,b) => a.dev===b.dev && a.ino===b.ino;
+const regular = s => s.isFile() && !s.isSymbolicLink() && s.nlink===1;
+const string = (s,max) => typeof s==='string' && s.length<=max;
+const empty = () => ({version:1,messages:[],draft:'',model:'',dayId:null,thread:null,run:null,pendingProposal:false,lastOutcome:'尚未產生提案。'});
+function validPlan(p){return p===undefined||p===null||(p&&string(p.markdown,40000)&&(p.approvedDigest===null||string(p.approvedDigest,64)));}
+function validResearch(r){return r===undefined||r===null||(r&&string(r.summary,16000)&&string(r.feasibility,12000)&&string(r.sourceHash,128)&&typeof r.confirmed==='boolean'&&Array.isArray(r.sources)&&r.sources.length<=20&&r.sources.every(v=>v&&string(v.url,4096)&&string(v.title,1000)&&string(v.evidence,500)&&string(v.checkedAt,40)&&typeof v.verified==='boolean')&&Array.isArray(r.unresolved)&&r.unresolved.length<=200&&r.unresolved.every(v=>string(v,3000)));}
+function validConversations(s){return (s.conversationId===undefined||string(s.conversationId,100))&&(s.conversationTitle===undefined||string(s.conversationTitle,100))&&(s.archives===undefined||(Array.isArray(s.archives)&&s.archives.length<=50&&s.archives.every(c=>c&&string(c.id,100)&&string(c.title,100)&&typeof c.archived==='boolean'&&c.payload&&Object.keys(c.payload).every(key=>SESSION_FIELDS.includes(key))&&valid({...c.payload,version:1,pendingProposal:false,lastOutcome:'',archives:undefined,conversationId:undefined,conversationTitle:undefined}))));}
+function validGeneration(value){return value===undefined||(value&&typeof value==='object'&&!Array.isArray(value)&&['codex','claude','gemini'].includes(value.provider)&&string(value.model,200)&&string(value.effort,40)&&(value.resolvedEffort===undefined||string(value.resolvedEffort,40)));}
+function valid(s) {
+  return s?.version===1 && (s.started===undefined||typeof s.started==='boolean') && (s.provider===undefined||['codex','claude','gemini'].includes(s.provider)) && validConversations(s)&&validPlan(s.plan)&&validResearch(s.research)&&validJob(s.job) && (s.effort===undefined||string(s.effort,40)) && (s.handoff===undefined||s.handoff===null||string(s.handoff,16000)) && string(s.draft,2000) && string(s.model,200) && (s.dayId===null || Number.isSafeInteger(s.dayId))
+    && typeof s.pendingProposal==='boolean' && string(s.lastOutcome,1000)
+    && Array.isArray(s.messages) && s.messages.length<=2000 && s.messages.every(m=>m && ['user','assistant'].includes(m.role) && string(m.text,64000)&&validGeneration(m.generation))
+    && (s.thread===null || (string(s.thread.id,200) && string(s.thread.accountKey,200) && (s.thread.lastTurnId===null || string(s.thread.lastTurnId,200))))
+    && (s.run===null || (string(s.run.id,100) && ['pending','complete','failed','unknown','stopped'].includes(s.run.status)
+      && (s.run.stopRequested===undefined||typeof s.run.stopRequested==='boolean')
+      && (s.run.stopConfirmed===undefined||typeof s.run.stopConfirmed==='boolean')
+      && (s.run.stopConfirmed!==true||s.run.stopRequested===true&&s.run.status==='stopped')));
+}
+class ConversationStore {
+  constructor(directory) { if(!path.isAbsolute(directory))throw fail();this.directory=path.join(directory,'conversations');this.queue=Promise.resolve();this.anchor=null; }
+  filename(target) {
+    if(!target || !path.isAbsolute(target.root) || !/^[a-zA-Z0-9_-]{1,100}$/.test(target.slug))throw fail();
+    return path.join(this.directory,createHash('sha256').update(JSON.stringify([target.root,target.slug])).digest('hex')+'.json');
+  }
+  async checkDirectory() {
+    try {
+      const stat=await fs.lstat(this.directory);const canonical=await fs.realpath(this.directory);
+      if(!stat.isDirectory() || stat.isSymbolicLink() || !same(stat,await fs.lstat(canonical)) || !same(stat,await fs.lstat(this.directory)))throw fail();
+      if(this.anchor && (!same(stat,this.anchor.stat) || canonical!==this.anchor.canonical))throw fail();
+      this.anchor ||= {stat,canonical};return true;
+    } catch(e) { if(e.code==='ENOENT'&&!this.anchor)return false;throw fail(); }
+  }
+  read(target) {
+    // Readers share the mutation queue: our own atomic rename must not look like
+    // an external inode replacement between lstat and open.
+    const operation=this.queue.then(()=>this.load(target));
+    this.queue=operation.catch(()=>{});return operation;
+  }
+  async load(target) {
+    const file=this.filename(target);
+    if(!await this.checkDirectory())return empty();
+    let handle;
+    try {
+      const stat=await fs.lstat(file);if(!regular(stat)||stat.size>MAX_BYTES)throw fail();
+      handle=await fs.open(file,constants.O_RDONLY|constants.O_NOFOLLOW);
+      if(!same(stat,await handle.stat()))throw fail();
+      await this.checkDirectory();
+      const bytes=Buffer.alloc(stat.size+1);const {bytesRead}=await handle.read(bytes,0,bytes.length,0);
+      if(bytesRead!==stat.size)throw fail();
+      const current=await handle.stat();if(!regular(current)||current.size!==stat.size||current.mtimeMs!==stat.mtimeMs)throw fail();
+      await this.checkDirectory();
+      const state=JSON.parse(bytes.subarray(0,bytesRead).toString('utf8'));if(!valid(state))throw fail();return state;
+    } catch(e) {
+      if(e.code==='ENOENT'){await this.checkDirectory();return empty();}throw fail();
+    } finally {await handle?.close();}
+  }
+  update(target, change) {
+    const operation=this.queue.then(async()=>{
+      const state=await this.load(target);change(state);if(!valid(state))throw fail();
+      const bytes=JSON.stringify(state)+'\n';if(Buffer.byteLength(bytes)>MAX_BYTES)throw fail();
+      await fs.mkdir(this.directory,{recursive:true,mode:0o700});await this.checkDirectory();
+      const temp=path.join(this.directory,`.chat-${randomUUID()}.tmp`);let owned;
+      try {
+        const handle=await fs.open(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
+        try {owned=await handle.stat();await this.checkDirectory();await handle.writeFile(bytes);await handle.sync();} finally {await handle.close();}
+        await this.load(target);await this.checkDirectory();
+        const stat=await fs.lstat(temp);if(!regular(stat)||!same(owned,stat))throw fail();
+        await fs.rename(temp,this.filename(target));await this.checkDirectory();return state;
+      } finally {
+        try {await this.checkDirectory();const stat=await fs.lstat(temp);if(owned&&regular(stat)&&same(stat,owned))await fs.unlink(temp);}catch{/* Never remove a replaced file. */}
+      }
+    });this.queue=operation.catch(()=>{});return operation;
+  }
+  async flush(){await this.queue;}
+}
+module.exports={ConversationStore,SESSION_FIELDS};

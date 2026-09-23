@@ -19,15 +19,22 @@
     "update-check": "node scripts/update-check.js",
     "contrib-check": "node scripts/contrib-check.js",
     "migrate": "node scripts/migrate.js",
+    "desktop:prototype": "npm run start --workspaces --workspace=@travel-planner/desktop",
     "basemap": "node tools/basemap/index.mjs",
     "photos": "node scripts/photos.js",
     "test": "node --test \"tests/**/*.test.js\" \"tests/**/*.test.mjs\"",
-    "sync:agent-assets": "node scripts/sync-agent-assets.mjs"
+    "sync:agent-assets": "node scripts/sync-agent-assets.mjs",
+    "desktop:setup": "npm install --workspaces --include-workspace-root"
   },
   "dependencies": {
-    "pngjs": "^7.0.0"
+    "pngjs": "^7.0.0",
+    "acorn": "8.18.0"
   },
   "devDependencies": {
     "wrangler": "4.135.0"
-  }
+  },
+  "workspaces": [
+    "packages/*",
+    "desktop/prototype"
+  ]
 }

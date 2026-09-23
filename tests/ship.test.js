@@ -276,7 +276,7 @@ test('成功部署後寫入紀錄失敗，仍明說遠端已部署，不留下�
 test('ship CLI 接上保護：可匯入、使用 runner 替身、拒絕時非零退出', (t) => {
   const repo = gitSandbox(t);
   const root = path.join(__dirname, '..');
-  for (const dir of ['src', 'public', 'trips/_example']) {
+  for (const dir of ['src', 'public', 'trips/_example', 'packages/engine']) {
     fs.cpSync(path.join(root, dir), path.join(repo.dir, dir), { recursive: true });
   }
   const source = fs.readFileSync(path.join(repo.dir, 'scripts/ship.js'), 'utf8');

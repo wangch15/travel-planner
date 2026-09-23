@@ -1,0 +1,45 @@
+name: Desktop and engine
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --workspaces --include-workspace-root
+      - name: Engine and desktop tests with fake providers
+        run: npm test --workspaces --workspace=@travel-planner/engine --workspace=@travel-planner/desktop
+      - name: Existing CLI regression
+        if: runner.os == 'macOS'
+        run: npm test
+      - run: npm --prefix desktop/prototype run smoke:startup
+      - run: npm --prefix desktop/prototype run smoke:preview
+      - run: npm --prefix desktop/prototype run smoke:workflow
+      - run: npm --prefix desktop/prototype run smoke:versions
+      - run: npm --prefix desktop/prototype run smoke:batch
+      - run: npm --prefix desktop/prototype run smoke:batch-safety
+      - run: npm --prefix desktop/prototype run smoke:updater
+      - run: npm --prefix desktop/prototype run smoke:navigation
+      - run: npm --prefix desktop/prototype run smoke:menus
+      - run: npm --prefix desktop/prototype run smoke:settings
+      - run: npm --prefix desktop/prototype run smoke:stop
+      - run: npm --prefix desktop/prototype run smoke:session-settings
+
+# No ChatGPT login, model request, Cloudflare deployment, or private trip data.
+# A committed workflow is not evidence that native Windows has already passed.
