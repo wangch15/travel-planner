@@ -1,6 +1,7 @@
 const { Worker } = require('node:worker_threads');
 const { randomBytes } = require('node:crypto');
 const path = require('node:path');
+const { publicationOutput } = require('./publication-output.cjs');
 
 const PREVIEW_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src travel-preview: data:; font-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; sandbox allow-scripts";
 
@@ -26,8 +27,11 @@ function buildPreview(projectRoot, slug) {
         if (!/^img\/[a-zA-Z0-9_-]+-\d+\.jpg$/.test(photo.name)) { done(Error('invalid-preview-photo')); return; }
         assets.set(`/${photo.name}`, { body: Buffer.from(photo.bytes), type: 'image/jpeg' });
       }
-      done(null, { token, url: `travel-preview://${token}/index.html`, digest: result.digest, summary: result.summary, snapshot: result.snapshot,
-        read: pathname => assets.get(pathname) || null });
+      const artifact = { token, url: `travel-preview://${token}/index.html`, digest: result.digest, summary: result.summary, snapshot: result.snapshot,
+        read: pathname => assets.get(pathname) || null };
+      try { artifact.outputDigest = publicationOutput(artifact).digest; }
+      catch (error) { done(error); return; }
+      done(null, artifact);
     });
   });
 }

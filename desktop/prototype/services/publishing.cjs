@@ -5,6 +5,7 @@ const { createHash, randomUUID } = require('node:crypto');
 const { execFile } = require('node:child_process');
 const { sanitizeAccounts } = require('./auth-tools.cjs');
 const { buildPreview } = require('../preview.cjs');
+const { publicationOutput } = require('../publication-output.cjs');
 const { inspectWorker, deployBuiltTrip, readState } = require('../../../scripts/lib/deployment-state.js');
 const hash = value => createHash('sha256').update(value).digest('hex');
 const fail = (code, message) => Object.assign(new Error(message || code), { code });
@@ -92,28 +93,18 @@ class PublishingService {
     if ((config.deploy?.target || 'workers') !== 'workers') throw fail('WORKERS_ONLY', '桌面版目前只發布 Workers；Pages 請先完成遷移。');
     if (!NAME.test(config.deploy?.name || '')) throw fail('INVALID_TARGET', '請先設定有效的 Worker 網站名稱。');
     return { root: canonicalRoot, slug, artifact, name: config.deploy.name, title: config.title,
-      stateDir: path.join(this.directory, hash(canonicalRoot)) };
+      output: publicationOutput(artifact), stateDir: path.join(this.directory, hash(canonicalRoot)) };
   }
   materialize(target) {
     ownedDirectory(this.directory);
     const temporary = fs.mkdtempSync(path.join(this.directory, '.publish-'));
     try {
       const site = path.join(temporary, 'site'); fs.mkdirSync(site, { mode: 0o700 });
-      const index = target.artifact.read('/index.html');
-      if (!index || !index.type.startsWith('text/html')) throw fail('INVALID_PREVIEW');
-      fs.writeFileSync(path.join(site, 'index.html'), index.body, { flag: 'wx', mode: 0o600 });
-      const copied = new Set(); let total = Buffer.byteLength(index.body);
-      for (const photo of Object.values(target.artifact.snapshot.photos || {}).flat()) {
-        if (!/^img\/[a-zA-Z0-9_-]+-\d+\.jpg$/.test(photo.src)) throw fail('INVALID_PREVIEW');
-        if (copied.has(photo.src)) continue;
-        const asset = target.artifact.read('/' + photo.src);
-        if (!asset || asset.type !== 'image/jpeg') throw fail('INVALID_PREVIEW');
-        total += Buffer.byteLength(asset.body); if (total > 160 * 1024 * 1024) throw fail('PUBLICATION_TOO_LARGE');
-        fs.mkdirSync(path.join(site, 'img'), { recursive: true, mode: 0o700 });
-        fs.writeFileSync(path.join(site, photo.src), asset.body, { flag: 'wx', mode: 0o600 }); copied.add(photo.src);
+      for (const [name, bytes] of target.output.files) {
+        const file = path.join(site, name);
+        fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+        fs.writeFileSync(file, bytes, { flag: 'wx', mode: 0o600 });
       }
-      fs.writeFileSync(path.join(site, 'robots.txt'), 'User-agent: *\nDisallow: /\n', { flag: 'wx', mode: 0o600 });
-      fs.writeFileSync(path.join(site, '_headers'), '/*\n  X-Robots-Tag: noindex, nofollow, noarchive, noimageindex\n  Referrer-Policy: no-referrer\n  X-Content-Type-Options: nosniff\n', { flag: 'wx', mode: 0o600 });
       const configFile = path.join(temporary, 'wrangler.json');
       fs.writeFileSync(configFile, JSON.stringify({ name: target.name, compatibility_date: new Date().toISOString().slice(0, 10), assets: { directory: './site' } }), { flag: 'wx', mode: 0o600 });
       return { temporary, configFile };
@@ -132,27 +123,27 @@ class PublishingService {
   async prepare(input) {
     if (this.busy) throw fail('PUBLISH_BUSY');
     const target = await this.target(input);
-    if (!input.previewSeen || input.previewDigest !== target.artifact.digest) throw fail('PREVIEW_REQUIRED', '請先在 App 看過目前完整版本的預覽，再準備發布。');
+    if (!input.previewSeen || input.previewDigest !== target.artifact.digest || input.previewOutputDigest !== target.output.digest) throw fail('PREVIEW_REQUIRED', '請先在 App 看過目前完整版本的預覽，再準備發布。');
     const output = this.materialize(target);
     try {
       const remote = await this.inspect(target, output.configFile), previous = this.requireMatchingReceipt(target, remote);
       const token = randomUUID(); this.pending.clear();
-      this.pending.set(token, { kind: 'publish', root: target.root, slug: target.slug, name: target.name, digest: target.artifact.digest,
+      this.pending.set(token, { kind: 'publish', root: target.root, slug: target.slug, name: target.name, digest: target.artifact.digest, outputDigest: target.output.digest,
         remote: remoteIdentity(remote), receipt: JSON.stringify(previous), expires: Date.now() + 10 * 60 * 1000 });
       return { token, name: target.name, title: target.title, accountId: remote.accountId, accountName: remote.accountName,
-        sourceDigest: target.artifact.digest, firstPublish: remote.latest === null, previousUrl: previous?.url || null,
+        sourceDigest: target.artifact.digest, outputDigest: target.output.digest, firstPublish: remote.latest === null, previousUrl: previous?.url || null,
         warning: '發布後任何取得網址的人都能開啟；不被搜尋引擎收錄並不等於密碼保護。' };
     } finally { fs.rmSync(output.temporary, { recursive: true, force: true }); }
   }
-  async confirm(token, { previewSeen, previewDigest } = {}) {
+  async confirm(token, { previewSeen, previewDigest, previewOutputDigest } = {}) {
     if (this.busy) throw fail('PUBLISH_BUSY');
     const pending = this.pending.get(token); this.pending.delete(token);
     if (!pending || pending.kind !== 'publish' || Date.now() > pending.expires) throw fail('STALE_CONFIRMATION');
-    if (!previewSeen || previewDigest !== pending.digest) throw fail('PREVIEW_REQUIRED');
+    if (!previewSeen || previewDigest !== pending.digest || previewOutputDigest !== pending.outputDigest) throw fail('PREVIEW_REQUIRED');
     this.busy = true; let output, attempted = false;
     try {
       const target = await this.target(pending);
-      if (target.artifact.digest !== pending.digest || target.name !== pending.name) throw fail('CONTENT_CHANGED', '資料已變更，請重新預覽及確認發布。');
+      if (target.artifact.digest !== pending.digest || target.output.digest !== pending.outputDigest || target.name !== pending.name) throw fail('CONTENT_CHANGED', '資料或頁面產物已變更，請重新預覽及確認發布。');
       output = this.materialize(target);
       const remote = await this.inspect(target, output.configFile);
       const previous = this.requireMatchingReceipt(target, remote);

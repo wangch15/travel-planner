@@ -4,14 +4,15 @@ const fs = require('node:fs/promises');
 const sync = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { publicationOutput } = require('../publication-output.cjs');
 const { PublishingService } = require('../services/publishing.cjs');
 const account = 'a'.repeat(32), version = '11111111-1111-1111-1111-111111111111';
 const remote = () => ({ id: 'deployment-one', created_on: '2026-09-22T00:00:00.000Z', versions: [{ version_id: version, percentage: 100 }] });
 async function fixture(t) {
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'tp-publish-'))); t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const state = { digest: 'digest-one', latest: null, account, calls: [], failDeploy: false, uploaded: null };
+  const state = { html: '<html>immutable preview</html>', photo: Buffer.from([1,2,3]), digest: 'digest-one', latest: null, account, calls: [], failDeploy: false, uploaded: null };
   const loadPreview = async () => ({ digest: state.digest, snapshot: { trip: { config: { title: 'Sample', deploy: { target: 'workers', name: 'sample-trip' } } }, photos: { sample: [{ src: 'img/sample-1.jpg' }] } },
-    read: name => name === '/index.html' ? { body: '<html>immutable preview</html>', type: 'text/html; charset=utf-8' } : name === '/img/sample-1.jpg' ? { body: Buffer.from([1,2,3]), type: 'image/jpeg' } : null });
+    read: name => name === '/index.html' ? { body: state.html, type: 'text/html; charset=utf-8' } : name === '/img/sample-1.jpg' ? { body: state.photo, type: 'image/jpeg' } : null });
   const runWrangler = (args, options) => {
     state.calls.push(args);
     if (args[0] === 'whoami') return { status: 0, stdout: JSON.stringify({ loggedIn: true, accounts: state.accounts || [{ id: state.account, name: 'Sample account' }] }) };
@@ -28,7 +29,7 @@ async function fixture(t) {
     throw Error('unexpected command');
   };
   const service = new PublishingService(root, { loadPreview, runWrangler: async (...args) => runWrangler(...args), env: {} });
-  return { root, state, service, input: { root, slug: 'sample', previewSeen: true, previewDigest: state.digest } };
+  return { root, state, service, input: { root, slug: 'sample', previewSeen: true, previewDigest: state.digest, previewOutputDigest: publicationOutput(await loadPreview()).digest } };
 }
 test('publishes only immutable application output after preview and double remote checks', async t => {
   const f = await fixture(t), p = await f.service.prepare(f.input);
@@ -94,4 +95,28 @@ test('multiple Cloudflare accounts require selection and changing it invalidates
   const failed = await f.service.confirm(next.token, f.input); assert.equal(failed.published, false);
   assert.equal(f.state.calls.some(args => args[0] === 'deploy'), false);
   assert.throws(() => f.service.setAccount('../account'), { code: 'INVALID_ACCOUNT' });
+});
+
+test('changed rendered HTML or photos require fresh preview even with identical trip inputs', async t => {
+  for (const change of ['html', 'photo']) {
+    const f = await fixture(t);
+    if (change === 'html') f.state.html = '<html>updated engine output</html>';
+    else f.state.photo = Buffer.from([9,8,7]);
+    await assert.rejects(f.service.prepare(f.input), { code: 'PREVIEW_REQUIRED' });
+    assert.equal(f.state.calls.length, 0, 'reject before contacting Cloudflare');
+  }
+});
+test('rendered output changing after preparation invalidates confirmation without deploying', async t => {
+  const f = await fixture(t), p = await f.service.prepare(f.input);
+  f.state.html = '<html>engine changed after preview</html>';
+  const result = await f.service.confirm(p.token, f.input);
+  assert.equal(result.code, 'CONTENT_CHANGED');
+  assert.equal(f.state.calls.some(args => args[0] === 'deploy'), false);
+});
+test('missing or mismatched output approval is rejected at both publication gates', async t => {
+  const f = await fixture(t);
+  await assert.rejects(f.service.prepare({ ...f.input, previewOutputDigest: undefined }), { code: 'PREVIEW_REQUIRED' });
+  const p = await f.service.prepare(f.input);
+  await assert.rejects(f.service.confirm(p.token, { ...f.input, previewOutputDigest: 'other' }), { code: 'PREVIEW_REQUIRED' });
+  assert.equal(f.state.calls.some(args => args[0] === 'deploy'), false);
 });

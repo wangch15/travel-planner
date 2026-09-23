@@ -527,6 +527,32 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
 - 引擎會讀：`trip.config.json`、五個資料檔、`photos/`、`basemap.json`、兩個插槽（`theme.css`、`extra.js`）
 - 引擎**永遠不讀**：`docs/`（你的筆記）、`.cache/`（快取，gitignore）
 
+## 呈現邏輯與互動狀態
+
+**決定 HTML 內容的純邏輯放 `src/render.js`；DOM 與互動狀態留在 `src/app.js`。**
+
+| 檔案 | 責任 | 驗證方式 |
+|---|---|---|
+| `src/util.js`、`src/render.js` | 純函式：依資料決定文字、HTML 與顯示結構，不操作 DOM 或 `window` | `tests/helpers/render-ctx.js` 用 `node:vm` 載入 |
+| `src/app.js` | DOM 更新、事件、目前分頁／燈箱等互動狀態 | 瀏覽器或 Electron 整合測試；上述 VM harness 沒有 DOM |
+| `src/styles.css`、`src/index.html` | 頁面外殼與樣式 | 結構檢查與實際頁面驗證 |
+
+例如「照片資料為空時輸出哪種結構」可抽成 `lightboxSliderHTML(key)`，
+「點擊下一張後更新目前索引」仍是互動層的責任。
+`desktop/prototype/app.js` 是桌面工作台的 UI，另由原生 Electron smoke tests 驗證；
+此分工不要求把桌面的狀態判斷搬進旅程網頁的 `src/render.js`。
+
+### 執行環境與信任邊界
+
+- CLI 建置會透過 Node 載入行程模組，包括 `extra.js`，因此只能對可信任的專案執行；
+  這些模組在建置時具有該 Node 程序的權限，並非只在瀏覽器執行。
+- 桌面匯入由 `packages/engine` 靜態解析允許的資料與 `extra.js`，不執行匯入專案的程式。
+  `packages/engine/render.cjs` 使用 App 自帶的模板，把已解析資料組成 HTML。
+- 產出的 HTML、`src/app.js` 及自訂 HTML 在桌面預覽中均視為不受信任，
+  由隔離 frame 執行，沒有宿主 IPC、Node、憑證或部署權限；宿主才處理檔案與發布。
+- 純函式分工改善可測性；實際權限隔離由靜態解析、Electron 與預覽限制維持，
+  不會因為把函式搬到 `render.js` 就自動取得安全隔離。
+
 ## 為什麼重要
 
 行程擁有者的複本要能長期 `git merge upstream/main` 拿到引擎更新。

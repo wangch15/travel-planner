@@ -1,5 +1,9 @@
 # Desktop trip workbench
 
+## 發布預覽核對
+
+發布準備與最終確認都綁定行程資料及完整發布產物（HTML、照片、robots.txt、_headers）的摘要。引擎或頁面產物在看過預覽後變動，必須重新預覽並確認；寫入部署目錄的檔案就是核對過的位元組快照。
+
 ## 0.3.3：Claude 登入狀態修正
 
 移除錯用的 `CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST`。此旗標要求宿主提供憑證，會讓 Claude Code 略過自己保存的 OAuth；App 實際採官方 CLI 管理獨立 profile 的登入，因此不應設定它。仍保留 App 專屬設定／憑證命名空間、safe mode、工具限制與環境變數過濾。
