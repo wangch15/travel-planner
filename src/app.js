@@ -157,7 +157,20 @@ svg.addEventListener('pointermove', (e) => {
 const endDrag = (e) => { if (drag && e.pointerId === drag.id) { drag = null; svg.classList.remove('drag'); } };
 svg.addEventListener('pointerup', endDrag);
 svg.addEventListener('pointercancel', endDrag);
-svg.addEventListener('wheel', (e) => { e.preventDefault(); zoom(e.deltaY > 0 ? 1.18 : 1 / 1.18, e.clientX, e.clientY); }, { passive:false });
+// 滑鼠滾輪預設捲動頁面，不搶走捲動；按住 Shift（觸控板雙指縮放時瀏覽器會帶 ctrlKey）才縮放地圖。
+// 放大檢視的對話框裡沒有頁面可捲，直接縮放。按 Shift 時 macOS 會把垂直滾動轉成水平，所以也看 deltaX。
+let wheelHintTimer = 0;
+svg.addEventListener('wheel', (e) => {
+  if (!e.shiftKey && !e.ctrlKey && !mapInDialog()) {
+    const hint = $('#maphint');
+    hint.hidden = false; clearTimeout(wheelHintTimer);
+    wheelHintTimer = setTimeout(() => { hint.hidden = true; }, 1400);
+    return;
+  }
+  e.preventDefault();
+  const delta = e.deltaY || e.deltaX;
+  if (delta) zoom(delta > 0 ? 1.18 : 1 / 1.18, e.clientX, e.clientY);
+}, { passive:false });
 svg.addEventListener('touchmove', (e) => {
   if (e.touches.length !== 2) return;
   e.preventDefault();
