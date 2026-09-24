@@ -7,6 +7,11 @@
 開發中的 commit 不升版，未打包執行時側欄顯示 `vX.Y.Z-dev`。版號只維護在 `desktop/prototype/package.json`（與 root lockfile 對應欄位），側欄品牌後方與「關於」頁都從這裡讀。
 發布放在 GitHub release `desktop-vX.Y.Z`，App 內「檢查新版本」只認這個格式。網頁引擎版號另計（root `package.json` + `CHANGELOG.md`）。
 
+## 資料分開與重置（0.3.0）
+
+- **安裝版與開發版各用各的資料夾**：安裝版在 `~/Library/Application Support/Travel Planner`（Windows 為 `%APPDATA%\Travel Planner`），從原始碼執行仍用 `travel-planner-prototype`。專案連接、對話、版本紀錄與 App 專屬的 Codex／Claude 登入互不影響；`TRAVEL_PLANNER_STATE_DIR` 仍可覆寫。GitHub 與 Cloudflare 用的是這台電腦的登入（和終端機共用），兩邊一樣。
+- **「關於 → 重置 App 資料」**：先登出 App 專屬的 Codex／Claude（它們的登入存在系統鑰匙圈，只刪資料夾不會清掉），再留下標記並重新啟動；下次啟動在 Chromium 開啟資料夾之前整個刪除。不動專案資料夾、GitHub／Cloudflare 登入與已發布網站。登出無法確認就不重置。驗證：`app-reset` 單元測試，以及用臨時資料夾實際按下重置、確認重新啟動後舊資料消失；**尚未用已登入的真實帳號實測登出這一步**。
+
 ## 發布網站入口（0.1.3）
 
 頂部「版本紀錄」旁邊有「發布網站」，旅程的「⋯」選單也有「發布網站…」；兩者都只是打開「設定 → 備份與發布 → 公開網站」，核對發布目標、勾選已看過預覽與最終確認仍在那裡完成。示範旅程與規劃中的草稿不顯示這個入口。

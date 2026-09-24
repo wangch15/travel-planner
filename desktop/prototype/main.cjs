@@ -22,6 +22,7 @@ const {ProjectSetupService}=require('./services/project-setup.cjs');
 const {BackupService}=require('./services/backup.cjs');
 const {PublishingService}=require('./services/publishing.cjs');
 const {UpdateManager}=require('./services/updater.cjs');
+const {requestReset,applyPendingReset}=require('./services/app-reset.cjs');
 const { ProposalStore, verifyPrivateProject } = require('./proposals.cjs');
 const { VersionStore } = require('./version-store.cjs');
 const { ConversationStore,SESSION_FIELDS } = require('./conversation-store.cjs');
@@ -36,7 +37,10 @@ const APP_URL = 'travel-app://prototype/index.html';
 protocol.registerSchemesAsPrivileged(['travel-app', 'travel-preview'].map(scheme => ({ scheme, privileges: { standard: true, secure: true, supportFetchAPI: true } })));
 app.setName('Travel Planner');
 const bundledApp=()=>{const rel=path.relative(path.join(process.resourcesPath,'app'),__dirname);return rel!==''&&!rel.startsWith('..')&&!path.isAbsolute(rel);};
-app.setPath('userData', process.env.TRAVEL_PLANNER_STATE_DIR || path.join(app.getPath('appData'), 'travel-planner-prototype'));
+// 安裝版與從原始碼執行的開發版各用各的資料夾：專案連接、對話與 App 專屬的 AI 登入互不影響。
+app.setPath('userData', process.env.TRAVEL_PLANNER_STATE_DIR || path.join(app.getPath('appData'), bundledApp() ? 'Travel Planner' : 'travel-planner-prototype'));
+// 「重置 App 資料」在上次關閉前留下標記；必須在 Chromium 開啟資料夾之前刪除。
+applyPendingReset(app.getPath('userData'));
 
 async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickArchivePath,pickProjectParent,makeToolSupport=(dir,options)=>new ToolSupport(dir,options),makeTrash=()=>new TripTrashService(),makeProvider=(id,directory,options)=>require('./providers/index.cjs').createProvider(id,directory,options),makeProjectSetup=()=>new ProjectSetupService(),fetchReference=fetchPublicReference,referenceOptions,makeResearch=options=>createResearchTools(options),
   makeArchive=()=>new LocalArchiveService(),makeAuth=options=>new AuthTools(options),makeUpdater=options=>new UpdateManager(options),environmentService, stateDirectory = app.getPath('userData'), codexAccount,
@@ -428,7 +432,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       try{return {ok:true,...await handler(input)};}catch(error){const failure=workflowFailure(error);return {...failure,message:featureMessage(error)};}finally{if(exclusive)versionBusy=false;}});
   };
   function featureMessage(error){
-    const texts={SESSION_PROVIDER_LOCKED:'這段對話的 AI 服務已固定，請使用「使用其他 AI 開新對話」。',WAIT_UNSUPPORTED:'此 AI 服務目前不支援自動等待額度。請稍後自行重試，不會自動轉用其他付費方式。',TRIP_CHANGED:'旅程已變動，請重新核對移除內容。',TRASH_NOT_IGNORED:'此專案尚未忽略本機回收區，請先檢查 .gitignore，旅程未移除。',TRIP_EXISTS:'原位置已有同名旅程，無法覆蓋還原。',GIT_IDENTITY_REQUIRED:'Git 尚未設定提交者名稱與電子郵件。請使用下方「設定備份署名」後再重新核對備份；原檔未變。',PRIVATE_REPO_REQUIRED:'請先連接 GitHub，並確認這是你有權存取的私人專案。',INVALID_REPOSITORY:'請填寫正確的 GitHub 擁有者／專案名稱。',NESTED_PROJECT:'請選擇 Git 專案以外的存放位置。',DESTINATION_EXISTS:'目的地資料夾已存在，請選擇其他位置。',STALE_CONFIRMATION:'確認已過期，請重新核對。',CONVERSATION_LIMIT:'這趟旅程已達50段對話上限，舊紀錄完整保留。可先複製重要紀錄，暫時繼續使用既有對話。',NO_PROJECT:'請先從專案管理連接你的私人專案。',PRIVATE_PROJECT_REQUIRED:'建立旅程需要可確認的私人專案。',UNSUPPORTED_ATTACHMENT_TYPE:'目前支援文字、Markdown、JSON、PNG、JPEG 與 WebP；PDF/OCR 尚未支援。',ATTACHMENT_LIMIT:'附件數量已達上限，請先移除不需要的附件。',UNSAFE_REFERENCE_ADDRESS:'參考網址必須是公開網站，不能讀取本機或內部網路。',REFERENCE_TIMEOUT:'網站未在時間內回應，請稍後重試或附上文字。',REFERENCE_HTTP_ERROR:'未能讀取這個網站，請檢查網址或使用文字附件。',PLAN_CONFIRMATION_REQUIRED:'請先確認最新逐日草案。',RESEARCH_CONFIRMATION_REQUIRED:'請先完成查核並確認摘要。',RESEARCH_INCOMPLETE:'仍有未核對的來源或待確認事項，請補充來源並重新查核。',DRAFT_CHANGED:'草稿或候選資料已變動，請重新建立預覽。',PREVIEW_CONFIRMATION_REQUIRED:'請先查看這份候選預覽。',ADOPTION_REQUIRED:'網站已存在，請先查核並明確接管，避免覆蓋其他網站。',TRUSTED_HOOK_REQUIRED:'專案的備份保護尚未安裝，請先完成 Git hook 設定。',UNTRUSTED_HOOK:'專案含未知的 Git hook，請先核對，App 不會執行。',UNSAFE_GIT_CONFIG:'Git 設定包含未知的外部指令，請先核對。',STAGED_CHANGES:'已有其他暫存修改，請先處理再備份。',NO_WAITING_JOB:'目前沒有可自動等待的工作。',STALE_JOB:'工作已更新，請重新載入。',MISSING_TOOL:'所需工具尚未安裝，請查看工具與更新。',PRIVATE_DATA_IN_TRIP:'候選內容含有訂房確認碼或私人網站網址，不能寫進會公開的行程檔，已擋下。請再請 AI 修改一次。',UNSAFE_PRIVATE_NOTES:'這趟的 docs 資料夾狀態異常（可能是捷徑），私人筆記沒有寫入。',PRIVATE_SITE_NOT_CONNECTED:'這個網站尚未連接，請先在「資料來源」連接。',TOOL_CHECKSUM_MISMATCH:'下載的檔案和官方檢查碼不符，已停止安裝，電腦沒有被改動。請稍後重試。',TOOL_INSTALL_UNVERIFIED:'安裝跑完了，但 App 沒找到可用的工具。請按「重新檢查」，或稍後重試。',TOOL_DOWNLOAD_FAILED:'下載失敗，請確認網路連線後重試。',TOOL_DOWNLOAD_TIMEOUT:'下載太久沒有完成，請確認網路連線後重試。',TOOL_INSTALL_BUSY:'另一個工具正在安裝，請等它完成。',PRIVATE_SITE_INVALID:'網站資料不正確，請重新整理後再試。',UNSAFE_ATTACHMENT:'這個檔案無法加入：可能超過 8MB（文字 1MB），或檔名不正確。',INVALID_IMAGE:'無法辨識這張圖片，或尺寸超過 8192px；請換成 PNG、JPEG 或 WebP 截圖。',INVALID_TEXT:'文字檔不是 UTF-8 文字，請另存為純文字後再加入。'};
+    const texts={RESET_LOGOUT_FAILED:'無法確認 AI 帳號已登出，資料沒有重置。請到 AI 設定重新核對登入狀態後再試。',SESSION_PROVIDER_LOCKED:'這段對話的 AI 服務已固定，請使用「使用其他 AI 開新對話」。',WAIT_UNSUPPORTED:'此 AI 服務目前不支援自動等待額度。請稍後自行重試，不會自動轉用其他付費方式。',TRIP_CHANGED:'旅程已變動，請重新核對移除內容。',TRASH_NOT_IGNORED:'此專案尚未忽略本機回收區，請先檢查 .gitignore，旅程未移除。',TRIP_EXISTS:'原位置已有同名旅程，無法覆蓋還原。',GIT_IDENTITY_REQUIRED:'Git 尚未設定提交者名稱與電子郵件。請使用下方「設定備份署名」後再重新核對備份；原檔未變。',PRIVATE_REPO_REQUIRED:'請先連接 GitHub，並確認這是你有權存取的私人專案。',INVALID_REPOSITORY:'請填寫正確的 GitHub 擁有者／專案名稱。',NESTED_PROJECT:'請選擇 Git 專案以外的存放位置。',DESTINATION_EXISTS:'目的地資料夾已存在，請選擇其他位置。',STALE_CONFIRMATION:'確認已過期，請重新核對。',CONVERSATION_LIMIT:'這趟旅程已達50段對話上限，舊紀錄完整保留。可先複製重要紀錄，暫時繼續使用既有對話。',NO_PROJECT:'請先從專案管理連接你的私人專案。',PRIVATE_PROJECT_REQUIRED:'建立旅程需要可確認的私人專案。',UNSUPPORTED_ATTACHMENT_TYPE:'目前支援文字、Markdown、JSON、PNG、JPEG 與 WebP；PDF/OCR 尚未支援。',ATTACHMENT_LIMIT:'附件數量已達上限，請先移除不需要的附件。',UNSAFE_REFERENCE_ADDRESS:'參考網址必須是公開網站，不能讀取本機或內部網路。',REFERENCE_TIMEOUT:'網站未在時間內回應，請稍後重試或附上文字。',REFERENCE_HTTP_ERROR:'未能讀取這個網站，請檢查網址或使用文字附件。',PLAN_CONFIRMATION_REQUIRED:'請先確認最新逐日草案。',RESEARCH_CONFIRMATION_REQUIRED:'請先完成查核並確認摘要。',RESEARCH_INCOMPLETE:'仍有未核對的來源或待確認事項，請補充來源並重新查核。',DRAFT_CHANGED:'草稿或候選資料已變動，請重新建立預覽。',PREVIEW_CONFIRMATION_REQUIRED:'請先查看這份候選預覽。',ADOPTION_REQUIRED:'網站已存在，請先查核並明確接管，避免覆蓋其他網站。',TRUSTED_HOOK_REQUIRED:'專案的備份保護尚未安裝，請先完成 Git hook 設定。',UNTRUSTED_HOOK:'專案含未知的 Git hook，請先核對，App 不會執行。',UNSAFE_GIT_CONFIG:'Git 設定包含未知的外部指令，請先核對。',STAGED_CHANGES:'已有其他暫存修改，請先處理再備份。',NO_WAITING_JOB:'目前沒有可自動等待的工作。',STALE_JOB:'工作已更新，請重新載入。',MISSING_TOOL:'所需工具尚未安裝，請查看工具與更新。',PRIVATE_DATA_IN_TRIP:'候選內容含有訂房確認碼或私人網站網址，不能寫進會公開的行程檔，已擋下。請再請 AI 修改一次。',UNSAFE_PRIVATE_NOTES:'這趟的 docs 資料夾狀態異常（可能是捷徑），私人筆記沒有寫入。',PRIVATE_SITE_NOT_CONNECTED:'這個網站尚未連接，請先在「資料來源」連接。',TOOL_CHECKSUM_MISMATCH:'下載的檔案和官方檢查碼不符，已停止安裝，電腦沒有被改動。請稍後重試。',TOOL_INSTALL_UNVERIFIED:'安裝跑完了，但 App 沒找到可用的工具。請按「重新檢查」，或稍後重試。',TOOL_DOWNLOAD_FAILED:'下載失敗，請確認網路連線後重試。',TOOL_DOWNLOAD_TIMEOUT:'下載太久沒有完成，請確認網路連線後重試。',TOOL_INSTALL_BUSY:'另一個工具正在安裝，請等它完成。',PRIVATE_SITE_INVALID:'網站資料不正確，請重新整理後再試。',UNSAFE_ATTACHMENT:'這個檔案無法加入：可能超過 8MB（文字 1MB），或檔名不正確。',INVALID_IMAGE:'無法辨識這張圖片，或尺寸超過 8192px；請換成 PNG、JPEG 或 WebP 截圖。',INVALID_TEXT:'文字檔不是 UTF-8 文字，請另存為純文字後再加入。'};
     if(/^PRIVATE_SITE_/.test(error.code||'')&&error.hint)return error.hint;
     return texts[error.code]||workflowFailure(error).message;
   }
@@ -472,6 +476,22 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   feature('demo-visibility',async input=>{await store.setDemoHidden(input.hidden===true);return {hidden:input.hidden===true};});
   feature('provider-status',async()=>({provider:providerId,account:providerView(providerId),defaults:aiDefaults,capabilities:bundle.capabilities||null}));
   feature('provider-accounts',async()=>({accounts:['codex','claude'].map(id=>{getProvider(id);return providerView(id);}),defaults:aiDefaults}));
+  // 重置只動 App 自己的資料夾：先登出 App 專屬的 Codex／Claude（清掉鑰匙圈），再標記、重新啟動後整個刪除。
+  // 使用者的專案資料夾、GitHub 與 Cloudflare（和終端機共用）都不動。
+  feature('reset-app-data',async input=>{
+    if(input.confirmed!==true)throw Object.assign(Error('CONFIRMATION_REQUIRED'),{code:'CONFIRMATION_REQUIRED'});
+    if(generating||editor.active||proposals.pending||materialization||providerAuthBusy.size)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});
+    const loggedOut=[];
+    for(const id of ['codex','claude']){
+      const account=getProvider(id).account;
+      try{await account.connect();if(account.refresh)await account.refresh();}catch{continue;}
+      if(account.account?.state!=='connected')continue;
+      try{await account.logout();loggedOut.push(id);}catch{throw Object.assign(Error('RESET_LOGOUT_FAILED'),{code:'RESET_LOGOUT_FAILED',provider:id});}
+    }
+    requestReset(app.getPath('userData'));
+    setTimeout(()=>{app.relaunch();app.quit();},300);
+    return {loggedOut};
+  },{exclusive:true});
   feature('provider-account-action',async input=>{
     if(input.id==='gemini')throw Object.assign(Error('PROVIDER_UNAVAILABLE'),{code:'PROVIDER_UNAVAILABLE'});
     const item=getProvider(input.id),id=input.id;

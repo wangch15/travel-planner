@@ -115,6 +115,16 @@ class CodexAccount extends EventEmitter {
     return (result.data || []).map(model => ({ id: model.id, name: model.displayName || model.id,
       isDefault: Boolean(model.isDefault), inputModalities:model.inputModalities||['text','image'], effort: model.supportedReasoningEfforts || [], defaultEffort: model.defaultReasoningEffort || null }));
   }
+  // 只登出 App 專屬 profile（CODEX_HOME），給「重置 App 資料」清掉系統鑰匙圈裡的登入。
+  async logout() {
+    await this.connect();
+    const transport = this.transport;
+    await transport.request('account/logout',{}, {uncertainOnTimeout:true});
+    const checked = await transport.request('account/read',{refreshToken:false});
+    if (checked.account) throw Error('logout-not-confirmed');
+    this.account = {state:'disconnected',label:null,plan:null,version:this.cliVersion};
+    this.emit('changed',this.account);
+  }
   switchAccount() {
     if (this.switchPromise) return this.switchPromise;
     this.switchPromise = this._switchAccount().finally(() => { this.switchPromise = null; });

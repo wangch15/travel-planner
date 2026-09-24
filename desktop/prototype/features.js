@@ -96,6 +96,14 @@
     }catch(e){notify(e.message);}
   };
   $('cancel-trip-delete').onclick=()=>$('trip-delete-dialog').close();
+  $('reset-app-open').hidden=!window.travelDesktop;
+  $('reset-app-open').onclick=()=>{if(aiBusy||pendingProposal||materializedCandidate){notify('請先停止 AI 工作，或確認／放棄目前的提案，再重置。');return;}$('reset-app-error').hidden=true;$('confirm-reset-app').disabled=false;$('reset-app-dialog').showModal();};
+  $('cancel-reset-app').onclick=()=>$('reset-app-dialog').close();
+  $('confirm-reset-app').onclick=async()=>{
+    $('confirm-reset-app').disabled=true;$('confirm-reset-app').textContent='正在登出並重置…';$('reset-app-error').hidden=true;
+    try{await api('reset-app-data',{confirmed:true});}
+    catch(e){$('reset-app-error').textContent=e.message;$('reset-app-error').hidden=false;$('confirm-reset-app').disabled=false;$('confirm-reset-app').textContent='重置並重新啟動';}
+  };
   $('confirm-trip-delete').onclick=()=>action('confirm-trip-delete',async()=>{
     if(!deletion||aiBusy)return;const {trip,demo,preparation}=deletion;
     aiBusy=true;proposalBusy=true;updateComposer();try{if(!await flushConversationDraft())return;

@@ -203,6 +203,13 @@ class CliAccount extends EventEmitter {
     process?.cancel(); await process?.done.catch(() => {});
     return this.refresh();
   }
+  // 給「重置 App 資料」：登出 App 專屬 profile，清掉以設定目錄命名的鑰匙圈項目。
+  async logout() {
+    if (this.provider !== 'claude') throw failure('ACCOUNT_SWITCH_UNSUPPORTED');
+    await this.cancelLogin();
+    await this.run([...claudeFlags(this.runtime), 'auth', 'logout'], { timeoutMs: 10000, maxBytes: 16384 });
+    if ((await this.refresh()).state === 'connected') throw failure('PROVIDER_LOGOUT_FAILED');
+  }
   async switchAccount() {
     if (this.provider !== 'claude') throw failure('ACCOUNT_SWITCH_UNSUPPORTED');
     await this.cancelLogin();
