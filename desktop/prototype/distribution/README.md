@@ -80,4 +80,6 @@ node desktop/prototype/distribution/build-local-dmg.cjs
 
 This uses macOS `hdiutil`, includes the existing `.app` plus an Applications shortcut, verifies the disk image and marks the artifact `unsigned`. It does not create update YAML or claim automatic-update capability.
 
+After the DMG verifies, it writes `<dmg>.sha256` and keeps only the newest build: the intermediate `Travel Planner.app` (~640 MB), the packaging manifest and older `TravelPlanner-*-mac-*.dmg` files in `.local/distribution` are removed. Rebuild with `package.cjs` when you need the `.app` again (for example to run `distribution/smoke.cjs`).
+
 Primary references: [electron-builder automatic updates](https://www.electron.build/docs/features/auto-update/), plus the installed `electron-updater@6.8.9` implementation (current online documentation also describes v7 features that this app does not use).
