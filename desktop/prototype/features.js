@@ -20,7 +20,7 @@
   async function reloadProject(result){const changed=project?.projectId!==result.project.projectId;if(changed){clearTimeout(draftTimer);selected=null;window.onFeatureTrip?.();$('welcome').hidden=false;$('messages').hidden=true;$('messages').replaceChildren();$('message').value='';$('trip-title').textContent='選擇一趟旅程';$('trip-status').textContent='已切換專案';}project=result.project;pendingProposal=null;materializedCandidate=false;realPreview=null;navigation();renderProject();updateComposer();if(changed)renderPreview();const trip=project.trips.find(t=>t.slug===result.selectedSlug);if(trip){await selectTrip(trip);setPreview(true);}}
   async function changeConversation(actionName,extra={}){
     if(aiBusy||pendingProposal||materializedCandidate){notify('請先停止 AI 工作，或確認／放棄目前的提案，再操作對話。');return;}
-    const archiving=actionName==='conversation-archive'&&extra.archived!==false,archivedTitle=archiving?conversationItems.find(c=>c.id===extra.id)?.title||'這段對話':null,wasCurrent=extra.id===currentConversation;
+    const archiving=actionName==='conversation-archive'&&extra.archived!==false,wasCurrent=extra.id===currentConversation,archivedTitle=archiving?(wasCurrent?selected?.trip.featureState?.conversationTitle:null)||conversationItems.find(c=>c.id===extra.id)?.title||'這段對話':null;
     aiBusy=true;proposalBusy=true;updateComposer();
     try{if(!await flushConversationDraft())return;useConversation(await api(actionName,{...target(),...extra}));await loadConversations();
       // 封存目前對話會自動換成一段新的討論，畫面看起來像沒變化，所以明確告知。

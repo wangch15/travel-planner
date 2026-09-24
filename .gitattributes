@@ -1,0 +1,5 @@
+# 備份保護 hook 與它載入的腳本一律用 LF：CRLF 的 shebang 在 Git for Windows 的 sh 會失敗，
+# 也讓 App 的可信版本比對更穩定。
+.githooks/* text eol=lf
+scripts/pre-push.js text eol=lf
+scripts/lib/*.js text eol=lf

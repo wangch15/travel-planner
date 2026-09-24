@@ -8,7 +8,7 @@ const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { compareVersions, parseChangelog } = require('../../../scripts/update-check.js');
 const { SCHEMA_VERSION } = require('../../../packages/engine/schema.cjs');
-const { TRUSTED_FILES } = require('./backup.cjs');
+const { TRUSTED_FILES, sameTrusted } = require('./backup.cjs');
 
 const execute = promisify(execFile);
 const TEMPLATE_URL = /^(?:https:\/\/github\.com\/|git@github\.com:)wangch15\/travel-planner(?:\.git)?\/?$/i;
@@ -25,7 +25,7 @@ async function defaultRun(bin, args, options = {}) {
 }
 
 async function readJSON(file) { try { return JSON.parse(await fs.readFile(file, 'utf8')); } catch { return null; } }
-async function sameBytes(a, b) { try { return (await fs.readFile(a)).equals(await fs.readFile(b)); } catch { return false; } }
+async function sameBytes(a, b) { try { return sameTrusted(await fs.readFile(a), await fs.readFile(b)); } catch { return false; } }
 
 class ProjectUpdateService {
   constructor({ run = defaultRun, trustedRoot = path.resolve(__dirname, '../../..'), appCommit = null, engineVersion = null, templatePattern = TEMPLATE_URL } = {}) {

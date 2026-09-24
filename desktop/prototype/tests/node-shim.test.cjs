@@ -16,3 +16,9 @@ test('node shim refuses paths that could break out of the quoted command',()=>{
   assert.throws(()=>script('/tmp/$(id)'),{code:'UNSAFE_NODE_SHIM'});
   assert.match(script('/Applications/Travel Planner.app/Contents/MacOS/Electron'),/exec "\/Applications\/Travel Planner\.app/);
 });
+
+test('trusted backup files match regardless of CRLF checkout, but not other edits',()=>{
+  const {sameTrusted}=require('../services/backup.cjs');
+  assert.equal(sameTrusted(Buffer.from('a\r\nb\r\n'),Buffer.from('a\nb\n')),true);
+  assert.equal(sameTrusted(Buffer.from('a\nb\n'),Buffer.from('a\nc\n')),false);
+});

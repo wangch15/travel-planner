@@ -3,7 +3,7 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { createHash, randomUUID } = require('node:crypto');
-const { TRUSTED_FILES, regularBytes } = require('./backup.cjs');
+const { TRUSTED_FILES, regularBytes, sameTrusted } = require('./backup.cjs');
 const { destinationRepo } = require('../../../scripts/lib/pre-push.js');
 const exec = promisify(execFile);
 const TEMPLATE = 'wangch15/travel-planner';
@@ -172,7 +172,7 @@ class ProjectSetupService {
       for (const relative of TRUSTED_FILES) {
         const file = path.join(root, relative), stat = await fs.lstat(file);
         if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 1024 * 1024 || await fs.realpath(file) !== file) return false;
-        if (!(await fs.readFile(file)).equals(await fs.readFile(path.join(this.trustedRoot, relative)))) return false;
+        if (!sameTrusted(await fs.readFile(file), await fs.readFile(path.join(this.trustedRoot, relative)))) return false;
       }
       for (const folder of ['', 'scripts', 'scripts/lib']) {
         try { const data = JSON.parse(await fs.readFile(path.join(root, folder, 'package.json'), 'utf8')); if (data.type && data.type !== 'commonjs') return false; }

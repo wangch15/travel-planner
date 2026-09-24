@@ -9,6 +9,8 @@ const execute = promisify(execFile);
 const hash = value => createHash('sha256').update(value).digest('hex');
 const fail = (code, message) => Object.assign(new Error(message || code), { code });
 const TRUSTED_FILES = ['.githooks/pre-push', 'scripts/pre-push.js', 'scripts/lib/pre-push.js', 'scripts/lib/push-history.js', 'scripts/lib/contribution-history.js'];
+// Git for Windows 預設 autocrlf，檢出的檔案可能是 CRLF；比對可信版本時忽略換行差異。
+const sameTrusted = (a, b) => a.toString('latin1').replace(/\r\n/g, '\n') === b.toString('latin1').replace(/\r\n/g, '\n');
 const safeEnv = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(GIT_|NODE_OPTIONS$|NODE_PATH$|LD_|DYLD_)/.test(key)));
 async function defaultRun(bin, args, { pathPrefix, ...options } = {}) {
   // pathPrefix：只給 App 自己發起的推送用，讓備份 hook 找得到 App 內建的 node。
@@ -68,7 +70,7 @@ class BackupService {
       if (entry !== 'pre-push') throw fail('UNTRUSTED_HOOK', '自訂 Git hook 需要先核對，App 不會執行未知程式。');
     }
     for (const relative of TRUSTED_FILES) {
-      if (!(await regularBytes(path.join(root, relative), 1024 * 1024)).equals(await regularBytes(path.join(this.trustedRoot, relative), 1024 * 1024))) throw fail('UNTRUSTED_HOOK', '備份保護程式與 App 的可信版本不同，請先更新核對。');
+      if (!sameTrusted(await regularBytes(path.join(root, relative), 1024 * 1024), await regularBytes(path.join(this.trustedRoot, relative), 1024 * 1024))) throw fail('UNTRUSTED_HOOK', '備份保護程式與 App 的可信版本不同，請先更新核對。');
     }
     // A package type override would change how the trusted hook imports are executed.
     for (const folder of ['', 'scripts', 'scripts/lib']) {
@@ -191,4 +193,4 @@ class BackupService {
     } finally { this.busy = false; }
   }
 }
-module.exports = { BackupService, defaultRun, regularBytes, TRUSTED_FILES };
+module.exports = { BackupService, defaultRun, regularBytes, TRUSTED_FILES, sameTrusted };
