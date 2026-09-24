@@ -30,14 +30,17 @@
   async function loadConversations(){if(!selected||selected.demo||!window.travelDesktop)return;const request=++conversationRequest;const result=await api('conversations-list',target());if(request!==conversationRequest)return;conversationItems=result.items;currentConversation=result.currentId;navigation();window.refreshBackupStatus();}
   // 頂部「尚未備份」：只看本機（未提交的行程改動、未推送的提交），不連網。
   let backupStatusRequest=0;
-  window.refreshBackupStatus=async()=>{
+  let backupStatusTimer=null;
+  // 多個觸發點可能同時呼叫，合併成一次本機查詢。
+  window.refreshBackupStatus=()=>{clearTimeout(backupStatusTimer);backupStatusTimer=setTimeout(()=>updateBackupStatus().catch(()=>{}),400);};
+  async function updateBackupStatus(){
     const button=$('backup-status');if(!project||!selected||selected.demo||!window.travelDesktop){button.hidden=true;return;}
     const request=++backupStatusRequest;let status=null;try{status=(await window.travelDesktop.feature('backup-status',{slug:selected.trip.slug})).status;}catch{}
     if(request!==backupStatusRequest)return;
     const pending=status&&(status.neverBackedUp||status.pendingFiles>0||status.unpushedCommits>0);
     button.hidden=!pending||$('versions-open').hidden;if(!pending)return;
     button.textContent=status.neverBackedUp?'尚未備份到 GitHub':'尚未備份'+(status.pendingFiles?` · ${status.pendingFiles} 個檔案`:'');
-  };
+  }
   $('backup-status').onclick=()=>openSettings('backup');
   window.addEventListener('focus',()=>window.refreshBackupStatus());
   function conversationMenu(item){const disabled=aiBusy||Boolean(pendingProposal)||materializedCandidate;return [
@@ -370,6 +373,8 @@
   window.renderProjectUpdate=async()=>{
     if(window.travelDesktop&&(project?.root||null)!==checkedProjectRoot){checkedProjectRoot=project?.root||null;window.travelDesktop.feature('project-open-check').then(r=>{if(r.ok&&r.warning)notify(r.warning);}).catch(()=>{});}
     const box=$('project-update');if(!project||!window.travelDesktop){box.hidden=true;return;}
+    // 只在專案設定畫面開著時查（renderProject 很常被呼叫）。
+    if($('settings').hidden||$('setting-projects').hidden)return;
     const request=++projectUpdateRequest;let update;try{update=(await api('project-update-status')).update;}catch{if(request===projectUpdateRequest)box.hidden=true;return;}
     if(request!==projectUpdateRequest)return;
     const notes=[];if(update.state==='update-available'){if(update.projectVersion&&update.appVersion&&update.projectVersion!==update.appVersion)notes.push(`專案引擎 ${update.projectVersion}，App 內建 ${update.appVersion}。`);if(!update.trusted)notes.push('備份保護程式需要更新，更新前無法備份到 GitHub。');if(update.migrateTrips.length)notes.push(`有 ${update.migrateTrips.length} 趟行程的資料格式需要升級。`);}
@@ -397,5 +402,5 @@
       const r=response.result,parts=[r.merged?'專案已更新到 App 內建的引擎版本。':'專案引擎已是最新。'];if(r.migrated.length)parts.push(`已升級 ${r.migrated.length} 趟行程的資料格式。`);parts.push(r.status.trusted?'下次私人備份會一起推送這次更新。':'備份保護程式仍和 App 不同，請更新 App 後再備份。');notify(parts.join(''));}
     catch(e){$('project-update-error').textContent=e.message;$('project-update-error').hidden=false;$('confirm-project-update').disabled=false;}
   };
-  window.onFeatureSetting=section=>{if(section==='backup')authStatus('github').catch(()=>{});if(section==='publish')authStatus('cloudflare').catch(()=>{});if(section==='tools'){environment().catch(e=>notify(e.message));api('updates-status').then(({update})=>renderUpdate(update)).catch(()=>{});}if(section==='backup'&&(!selected||selected.demo)&&project)tell('backup-result','目前沒有選擇旅程：會推送這個專案既有、尚未備份的提交（例如第一次推送或專案更新）。');else if(['backup','publish'].includes(section)&&(!selected||selected.demo))tell(section+'-result','請先回到工作台選擇正式旅程。');};
+  window.onFeatureSetting=section=>{if(section==='projects')window.renderProjectUpdate();if(section==='backup')authStatus('github').catch(()=>{});if(section==='publish')authStatus('cloudflare').catch(()=>{});if(section==='tools'){environment().catch(e=>notify(e.message));api('updates-status').then(({update})=>renderUpdate(update)).catch(()=>{});}if(section==='backup'&&(!selected||selected.demo)&&project)tell('backup-result','目前沒有選擇旅程：會推送這個專案既有、尚未備份的提交（例如第一次推送或專案更新）。');else if(['backup','publish'].includes(section)&&(!selected||selected.demo))tell(section+'-result','請先回到工作台選擇正式旅程。');};
 })();
