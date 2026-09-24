@@ -68,8 +68,13 @@ function readState(file) {
   }
 }
 
+// 新的 Cloudflare 帳號還沒有 workers.dev 網址名稱時，非互動的 wrangler deploy 會直接拒絕，沒有上線任何內容。
+const SUBDOMAIN_REQUIRED = /register a workers\.dev subdomain|workers\.dev subdomain.*(?:required|not (?:yet )?registered)|need to register.*workers\.dev/i;
 function failure(r, phase) {
   const text = output(r);
+  if (phase === '部署' && SUBDOMAIN_REQUIRED.test(text)) {
+    return Object.assign(new Error('這個 Cloudflare 帳號還沒有設定 workers.dev 網址名稱。請到 Cloudflare 網頁的「Workers 和 Pages」設定一次（免費，約一分鐘），完成後再發布。這次沒有上線任何內容。'), { code: 'WORKERS_SUBDOMAIN_REQUIRED', notDeployed: true });
+  }
   if (NOT_LOGGED_IN.test(text)) {
     return new Error(`${phase}失敗：尚未登入 Cloudflare，請先完成登入授權。`);
   }

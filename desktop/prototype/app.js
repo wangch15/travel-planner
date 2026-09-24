@@ -286,6 +286,8 @@ function addMessage(message) {
   item.setAttribute('aria-label', message.role === 'user' ? '你的訊息' : '助手回覆');
   const content=el('div',undefined,'message-content');if(message.role==='assistant'&&window.renderMarkdown)window.renderMarkdown(content,message.text);else content.textContent=message.text;
   item.append(content);
+  // AI 提出的 App 動作（備份、發布…）以確認卡片呈現，由使用者按下才執行。
+  if(message.role==='assistant'&&message.action){const card=window.actionCard?.(message.action);if(card)item.append(card);}
   if(message.generation){const g=message.generation;item.title=`回覆設定：${g.provider} · ${g.model||'服務預設模型'} · ${g.effort||(g.resolvedEffort?'預設思考強度（'+g.resolvedEffort+'）':'預設思考強度')}`;item.dataset.provider=g.provider;item.dataset.model=g.model;item.dataset.effort=g.effort;}
   $('messages').append(item);
   return item;

@@ -60,7 +60,7 @@ test('whole-trip discussion sends all raw days with only referenced place descri
   assert.deepEqual(sent.places,{first:{name:'First',cat:'sight',note:'Known note'},second:{name:'Second',cat:'stay'},alternate:{name:'Alternate',cat:'sight'},another:{name:'Another',cat:'food'}});
   assert.equal(JSON.stringify(sent).includes('PRIVATE_ADDRESS'),false);
   assert.equal(JSON.stringify(sent).includes('EXCLUDED_TOKEN'),false);
-  assert.deepEqual(schema,{type:'object',additionalProperties:false,properties:{summary:{type:'string'},conversationTitle:{type:'string'}},required:['summary','conversationTitle']});
+  assert.deepEqual(schema,{type:'object',additionalProperties:false,properties:{summary:{type:'string'},conversationTitle:{type:'string'},appAction:{type:'string',enum:['none','backup','publish','project-update','research']}},required:['summary','conversationTitle','appAction']});
   assert.match(instructions,/整趟/);
   assert.match(instructions,/不可.*(?:修改|保存)/);
   assert.deepEqual(result,{summary:'建議每天留一段休息時間。',discussion:true,threadId:'thread',turnId:'turn',model:'server-model'});
@@ -249,4 +249,15 @@ test('conversationTitle is optional, cleaned and never mixed into the answer pay
   assert.equal(decodeAnswer(JSON.stringify({summary:'好'}),{mode:'discussion'}).conversationTitle,undefined);
   assert.equal(decodeAnswer(JSON.stringify({summary:'好',conversationTitle:'x'.repeat(41)}),{mode:'discussion'}).conversationTitle,undefined);
   assert.throws(()=>decodeAnswer(JSON.stringify({summary:'好',conversationTitle:3}),{mode:'discussion'}),{code:'AI_OUTPUT_INVALID'});
+});
+
+test('appAction is an optional App action proposal; unknown actions are rejected',()=>{
+  const {decodeAnswer}=require('../editor.cjs');
+  assert.equal(decodeAnswer(JSON.stringify({summary:'好',conversationTitle:'備份',appAction:'backup'}),{mode:'discussion'}).appAction,'backup');
+  assert.equal(decodeAnswer(JSON.stringify({summary:'好',appAction:'none'}),{mode:'discussion'}).appAction,undefined);
+  assert.equal(decodeAnswer(JSON.stringify({summary:'好'}),{mode:'discussion'}).appAction,undefined);
+  assert.throws(()=>decodeAnswer(JSON.stringify({summary:'好',appAction:'delete-everything'}),{mode:'discussion'}),{code:'AI_OUTPUT_INVALID'});
+  // 研究模式的其他欄位仍照原本檢查
+  const research=decodeAnswer(JSON.stringify({summary:'查完',sources:[],unresolved:[],feasibility:'可行',privateNotes:'',appAction:'publish'}),{mode:'research'});
+  assert.equal(research.research,true);assert.equal(research.appAction,'publish');
 });

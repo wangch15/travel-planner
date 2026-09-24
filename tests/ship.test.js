@@ -354,3 +354,9 @@ test('Pages：部署要在產出目錄裡執行，不能讓 repo 根目錄的 wr
   assert.ok(!call.args.some((a) => String(a).includes(h.root) && String(a).includes('dist')),
     '以 outDir 為 cwd 時應該用相對路徑，不要再帶絕對路徑');
 });
+
+test('新帳號還沒有 workers.dev 網址名稱：明確說明下一步，不寫部署紀錄', (t) => {
+  const h = harness(t, { result: { status: 1, stdout: '', stderr: '✘ [ERROR] You need to register a workers.dev subdomain before publishing to workers.dev' } });
+  assert.throws(() => h.run(), (error) => error.code === 'WORKERS_SUBDOMAIN_REQUIRED' && error.notDeployed === true && /Workers 和 Pages/.test(error.message) && /沒有上線/.test(error.message));
+  assert.equal(fs.existsSync(h.stateFile), false);
+});

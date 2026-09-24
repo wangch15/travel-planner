@@ -20,7 +20,7 @@ function applySuggestedTitle(state,answer){if(answer?.conversationTitle&&state.c
 function valid(s) {
   return s?.version===1 && (s.started===undefined||typeof s.started==='boolean') && (s.provider===undefined||['codex','claude','gemini'].includes(s.provider)) && validConversations(s)&&validPlan(s.plan)&&validResearch(s.research)&&validJob(s.job) && (s.effort===undefined||string(s.effort,40)) && (s.handoff===undefined||s.handoff===null||string(s.handoff,16000)) && string(s.draft,2000) && string(s.model,200) && (s.dayId===null || Number.isSafeInteger(s.dayId))
     && typeof s.pendingProposal==='boolean' && string(s.lastOutcome,1000)
-    && Array.isArray(s.messages) && s.messages.length<=2000 && s.messages.every(m=>m && ['user','assistant'].includes(m.role) && string(m.text,64000)&&validGeneration(m.generation))
+    && Array.isArray(s.messages) && s.messages.length<=2000 && s.messages.every(m=>m && ['user','assistant'].includes(m.role) && string(m.text,64000)&&validGeneration(m.generation)&&(m.action===undefined||(m.role==='assistant'&&['backup','publish','project-update','research'].includes(m.action))))
     && (s.thread===null || (string(s.thread.id,200) && string(s.thread.accountKey,200) && (s.thread.lastTurnId===null || string(s.thread.lastTurnId,200))))
     && (s.run===null || (string(s.run.id,100) && ['pending','complete','failed','unknown','stopped'].includes(s.run.status)
       && (s.run.stopRequested===undefined||typeof s.run.stopRequested==='boolean')

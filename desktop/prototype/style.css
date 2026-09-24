@@ -564,3 +564,18 @@ body[data-onboarding="on"] .workbench { visibility:hidden; }
 .ob-chips { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
 .ob-chip { border-radius:999px; min-height:32px; padding:0 14px; font-size:12.5px; color:var(--muted); background:transparent; }
 @media (max-width:640px) { .ob-choices { grid-template-columns:1fr; } }
+
+/* 聊天裡的動作卡片（actions.js） */
+.action-card { margin-top:12px; border:1px solid var(--line); border-radius:10px; padding:14px 16px; display:flex; flex-direction:column; gap:8px; background:var(--panel); max-width:560px; }
+.action-card strong { font-size:14px; }
+.action-card-desc { margin:0; font-size:12.5px; line-height:1.6; color:var(--muted); }
+.action-card-body { display:flex; flex-direction:column; gap:6px; font-size:13px; line-height:1.6; }
+.action-card-body p { margin:0; }
+.action-card-body ul { margin:0; padding-left:18px; color:var(--muted); font-size:12.5px; }
+.action-card-ack { display:flex; gap:8px; align-items:flex-start; font-size:13px; }
+.action-card-note { margin:0; font-size:12.5px; line-height:1.6; color:var(--muted); }
+.action-card-note:empty { display:none; }
+.action-card-note[data-tone="ok"] { color:#2f8f58; } :root[data-theme="dark"] .action-card-note[data-tone="ok"] { color:#6cc08b; }
+.action-card-note[data-tone="warn"] { color:var(--error); }
+.action-card-buttons { display:flex; flex-wrap:wrap; gap:8px; }
+.action-card-buttons:empty { display:none; }

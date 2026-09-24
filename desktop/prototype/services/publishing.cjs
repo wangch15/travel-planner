@@ -170,7 +170,7 @@ class PublishingService {
         { stateDir: target.stateDir, runWrangler: run, env: { ...this.env, CLOUDFLARE_ACCOUNT_ID: remote.accountId, CF_ACCOUNT_ID: remote.accountId }, log: () => {} }), runPinned);
       return { published: true, backedUp: false, url: state.url, versionId: state.versionId, message: '網站已發布；這不代表私人專案已完成備份。' };
     } catch (error) {
-      return { published: false, outcome: attempted ? 'unknown' : 'not-started', code: error.code || 'PUBLISH_FAILED', message: error.code ? error.message : '發布或結果核對未完成。遠端可能已更新；請先核對 Cloudflare 狀態，不要直接重試。' };
+      return { published: false, outcome: attempted && !error.notDeployed ? 'unknown' : 'not-started', code: error.code || 'PUBLISH_FAILED', message: error.code ? error.message : '發布或結果核對未完成。遠端可能已更新；請先核對 Cloudflare 狀態，不要直接重試。' };
     } finally { if (output) fs.rmSync(output.temporary, { recursive: true, force: true }); this.busy = false; }
   }
   async prepareAdoption(input) {

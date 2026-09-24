@@ -181,7 +181,7 @@ class CliEditor {
       await runtime.assertPolicy();
       if (active.controller.signal.aborted) throw failure('AI_CANCELED');
       // conversationTitle 可有可無，由 decodeAnswer 檢查；其餘欄位照原 schema 驗證。
-      const { conversationTitle: _title, ...payload } = result && typeof result === 'object' ? result : {};
+      const { conversationTitle: _title, appAction: _action, ...payload } = result && typeof result === 'object' ? result : {};
       if (!initialized || !result || typeof result !== 'object' || Array.isArray(result) || !validate(payload, SCHEMAS[mode])) throw failure('AI_OUTPUT_INVALID');
       return decodeAnswer(JSON.stringify(result), { mode, threadId, turnId, model: selected.id });
     } catch (error) {

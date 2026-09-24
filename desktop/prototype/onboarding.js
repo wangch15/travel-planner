@@ -10,6 +10,8 @@
 
   // ---------- 狀態偵測 ----------
   async function detect() {
+    // AI 帳號剛啟動時是「檢查中」；等它有結果再判斷，避免把已登入的人當成沒登入。
+    for (let i = 0; i < 20; i++) { const list = await feature('provider-accounts').then(r => r.accounts).catch(() => []); if (!list.some(a => ['checking', 'switching'].includes(a.state))) break; await new Promise(r => setTimeout(r, 500)); }
     const [env, github, cloudflare, accounts, state] = await Promise.all([
       feature('environment').catch(() => ({ tools: [] })),
       feature('auth-status', { provider: 'github' }).then(r => r.auth).catch(() => ({ connected: false })),
@@ -247,8 +249,8 @@
   (async () => {
     await detect();
     if (saved.completed) return;
-    // 已經在用的人（有專案、有 AI）直接視為完成，不強迫重走。
-    if (facts.project && facts.done.ai) { saved = { ...saved, completed: true }; await feature('onboarding-save', saved).catch(() => {}); return; }
+    // 已經有專案的人（包括從舊版升級的人）直接視為完成，不強迫重走；需要時可從「關於」重新打開。
+    if (facts.project) { saved = { ...saved, completed: true }; await feature('onboarding-save', saved).catch(() => {}); return; }
     view = facts.done.github || facts.project ? firstOpen() : 'welcome';
     show();
   })().catch(() => {});
