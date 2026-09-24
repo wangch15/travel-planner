@@ -38,7 +38,7 @@ test('GitHub login returns before browser completion, exposes only device code, 
 test('Cloudflare credentials remain shared and response includes only account id/name', async () => {
   const f = fixture({ env: { NODE_OPTIONS: '--import malicious.js', CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32) } });
   const started = await f.tools.start('cloudflare'); assert.equal(started.state, 'waiting-browser');
-  const command = f.state.spawned[0]; assert.equal(command.bin, process.execPath); assert.equal(command.args[0], '/trusted/wrangler/cli.js'); assert.equal(command.args[1], 'login');
+  const command = f.state.spawned[0]; assert.equal(command.bin, process.execPath); assert.equal(command.args[0], require('../services/wrangler-launch.cjs').LAUNCHER); assert.equal(command.args[1], '/trusted/wrangler/cli.js'); assert.equal(command.args[2], 'login');
   assert.equal(command.opts.env.ELECTRON_RUN_AS_NODE, '1'); assert.equal(command.opts.env.NODE_OPTIONS, undefined);
   const child = f.state.children[0], done = f.tools.active.done; child.stdout.write('Opening OAuth URL https://example.invalid/?state=PRIVATE_TOKEN\n'); f.state.connected = true; child.emit('close', 0);
   const result = await done; assert.deepEqual(result.accounts, [{ id: 'a'.repeat(32), name: 'Personal Account' }]);

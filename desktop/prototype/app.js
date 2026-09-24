@@ -186,7 +186,6 @@ function closeSettings() {
   layoutPanels();updateComposer();
   if (settingsReturnFocus?.isConnected && settingsReturnFocus.offsetParent !== null) settingsReturnFocus.focus();
   else $('sidebar-toggle').focus();
-  window.onSettingsClosed?.();
 }
 $('open-settings').onclick = () => openSettings();
 $('welcome-connect').onclick = () => openSettings('projects');

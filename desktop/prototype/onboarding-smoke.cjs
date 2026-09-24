@@ -29,6 +29,8 @@ app.whenReady().then(async()=>{
     makeBackup:()=>({prepare:async t=>{calls.push('backup-prepare:'+(t.slug===null?'project':t.slug));return {token:'backup-token',files:[],unpublishedCommits:1,firstPush:true};},confirm:async token=>{calls.push('backup-confirm:'+token);return {backedUp:true,committed:false,message:'私人備份已完成，遠端版本已核對。'};},localStatus:async()=>({pendingFiles:0,unpushedCommits:0,neverBackedUp:false})}),
   };
   win=await createWindow(options);win.webContents.setBackgroundThrottling(false);
+  // 一開始就不露出一般畫面：還在判斷時是 pending，決定後是 on（引導）
+  assert.ok(['pending','on'].includes(await js('document.body.dataset.onboarding')));
 
   // 0 歡迎：全新的電腦從頭開始
   await until('window.onboarding?.state().facts && !window.onboarding.state().hidden && window.onboarding.state().view==="welcome"');
@@ -42,9 +44,10 @@ app.whenReady().then(async()=>{
   gitReady=true;await until('onboarding.state().view==="project"',300);
   // 3 私人專案：預設名稱與位置，建立後自動第一次備份
   await until('document.getElementById("ob-project-name")?.value==="travel-planner-trips"');await shot('3-project.png');
-  // 「我已經有專案了」要真的打開設定頁（不被引導蓋住），關掉設定後回到引導
-  await press('我已經有專案了');await until('document.getElementById("onboarding").hidden && !document.getElementById("settings").hidden && !document.getElementById("setting-projects").hidden');
-  await js('closeSettings()');await until('!document.getElementById("onboarding").hidden && onboarding.state().view==="project"');
+  // 「我已經有專案了」留在引導裡：直接選資料夾或從 GitHub 下載，不露出一般畫面或設定頁
+  await press('我已經有專案了');await until('onboarding.state().view==="existing" && !document.getElementById("onboarding").hidden && document.getElementById("settings").hidden');
+  assert.ok(await js('[...document.querySelectorAll("#onboarding button")].some(b=>b.textContent.startsWith("選擇資料夾")) && Boolean(document.getElementById("ob-existing-repo"))'));await shot('3b-existing.png');
+  await press('← 改成建立新的專案');await until('onboarding.state().view==="project"');
   await press('建立並完成第一次備份');await until('onboarding.state().view==="ai"',300);
   assert.deepEqual(calls.filter(c=>/^(prepare|backup)/.test(c)),['prepare:travel-planner-trips','backup-prepare:project','backup-confirm:backup-token']);
   assert.equal(await js('project?.root'),projectRoot);
@@ -56,5 +59,6 @@ app.whenReady().then(async()=>{
   await js('document.getElementById("ob-first-request").value="十月去東北泡溫泉"');await press('開始規劃');
   await until('document.getElementById("onboarding").hidden && document.getElementById("new-dialog").open');
   assert.equal(await js('document.getElementById("new-notes").value'),'十月去東北泡溫泉');
+  assert.equal(await js('document.body.dataset.onboarding'),undefined);
   const saved=(await createProjectStore(state).read()).state.onboarding;assert.deepEqual(saved,{completed:true,cloudflareSkipped:true});
 }).catch(async e=>{status=1;console.error(e);if(win&&!win.isDestroyed())console.error(await js('JSON.stringify({state:window.onboarding?.state?.(),text:document.getElementById("onboarding")?.innerText?.slice(0,600)})').catch(()=>''));}).finally(async()=>{await shutdown().catch(()=>{});app.exit(status);});

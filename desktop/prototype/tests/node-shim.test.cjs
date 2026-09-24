@@ -22,3 +22,13 @@ test('trusted backup files match regardless of CRLF checkout, but not other edit
   assert.equal(sameTrusted(Buffer.from('a\r\nb\r\n'),Buffer.from('a\nb\n')),true);
   assert.equal(sameTrusted(Buffer.from('a\nb\n'),Buffer.from('a\nc\n')),false);
 });
+
+test('wrangler runs correctly under the App runtime (Electron as Node) through the launcher',{skip:!process.versions.electron&&!require('node:fs').existsSync(require('node:path').resolve(__dirname,'../../../node_modules/electron/dist'))},()=>{
+  const {execFileSync}=require('node:child_process');const path=require('node:path');const {wranglerArgs,defaultCli}=require('../services/wrangler-launch.cjs');
+  const electron=require('electron');// 在 Node 下 require('electron') 回傳執行檔路徑
+  const out=execFileSync(electron,wranglerArgs(defaultCli(),['--version']),{env:{...process.env,ELECTRON_RUN_AS_NODE:'1',NO_COLOR:'1'},encoding:'utf8'});
+  assert.match(out,/\d+\.\d+\.\d+/);
+  // 過去的錯誤：wrangler 把腳本路徑當成參數，whoami 會回報 Unknown arguments
+  const help=execFileSync(electron,wranglerArgs(defaultCli(),['whoami','--help']),{env:{...process.env,ELECTRON_RUN_AS_NODE:'1',NO_COLOR:'1'},encoding:'utf8'});
+  assert.doesNotMatch(help,/Unknown arguments/);assert.match(help,/whoami/);
+});

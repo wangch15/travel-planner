@@ -13,6 +13,7 @@ function sanitizeAccounts(info) {
   if (info.accounts.some(account => !account || !/^[a-f0-9]{32}$/i.test(account.id) || typeof account.name !== 'string')) throw fail('INVALID_ACCOUNT_RESPONSE');
   return info.accounts.map(account => ({ id: account.id, name: cleanName(account.name) }));
 }
+const { wranglerArgs } = require('./wrangler-launch.cjs');
 function installedWrangler() {
   const manifest = require('wrangler/package.json');
   if (manifest.version !== PINNED_WRANGLER) throw fail('WRANGLER_VERSION_REQUIRED');
@@ -49,7 +50,7 @@ class AuthTools {
     if (provider === 'github') return { bin: process.platform === 'win32' ? 'gh.exe' : 'gh', args: action === 'login'
       ? ['auth', 'login', '--hostname', 'github.com', '--git-protocol', 'https', '--web', '--skip-ssh-key']
       : ['auth', 'status', '--hostname', 'github.com'] };
-    return { bin: process.execPath, args: [this.wranglerPath || installedWrangler(), action === 'login' ? 'login' : 'whoami', ...(action === 'login' ? [] : ['--json']), '--config', workspace.config] };
+    return { bin: process.execPath, args: wranglerArgs(this.wranglerPath || installedWrangler(), [action === 'login' ? 'login' : 'whoami', ...(action === 'login' ? [] : ['--json']), '--config', workspace.config]) };
   }
   async status(provider) {
     this.provider(provider); let workspace;

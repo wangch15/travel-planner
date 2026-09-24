@@ -507,7 +507,9 @@ select option[hidden] { display:none; }
 /* 首次引導（onboarding.js） */
 .onboarding { position:fixed; inset:56px 0 0 0; z-index:30; background:var(--bg); overflow:auto; --ob-ok:#2f8f58; --ob-accent:#c8663d; --ob-warn:#a3661c; }
 :root[data-theme="dark"] .onboarding { --ob-ok:#6cc08b; --ob-accent:#e0875f; --ob-warn:#e3a65b; }
-body[data-onboarding="on"] .workbench { visibility:hidden; }
+/* 啟動時先藏住工作台，等引導決定要不要出現，避免一般畫面閃一下又被蓋住。 */
+body[data-onboarding] .workbench { visibility:hidden; }
+body[data-onboarding] .app-header .chat-heading, body[data-onboarding] #preview-toggle, body[data-onboarding] #versions-open, body[data-onboarding] #publish-open, body[data-onboarding] #backup-status { visibility:hidden; }
 .ob-inner { min-height:100%; display:flex; flex-direction:column; align-items:center; gap:28px; padding:36px 24px 48px; }
 .ob-body { width:min(560px,100%); display:flex; flex-direction:column; gap:18px; }
 .ob-stepper { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; justify-content:center; gap:10px 22px; }
@@ -579,3 +581,5 @@ body[data-onboarding="on"] .workbench { visibility:hidden; }
 .action-card-note[data-tone="warn"] { color:var(--error); }
 .action-card-buttons { display:flex; flex-wrap:wrap; gap:8px; }
 .action-card-buttons:empty { display:none; }
+.ob-loading { padding-top:120px; align-items:center; }
+.ob-inline input#ob-existing-repo { height:40px; }

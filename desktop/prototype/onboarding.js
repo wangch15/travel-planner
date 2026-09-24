@@ -1,7 +1,9 @@
 // 首次引導：第一次打開 App 時，一步一步帶使用者完成 GitHub → Git → 私人專案 → AI 助手 → Cloudflare（可跳過），
 // 最後直接進入第一段規劃。每一步是否完成都由實際狀態判斷（不是勾選紀錄），所以關掉 App 再開會從還沒完成的那一步繼續。
 (() => {
-  if (!window.travelDesktop) return;
+  if (!window.travelDesktop) { delete document.body.dataset.onboarding; return; }
+  // 引導不需要出現時才露出一般畫面。
+  const reveal = () => { if (document.body.dataset.onboarding === 'pending') delete document.body.dataset.onboarding; };
   const feature = async (name, input = {}) => { const r = await window.travelDesktop.feature(name, input); if (!r.ok) throw Error(r.message || '操作未完成'); return r; };
   const root = $('onboarding');
   const STEPS = [['github', 'GitHub'], ['git', 'Git'], ['project', '私人專案'], ['ai', 'AI 助手'], ['cloudflare', 'Cloudflare']];
@@ -66,7 +68,7 @@
     ].map(([t, d], i) => h('li', {}, h('span', { class: 'ob-num' }, String(i + 1)), h('div', {}, h('strong', {}, t), h('span', {}, d))))),
       h('p', { class: 'ob-note' }, 'Node.js、GitHub 工具、Cloudflare 工具與行程網頁引擎都已經內建在 App 裡，不用另外安裝。')),
     h('div', { class: 'ob-actions ob-center' }, button('開始準備', () => go(firstOpen())),
-      link('我已經有專案了', () => { openSettingsFromOnboarding('projects'); }),
+      link('我已經有專案了', () => { go('existing'); }),
       link('先看看示範旅程', () => { dismissedForSession = true; hide(); openDemo(); }, 'ob-quiet'))];
   }
 
@@ -128,7 +130,7 @@
       h('div', { class: 'ob-row' }, h('span', {}, 'GitHub 專案'), h('div', { class: 'ob-inline' }, h('span', { class: 'ob-muted' }, s ? s.owner + ' /' : '…'), nameInput)),
       h('div', { class: 'ob-row' }, h('span', {}, '可見度'), h('strong', { class: 'ob-okText' }, '私人（只有你看得到）')),
       h('div', { class: 'ob-row' }, h('span', {}, '這台電腦'), h('span', { class: 'ob-path', title: s ? s.parentDirectory : '' }, s ? '…/' + s.parentDirectory.split(/[\\/]/).filter(Boolean).slice(-1)[0] + '/' + (d.name || s.name) : '…'), link('改位置', async () => { try { const r = await feature('onboarding-project-location'); if (r.suggestion) { d.suggestion = r.suggestion; d.name = r.suggestion.name; render(); } } catch (e) { fail('project', e); } })),
-      h('div', { class: 'ob-actions' }, button('建立並完成第一次備份', createProject, { disabled: busy || !s }), link('我已經有專案了', () => openSettingsFromOnboarding('projects')))));
+      h('div', { class: 'ob-actions' }, button('建立並完成第一次備份', createProject, { disabled: busy || !s }), link('我已經有專案了', () => go('existing')))));
     if (d.steps) body.push(card(...d.steps.map(([text, tone]) => status(text, tone))));
     return body;
   }
@@ -150,6 +152,36 @@
       } catch (e) { mark(2, '第一次備份沒有完成：' + e.message + '（之後可在「備份與發布」重試）', 'warn'); }
       busy = false; await refresh();
     } catch (e) { d.steps = null; fail('project', e, '專案沒有建立完成，請再試一次。'); }
+  }
+
+  // 已經有私人專案：在引導裡直接選資料夾或從 GitHub 下載，不跳到設定頁。
+  function existingStep() {
+    const d = detail.existing || (detail.existing = {});
+    const repoInput = h('input', { id: 'ob-existing-repo', value: d.repo || '', placeholder: '例如 your-name/travel-planner', 'aria-label': 'GitHub 私人專案', oninput: e => { d.repo = e.target.value.trim(); } });
+    return [heading('使用你已經有的專案', '行程會繼續存在原本的私人專案裡，App 只做唯讀檢查，不會改動它。'),
+      card(h('strong', {}, '這台電腦上已經有專案資料夾'), h('span', { class: 'ob-muted' }, '例如之前用 AI 助手在終端機做的 travel-planner 專案。'),
+        h('div', { class: 'ob-actions' }, button('選擇資料夾…', chooseLocalProject, { disabled: busy }))),
+      card(h('strong', {}, '專案在 GitHub 上，這台電腦還沒有'), h('span', { class: 'ob-muted' }, '會下載到「文件／Travel Planner」，並確認它是私人專案。'),
+        h('div', { class: 'ob-inline' }, repoInput), h('div', { class: 'ob-actions' }, button('下載這個專案', cloneProject, { disabled: busy }))),
+      d.progress ? card(status(d.progress, 'active')) : null,
+      h('div', { class: 'ob-actions' }, link('← 改成建立新的專案', () => go('project')))];
+  }
+  async function chooseLocalProject() {
+    busy = true; message = null; render();
+    try { await $('choose-project').onclick(); } finally { busy = false; }
+    if (project) { await refresh(); } else render();
+  }
+  async function cloneProject() {
+    const d = detail.existing; if (!d?.repo || !/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/.test(d.repo)) { message = { step: 'existing', text: '請輸入「帳號/專案名稱」，例如 your-name/travel-planner。' }; render(); return; }
+    busy = true; message = null; d.progress = '正在確認這是你的私人專案…'; render();
+    try {
+      const prep = await feature('onboarding-clone-prepare', { repo: d.repo });
+      d.progress = '正在下載專案…'; render();
+      const confirm = await feature('project-setup-confirm', { kind: 'clone', token: prep.preparation.token });
+      if (!confirm.result.ready) throw Error(confirm.result.message || '專案沒有下載完成。');
+      await window.reloadProjectFromResult?.(confirm);
+      d.progress = null; busy = false; await refresh();
+    } catch (e) { d.progress = null; fail('existing', e, '專案沒有下載完成，請確認名稱與權限後再試。'); }
   }
 
   function aiStep() {
@@ -210,10 +242,6 @@
   }
 
   // ---------- 流程 ----------
-  // 引導蓋在畫面最上層；要去設定頁（例如連接既有專案）時先收起來，關掉設定後再回來並重新偵測。
-  let pausedForSettings = false;
-  function openSettingsFromOnboarding(section) { pausedForSettings = true; hide(); openSettings(section); }
-  window.onSettingsClosed = () => { if (!pausedForSettings) return; pausedForSettings = false; if (saved.completed || dismissedForSession) return; detect().then(() => { view = firstOpen(); show(); }).catch(() => show()); };
   function go(step) { view = step; message = null; render(); }
   function poll(check, every, limit = 20 * 60 * 1000, onTimeout) {
     clearTimeout(pollTimer); const started = Date.now();
@@ -222,10 +250,11 @@
   }
   async function refresh() { clearTimeout(pollTimer); await detect(); if (view !== 'welcome') view = firstOpen(); render(); }
   function render() {
-    if (root.hidden || !facts) return;
-    const screens = { welcome, github: githubStep, git: gitStep, project: projectStep, ai: aiStep, cloudflare: cloudflareStep, ready: readyStep };
+    if (root.hidden) return;
+    if (!facts || view === 'loading') { root.replaceChildren(h('div', { class: 'ob-inner' }, h('div', { class: 'ob-body ob-loading' }, status('正在檢查這台電腦的準備狀況…', 'active')))); return; }
+    const screens = { welcome, github: githubStep, git: gitStep, project: projectStep, existing: existingStep, ai: aiStep, cloudflare: cloudflareStep, ready: readyStep };
     const content = screens[view]?.() || [];
-    const top = STEPS.some(([id]) => id === view) ? stepper(view) : null;
+    const top = STEPS.some(([id]) => id === view) ? stepper(view) : view === 'existing' ? stepper('project') : null;
     root.replaceChildren(h('div', { class: 'ob-inner' }, top, h('div', { class: 'ob-body' }, ...content, problem())));
     const logo = `assets/brand/travel-planner-mark-on-${document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'}-v2.svg`;
     root.querySelectorAll('[data-logo]').forEach(image => { image.src = logo; });
@@ -253,13 +282,15 @@
   (async () => {
     // 先用便宜的讀取判斷要不要引導；只有真的需要時才做完整偵測（會檢查多個工具與登入，較慢）。
     saved = await feature('onboarding-state').then(r => r.onboarding).catch(() => saved);
-    if (saved.completed) return;
+    if (saved.completed) { reveal(); return; }
     const workspace = await window.travelDesktop.readWorkspace?.().catch(() => null);
     // 已經有專案的人（包括從舊版升級的人）直接視為完成，不強迫重走；需要時可從「關於」重新打開。
-    if (workspace?.project) { saved = { ...saved, completed: true }; await feature('onboarding-save', saved).catch(() => {}); return; }
+    if (workspace?.project) { reveal(); saved = { ...saved, completed: true }; await feature('onboarding-save', saved).catch(() => {}); return; }
+    // 需要引導：先顯示歡迎頁（不必等完整偵測），偵測完再決定從哪一步開始。
+    view = 'loading'; show();
     await detect();
-    if (facts.project) { saved = { ...saved, completed: true }; await feature('onboarding-save', saved).catch(() => {}); return; }
+    if (facts.project) { hide(); saved = { ...saved, completed: true }; await feature('onboarding-save', saved).catch(() => {}); return; }
     view = facts.done.github ? firstOpen() : 'welcome';
     show();
-  })().catch(() => {});
+  })().catch(() => { reveal(); if (view === 'loading') hide(); });
 })();

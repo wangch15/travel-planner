@@ -1,3 +1,4 @@
+const { wranglerArgs } = require('./wrangler-launch.cjs');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
@@ -18,7 +19,7 @@ async function runWrangler(args, { cwd, env = {} } = {}) {
   catch { throw fail('WRANGLER_REQUIRED', '請先完成桌面版工具安裝，找不到可信的 Wrangler。'); }
   const inherited = Object.fromEntries(Object.entries({ ...process.env, ...env }).filter(([key]) => !/^(NODE_OPTIONS|NODE_PATH|LD_|DYLD_)/.test(key)));
   return new Promise(resolve => {
-    const child = execFile(process.execPath, [binary, ...args], { cwd, env: { ...inherited, ELECTRON_RUN_AS_NODE: '1', CI: 'true', NO_COLOR: '1', FORCE_COLOR: '0', WRANGLER_SEND_METRICS: 'false' },
+    const child = execFile(process.execPath, wranglerArgs(binary, args), { cwd, env: { ...inherited, ELECTRON_RUN_AS_NODE: '1', CI: 'true', NO_COLOR: '1', FORCE_COLOR: '0', WRANGLER_SEND_METRICS: 'false' },
       encoding: 'utf8', timeout: 120000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => resolve({
       status: error ? (typeof error.code === 'number' ? error.code : null) : 0, stdout, stderr, ...(error && typeof error.code !== 'number' ? { error } : {}),
     }));
