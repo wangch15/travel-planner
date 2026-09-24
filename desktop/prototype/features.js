@@ -182,6 +182,8 @@
   };
   // iframe load can arrive before the main process records its receipt (or for
   // an older document). Enable confirmation only after the host acknowledges it.
+  // 目前預覽是否已在 App 內完整載入（發布與保存前的確認依據）；供介面與測試查詢。
+  window.previewViewed=()=>Boolean(realPreview?.url)&&viewedPreviewURL===realPreview.url;
   window.travelDesktop?.onPreviewViewed?.(({url})=>{
     if(url!==realPreview?.url)return;
     viewedPreviewURL=url;
