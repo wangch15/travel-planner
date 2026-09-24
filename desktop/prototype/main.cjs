@@ -43,7 +43,8 @@ protocol.registerSchemesAsPrivileged(['travel-app', 'travel-preview'].map(scheme
 app.setName('Travel Planner');
 // 測試（smoke 直接以自己的檔案當入口，或設定 TRAVEL_PLANNER_BACKGROUND=1）在背景跑：
 // 不出現在 Dock、不顯示視窗，也就不會搶走開發者正在用的視窗焦點。
-const backgroundRun = process.env.TRAVEL_PLANNER_BACKGROUND === '1' || !/[\\/]boot\.cjs$/.test(require.main?.filename || '');
+// 由 boot.cjs 明確標記：Electron 下 require.main 不是 boot.cjs，不能拿它判斷入口。
+const backgroundRun = process.env.TRAVEL_PLANNER_BACKGROUND === '1' || globalThis.__travelPlannerBoot !== true;
 if (backgroundRun && process.platform === 'darwin') app.setActivationPolicy?.('accessory');
 const bundledApp=()=>{const rel=path.relative(path.join(process.resourcesPath,'app'),__dirname);return rel!==''&&!rel.startsWith('..')&&!path.isAbsolute(rel);};
 // 安裝版與從原始碼執行的開發版各用各的資料夾：專案連接、對話與 App 專屬的 AI 登入互不影響。

@@ -9,7 +9,8 @@ const { readTripSnapshot } = require('../../../packages/engine/snapshot.cjs');
 async function fixture(t) {
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'local-archive-'))); t.after(() => fs.rm(root, { recursive: true, force: true }));
   const source = path.join(root, 'trips/sample'); await fs.mkdir(path.dirname(source));
-  await fs.cp(path.resolve(__dirname, '../../../trips/_example'), source, { recursive: true });
+  // 本機 _example 可能有 gitignore 的 .cache（底圖快取），不複製；下面自己建 .cache 驗證排除。
+  await fs.cp(path.resolve(__dirname, '../../../trips/_example'), source, { recursive: true, filter: from => path.basename(from) !== '.cache' });
   await fs.mkdir(path.join(source, 'docs'), { recursive: true });
   await fs.writeFile(path.join(source, 'docs/private.md'), 'Private note retained in local backup.');
   await fs.writeFile(path.join(source, 'photos.json'), '{}\n');

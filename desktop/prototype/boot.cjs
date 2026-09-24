@@ -1,6 +1,8 @@
 // Electron's package entry must bootstrap unconditionally. Its CommonJS loader
 // does not guarantee Node's `require.main === module` entry-point convention.
 const { app, dialog, BrowserWindow } = require('electron');
+// 只有從這裡進來才是使用者啟動 App；smoke 直接載入 main.cjs，會在背景跑、不顯示視窗。
+globalThis.__travelPlannerBoot = true;
 const { createWindow, shutdown, isUpdateHandoff } = require('./main.cjs');
 
 if (!app.requestSingleInstanceLock()) app.quit();

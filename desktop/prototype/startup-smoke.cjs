@@ -24,7 +24,7 @@ function getTargets(port) {
 (async () => {
   const stateDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'travel-startup-'));
   const child = spawn(electronPath, ['.', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0'], {
-    cwd: __dirname, env: { ...process.env, TRAVEL_PLANNER_STATE_DIR: stateDirectory }, stdio: ['ignore', 'ignore', 'pipe'],
+    cwd: __dirname, env: { ...process.env, TRAVEL_PLANNER_STATE_DIR: stateDirectory, TRAVEL_PLANNER_BACKGROUND: '1' }, stdio: ['ignore', 'ignore', 'pipe'],
   });
   let port;
   let spawnError;

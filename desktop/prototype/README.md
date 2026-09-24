@@ -9,6 +9,11 @@
 - 版號不往回調低。版號只維護在 `desktop/prototype/package.json`（與 root lockfile 對應欄位），側欄與「關於」都讀這裡；從原始碼執行時顯示 `-dev`。
 - 發布放在 GitHub release `desktop-vX.Y.Z`，App 內「檢查新版本」只認這個格式。網頁引擎版號另計（root `package.json` + `CHANGELOG.md`）。
 
+## 0.1.3（2026-09-24）
+
+- **打開 App 什麼都沒出現**：0.1.0 起，App 把正常啟動誤判成背景測試，視窗不顯示、Dock 也沒有圖示。改成由 `boot.cjs` 明確標記正常啟動，smoke 測試仍在背景跑。
+- 0.1.2 沒有另外發布，它的內容一起包含在 0.1.3。
+
 ## 0.1.2（2026-09-24）
 
 流程改成「先改、看結果、最後才保存到 GitHub」，不再每一步都要確認：
