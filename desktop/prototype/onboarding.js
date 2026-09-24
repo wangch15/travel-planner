@@ -56,7 +56,7 @@
 
   // ---------- 各步驟 ----------
   function welcome() {
-    return [h('div', { class: 'ob-hero' }, h('img', { src: 'assets/brand/travel-planner-mark-on-light-v2.svg', 'data-logo': '', width: 64, height: 64, alt: '' }),
+    return [h('div', { class: 'ob-hero' }, h('img', { src: 'assets/brand/travel-planner-mark-on-light-v3.svg', 'data-logo': '', width: 64, height: 64, alt: '' }),
       h('h1', {}, '下一段旅程，從這裡開始。'),
       h('p', {}, '第一次使用要花大約 10–15 分鐘準備。App 會一步一步幫你做好，只有要你本人登入的地方才會停下來。')),
     card(h('ol', { class: 'ob-overview' }, [
@@ -256,7 +256,7 @@
     const content = screens[view]?.() || [];
     const top = STEPS.some(([id]) => id === view) ? stepper(view) : view === 'existing' ? stepper('project') : null;
     root.replaceChildren(h('div', { class: 'ob-inner' }, top, h('div', { class: 'ob-body' }, ...content, problem())));
-    const logo = `assets/brand/travel-planner-mark-on-${document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'}-v2.svg`;
+    const logo = `assets/brand/travel-planner-mark-on-${document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'}-v3.svg`;
     root.querySelectorAll('[data-logo]').forEach(image => { image.src = logo; });
   }
   function show() { root.hidden = false; document.body.dataset.onboarding = 'on'; render(); }

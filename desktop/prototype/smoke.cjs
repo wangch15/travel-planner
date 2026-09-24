@@ -236,7 +236,7 @@ app.whenReady().then(async () => {
   assert.equal(await win.webContents.executeJavaScript('document.getElementById("preview-panel").hidden'), true);
   await capture('workbench-small-chat-dark.png');
   await win.webContents.executeJavaScript('setTheme("system")');
-  assert.equal(await win.webContents.executeJavaScript('document.querySelector("img[data-logo]").getAttribute("src")'), 'assets/brand/travel-planner-mark-on-' + (require('electron').nativeTheme.shouldUseDarkColors ? 'dark' : 'light') + '-v2.svg');
+  assert.equal(await win.webContents.executeJavaScript('document.querySelector("img[data-logo]").getAttribute("src")'), 'assets/brand/travel-planner-mark-on-' + (require('electron').nativeTheme.shouldUseDarkColors ? 'dark' : 'light') + '-v3.svg');
   assert.deepEqual(failures, []);
   console.log(JSON.stringify({ passed: true, platform: process.platform, arch: process.arch, electron: process.versions.electron,
     cases: ['settings import + cancel', 'private notes omitted', 'real trip read-only', 'invalid selection recovery', 'chat + right user bubbles', 'sidebar + preview toggles', 'draft preservation', 'light/dark/system logos + native theme', 'new trip modal + dates + notes', 'trip isolation', 'preview HTML escaping', 'small window center remains visible', 'resize both panes with pointer and keyboard', 'four collapse combinations'], screenshots: output }, null, 2));

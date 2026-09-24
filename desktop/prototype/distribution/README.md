@@ -11,7 +11,7 @@ node desktop/prototype/distribution/package.cjs
 node desktop/prototype/distribution/smoke.cjs
 ```
 
-Output: `.local/distribution/Travel Planner.app`. The bundle identifier is `app.travelplanner.desktop`; the bundled ICNS is the selected v2 logo on its rounded macOS background. The smoke check launches this artifact using disposable app state, checks the actual rendered composer and preload bridge over an ephemeral localhost debugging connection, then terminates only its own child and removes its state. It never connects an existing project or account.
+Output: `.local/distribution/Travel Planner.app`. The bundle identifier is `app.travelplanner.desktop`; the bundled ICNS is the brand logo on its rounded macOS background (uncut v2 mark at 16px, creased v3 mark from 32px up). The smoke check launches this artifact using disposable app state, checks the actual rendered composer and preload bridge over an ephemeral localhost debugging connection, then terminates only its own child and removes its state. It never connects an existing project or account.
 
 The app is **unsigned and not notarized**. It is a local development artifact, not a signed public release. Apple Developer credentials and the release owner's authorization are required for a later signing/notarization release step. Helpers retain the Electron runtime's original names/signatures; the outer bundle's original resource signature is removed after rebranding.
 

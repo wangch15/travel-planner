@@ -63,7 +63,7 @@ function currentTheme() { return ui.theme === 'system' ? (systemTheme.matches ? 
 function renderTheme() {
   const mode = currentTheme();
   document.documentElement.dataset.theme = mode;
-  const logo = `assets/brand/travel-planner-mark-on-${mode}-v2.svg`;
+  const logo = `assets/brand/travel-planner-mark-on-${mode}-v3.svg`;
   document.querySelectorAll('[data-logo]').forEach(image => { image.src = logo; });
   $('favicon').href = `assets/brand/favicon-${mode}.svg`;
   $('touch-icon').href = `assets/brand/${mode}/icon-180.png`;

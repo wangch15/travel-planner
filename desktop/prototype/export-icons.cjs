@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
+const { markFile } = require('./brand-marks.cjs');
 
 const brand = path.join(__dirname, 'assets/brand');
 const sizes = [16, 20, 24, 32, 40, 48, 64, 128, 180, 192, 256, 512, 1024];
@@ -15,22 +16,26 @@ app.whenReady().then(async () => {
   await win.loadURL('data:text/html,<html><body></body></html>');
   for (const mode of ['light', 'dark']) {
     nativeTheme.themeSource = mode;
-    const file = `travel-planner-mark-on-${mode}-v2.svg`;
-    const svg = await fs.readFile(path.join(brand, file));
-    if (crypto.createHash('sha256').update(svg).digest('hex') !== hashes[file]) throw Error('Original SVG changed');
     const dir = path.join(brand, mode);
     await fs.mkdir(dir, { recursive: true });
     // Platform icons get their own square tile. The original transparent SVG is
     // embedded unchanged and fitted proportionally inside a padded viewport.
+    // 小尺寸用 v2、32px 以上用 v3，由 markFile 決定。
     const background = mode === 'dark' ? '#191919' : '#ffffff';
-    const markSource = `data:image/svg+xml;base64,${svg.toString('base64')}`;
-    const tile = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="${background}"/><image x="96" y="96" width="832" height="832" preserveAspectRatio="xMidYMid meet" href="${markSource}"/></svg>`;
-    await fs.writeFile(path.join(brand, `favicon-${mode}.svg`), tile + '\n');
-    const source = `data:image/svg+xml;base64,${Buffer.from(tile).toString('base64')}`;
-    const macTile = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><rect x="64" y="64" width="896" height="896" rx="200" fill="${background}"/><image x="144" y="144" width="736" height="736" preserveAspectRatio="xMidYMid meet" href="${markSource}"/></svg>`;
-    const macSource = `data:image/svg+xml;base64,${Buffer.from(macTile).toString('base64')}`;
-    for (const [prefix, imageSource] of [['icon',source],['macos-icon',macSource]]) {
+    const markSource = async size => {
+      const file = markFile(mode, size);
+      const svg = await fs.readFile(path.join(brand, file));
+      if (crypto.createHash('sha256').update(svg).digest('hex') !== hashes[file]) throw Error(`Original SVG changed: ${file}`);
+      return `data:image/svg+xml;base64,${svg.toString('base64')}`;
+    };
+    const tile = mark => `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="${background}"/><image x="96" y="96" width="832" height="832" preserveAspectRatio="xMidYMid meet" href="${mark}"/></svg>`;
+    const macTile = mark => `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><rect x="64" y="64" width="896" height="896" rx="200" fill="${background}"/><image x="144" y="144" width="736" height="736" preserveAspectRatio="xMidYMid meet" href="${mark}"/></svg>`;
+    // favicon 在分頁上只有 16–32px，用小尺寸版本。
+    await fs.writeFile(path.join(brand, `favicon-${mode}.svg`), tile(await markSource(16)) + '\n');
+    const encode = svg => `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+    for (const [prefix, makeTile] of [['icon', tile], ['macos-icon', macTile]]) {
     for (const size of sizes) {
+      const imageSource = encode(makeTile(await markSource(size)));
       const data = await win.webContents.executeJavaScript(`(async () => {
         const image = new Image(); image.src = ${JSON.stringify(imageSource)}; await image.decode();
         const canvas = document.createElement('canvas'); canvas.width = canvas.height = ${size};

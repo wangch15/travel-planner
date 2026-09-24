@@ -7,7 +7,7 @@ const assets = new Map([
   ['/menus.js', 'text/javascript; charset=utf-8'], ['/app.js', 'text/javascript; charset=utf-8'], ['/features.js','text/javascript; charset=utf-8'], ['/settings.js','text/javascript; charset=utf-8'], ['/onboarding.js','text/javascript; charset=utf-8'], ['/actions.js','text/javascript; charset=utf-8'], ['/markdown.js','text/javascript; charset=utf-8'],
 ]);
 for (const mode of ['light', 'dark']) {
-  assets.set(`/assets/brand/travel-planner-mark-on-${mode}-v2.svg`, 'image/svg+xml');
+  assets.set(`/assets/brand/travel-planner-mark-on-${mode}-v3.svg`, 'image/svg+xml');
   assets.set(`/assets/brand/favicon-${mode}.svg`, 'image/svg+xml');
 }
 for (const mode of ['light', 'dark']) {

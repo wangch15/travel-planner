@@ -6,12 +6,13 @@ const crypto = require('node:crypto');
 const { PNG } = require('pngjs');
 const { readAsset } = require('../desktop/prototype/assets.cjs');
 const { createServer } = require('../desktop/prototype/serve.cjs');
+const { SMALL_MARK_MAX, markFile } = require('../desktop/prototype/brand-marks.cjs');
 
 const root = path.join(__dirname, '../desktop/prototype');
 const brand = path.join(root, 'assets/brand');
-test('original v2 transparent marks match their source checksums', async () => {
+test('v2 and v3 transparent marks match their source checksums', async () => {
   const checks = JSON.parse(await fs.readFile(path.join(brand, 'source-checksums.json'), 'utf8'));
-  assert.deepEqual(Object.keys(checks).sort(), ['travel-planner-mark-on-dark-v2.svg', 'travel-planner-mark-on-light-v2.svg']);
+  assert.deepEqual(Object.keys(checks).sort(), ['dark-v2', 'dark-v3', 'light-v2', 'light-v3'].map(k => `travel-planner-mark-on-${k}.svg`));
   for (const [name, hash] of Object.entries(checks)) {
     const bytes = await fs.readFile(path.join(brand, name));
     assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'), hash);
@@ -45,14 +46,27 @@ test('both manifests reference decodable PNG headers with declared dimensions', 
     }
   }
 });
-test('favicon tiles embed untouched v2 source with proportional padding', async () => {
+test('small sizes use the uncut v2 mark, larger sizes the creased v3 mark', () => {
+  assert.equal(SMALL_MARK_MAX, 24);
+  for (const mode of ['light', 'dark']) {
+    for (const size of [16, 20, 24]) assert.equal(markFile(mode, size), `travel-planner-mark-on-${mode}-v2.svg`);
+    for (const size of [32, 64, 256, 1024]) assert.equal(markFile(mode, size), `travel-planner-mark-on-${mode}-v3.svg`);
+  }
+});
+test('v3 splits the map into four panels at the fold creases', async () => {
+  for (const mode of ['light', 'dark']) {
+    const svg = await fs.readFile(path.join(brand, `travel-planner-mark-on-${mode}-v3.svg`), 'utf8');
+    assert.equal(svg.match(/<path /g).length, 5, 'pin plus four map panels');
+  }
+});
+test('favicon tiles embed the untouched small-size v2 source with proportional padding', async () => {
   for (const mode of ['light', 'dark']) {
     const { body } = await readAsset(`/assets/brand/favicon-${mode}.svg`);
     const svg = body.toString();
     assert.match(svg, /viewBox="0 0 1024 1024"/);
     assert.match(svg, /preserveAspectRatio="xMidYMid meet"/);
     const embedded = svg.match(/data:image\/svg\+xml;base64,([^"]+)/)[1];
-    assert.deepEqual(Buffer.from(embedded, 'base64'), await fs.readFile(path.join(brand, `travel-planner-mark-on-${mode}-v2.svg`)));
+    assert.deepEqual(Buffer.from(embedded, 'base64'), await fs.readFile(path.join(brand, markFile(mode, 16))));
   }
 });
 test('platform icon containers contain complete original PNG representations', async () => {
@@ -76,7 +90,7 @@ test('browser preview serves only allowlisted UI assets with the expected MIME a
   const base = `http://127.0.0.1:${server.address().port}`;
   const page = await fetch(base);
   assert.equal(page.status, 200); assert.ok(page.headers.get('content-security-policy').includes("manifest-src 'self'"));
-  assert.equal((await fetch(`${base}/assets/brand/travel-planner-mark-on-light-v2.svg`)).headers.get('content-type'), 'image/svg+xml');
+  assert.equal((await fetch(`${base}/assets/brand/travel-planner-mark-on-light-v3.svg`)).headers.get('content-type'), 'image/svg+xml');
   assert.equal((await fetch(`${base}/manifest-dark.webmanifest`)).status, 200);
   for (const file of ['/main.cjs', '/package.json', '/assets/brand/../../main.cjs', '/trips/private/data.js']) assert.equal((await fetch(base + file)).status, 404);
   assert.equal((await fetch(base, { method: 'POST' })).status, 405);
