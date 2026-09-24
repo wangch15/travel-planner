@@ -17,19 +17,20 @@ const MATERIALIZE_SCHEMA={type:'object',additionalProperties:false,properties:{s
 // appAction：使用者要 App 做事（備份、發布、更新專案、查核）時由 AI 提出，App 顯示確認卡片，由使用者按下才執行。
 const APP_ACTIONS=Object.freeze(['none','backup','publish','project-update','research']);
 // nextReply：使用者下一句最可能想送出的話，App 顯示在輸入框，按 Tab 帶入。
-const withTitle=schema=>({...schema,properties:{...schema.properties,conversationTitle:{type:'string'},appAction:{type:'string',enum:[...APP_ACTIONS]},nextReply:{type:'string'}},required:[...schema.required,'conversationTitle','appAction','nextReply']});
-const TITLE_GUIDE='conversationTitle：用 4 到 16 個字的繁體中文替整段對話取名，概括討論主題，不加引號或句號；每輪都要回覆，主題沒變就沿用。appAction：使用者明確要求把行程備份到 GitHub 填 backup；要上線、發布或分享網址填 publish；要更新模板、引擎或專案填 project-update；要查核來源與可行性填 research；其他一律填 none。你不能自己執行這些動作，也不可宣稱已經完成；App 會在你的回覆下方顯示按鈕，由使用者確認後才執行，summary 請簡短說明接下來請他按下方按鈕確認。不要叫使用者去切換 App 的範圍或模式。nextReply：使用者下一句最可能想送出的話，繁體中文 20 字以內，例如「請套用修改」；沒有明確下一步就填空字串。';
+const withTitle=schema=>({...schema,properties:{...schema.properties,conversationTitle:{type:'string'},appAction:{type:'string',enum:[...APP_ACTIONS]},nextReply:{type:'string'},needsResearch:{type:'boolean'}},required:[...schema.required,'conversationTitle','appAction','nextReply','needsResearch']});
+const TITLE_GUIDE='conversationTitle：用 4 到 16 個字的繁體中文替整段對話取名，概括討論主題，不加引號或句號；每輪都要回覆，主題沒變就沿用。appAction：使用者明確要求把行程備份到 GitHub 填 backup；要上線、發布或分享網址填 publish；要更新模板、引擎或專案填 project-update；要查核來源與可行性填 research；其他一律填 none。你不能自己執行這些動作，也不可宣稱已經完成；App 會在你的回覆下方顯示按鈕，由使用者確認後才執行，summary 請簡短說明接下來請他按下方按鈕確認。不要叫使用者去切換 App 的範圍或模式。nextReply：使用者下一句最可能想送出的話，繁體中文 20 字以內，例如「請套用修改」；沒有明確下一步就填空字串。needsResearch：這一輪你修改了行程，而且改動帶進你無法從使用者的話或既有行程資料確定的事實（新加入的景點或店家、營業時間、票價、公休日、車程或路線時間）時填 true，App 會在回覆下方提供查核按鈕；只是照使用者已經確定的資訊修改（例如換成他指定的分店、改名稱或備註）、刪除項目，或這一輪沒有修改，都填 false。';
 function cleanTitle(value){if(typeof value!=='string')return null;const t=value.replace(/[\r\n\t]+/g,' ').replace(/^[「『"'\s]+|[」』"'。．.\s]+$/g,'').trim();return t&&t.length<=40?t:null;}
 function decodeAnswer(text,{mode,threadId,turnId,model}){
   let a;try{a=JSON.parse(text);}catch{throw error('AI_OUTPUT_INVALID');}
   if(!a||typeof a.summary!=='string'||a.summary.length>16000)throw error('AI_OUTPUT_INVALID');
   if(a.conversationTitle!==undefined&&typeof a.conversationTitle!=='string')throw error('AI_OUTPUT_INVALID');
   if(a.appAction!==undefined&&!APP_ACTIONS.includes(a.appAction))throw error('AI_OUTPUT_INVALID');
+  if(a.needsResearch!==undefined&&typeof a.needsResearch!=='boolean')throw error('AI_OUTPUT_INVALID');
   // 建議只是提示，格式不對就忽略，不讓整輪回覆失敗。
   const reply=typeof a.nextReply==='string'?a.nextReply.replace(/\s+/g,' ').trim():'';
   const suggestion=reply&&reply.length<=40?{reply}:null;
-  const conversationTitle=cleanTitle(a.conversationTitle),appAction=a.appAction&&a.appAction!=='none'?a.appAction:null;a={...a};delete a.conversationTitle;delete a.appAction;delete a.nextScope;delete a.nextReply;
-  const base={summary:a.summary,threadId,turnId,model,...(conversationTitle?{conversationTitle}:{}),...(appAction?{appAction}:{}),...(suggestion?{suggestion}:{})};
+  const conversationTitle=cleanTitle(a.conversationTitle),appAction=a.appAction&&a.appAction!=='none'?a.appAction:null;a={...a};delete a.conversationTitle;delete a.appAction;delete a.nextScope;delete a.nextReply;const needsResearch=a.needsResearch===true;delete a.needsResearch;
+  const base={summary:a.summary,threadId,turnId,model,...(needsResearch?{needsResearch:true}:{}),...(conversationTitle?{conversationTitle}:{}),...(appAction?{appAction}:{}),...(suggestion?{suggestion}:{})};
   if(mode==='research'){
     if(!Array.isArray(a.sources)||a.sources.length>20||!Array.isArray(a.unresolved)||a.unresolved.length>100||typeof a.feasibility!=='string'||a.feasibility.length>12000)throw error('AI_OUTPUT_INVALID');
     const sources=a.sources.map(source=>{let url;try{url=new URL(source.url);}catch{throw error('AI_OUTPUT_INVALID');}

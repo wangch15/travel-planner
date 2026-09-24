@@ -60,7 +60,7 @@ test('whole-trip discussion sends all raw days with only referenced place descri
   assert.deepEqual(sent.places,{first:{name:'First',cat:'sight',note:'Known note'},second:{name:'Second',cat:'stay'},alternate:{name:'Alternate',cat:'sight'},another:{name:'Another',cat:'food'}});
   assert.equal(JSON.stringify(sent).includes('PRIVATE_ADDRESS'),false);
   assert.equal(JSON.stringify(sent).includes('EXCLUDED_TOKEN'),false);
-  assert.deepEqual(schema,{type:'object',additionalProperties:false,properties:{summary:{type:'string'},replacementDaysJson:{type:'string'},conversationTitle:{type:'string'},appAction:{type:'string',enum:['none','backup','publish','project-update','research']},nextReply:{type:'string'}},required:['summary','replacementDaysJson','conversationTitle','appAction','nextReply']});
+  assert.deepEqual(schema,{type:'object',additionalProperties:false,properties:{summary:{type:'string'},replacementDaysJson:{type:'string'},conversationTitle:{type:'string'},appAction:{type:'string',enum:['none','backup','publish','project-update','research']},nextReply:{type:'string'},needsResearch:{type:'boolean'}},required:['summary','replacementDaysJson','conversationTitle','appAction','nextReply','needsResearch']});
   assert.match(instructions,/整趟/);
   assert.match(instructions,/不可.*(?:修改|保存)/);
   assert.deepEqual(result,{summary:'建議每天留一段休息時間。',discussion:true,threadId:'thread',turnId:'turn',model:'server-model'});
@@ -277,4 +277,14 @@ test('discussion decides by itself: empty replacementDaysJson is a reply, filled
   assert.equal(edit.discussion,undefined);assert.deepEqual(edit.replacementDays,[{id:1,title:'悠閒'}]);
   assert.throws(()=>decodeAnswer(JSON.stringify({summary:'x',replacementDaysJson:'not json'}),{mode:'discussion'}),{code:'AI_OUTPUT_INVALID'});
   assert.throws(()=>decodeAnswer(JSON.stringify({summary:'x',replacementDayJson:'{}'}),{mode:'discussion'}),{code:'AI_OUTPUT_INVALID'});
+});
+
+test('needsResearch comes from the AI and only a boolean is accepted', () => {
+  const { decodeAnswer } = require('../editor.cjs');
+  const day = { id: 1, date: '10/11', title: 'Day', stops: [] };
+  const decode = extra => decodeAnswer(JSON.stringify({ summary: 'ok', replacementDaysJson: JSON.stringify([day]), ...extra }), { mode: 'discussion', threadId: 't', turnId: 'u', model: 'm' });
+  assert.equal(decode({ needsResearch: true }).needsResearch, true);
+  assert.equal(decode({ needsResearch: false }).needsResearch, undefined);
+  assert.equal(decode({}).needsResearch, undefined, '舊回覆沒有這個欄位時不附查核卡片');
+  assert.throws(() => decode({ needsResearch: 'yes' }), { code: 'AI_OUTPUT_INVALID' });
 });

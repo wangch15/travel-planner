@@ -307,15 +307,16 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   async function assertNoPrivateData(target,texts){const markers=await privateMarkers(path.join(target.root,'trips',target.slug),researchKit.sources.list().map(s=>s.host));const reason=findPrivateData(texts,markers);if(reason)throw Object.assign(Error('PRIVATE_DATA_IN_TRIP'),{code:'PRIVATE_DATA_IN_TRIP',reason});}
   // AI 的修改直接寫進本機檔案（git 工作區），每次自動記一個版本，改錯可以回到前一版。
   // 保存前的私有檢查、私人資料檢查與「內容沒被別人改過」的核對仍照舊；需要查核的變更改成提醒，不擋保存。
-  async function applyPendingNow(target){
-    const pending=proposals.pending;const research=pending.requiresResearch&&pending.kind!=='restore';
+  // 要不要附「開始查核」由 AI 判斷（needsResearch）：照使用者給的資訊改不用查，新事實才要。
+  async function applyPendingNow(target,{needsResearch=false}={}){
+    const pending=proposals.pending;const research=needsResearch&&pending.kind!=='restore',required=pending.requiresResearch;
     const labels=pending.changes.filter(c=>pending.selectedKeys.includes(c.key)).map(c=>c.label).slice(0,30);
     pending.seen=true;pending.requiresResearch=false;
     try{await assertPendingClean(target);const result=await proposals.apply(pending.id,target);
       artifact=null;previewAttempt++;
       const history=await versions.read(target).catch(()=>null);const index=history&&result.version?history.revisions.findIndex(r=>r.id===result.version.id):-1;const previous=index>0?history.revisions[index-1]:null;
       return {versionId:result.version?.id||null,number:result.version?.number||null,previousId:previous?.id||null,previousNumber:previous?.number||null,labels,research};
-    }catch(error){if(proposals.pending===pending){pending.seen=false;pending.requiresResearch=research;}throw error;}
+    }catch(error){if(proposals.pending===pending){pending.seen=false;pending.requiresResearch=required;}throw error;}
   }
   async function assertPendingClean(target){if(!proposals.pending)return;try{await assertNoPrivateData(target,[proposals.pending.fullSource||proposals.pending.source||'']);}catch(error){proposals.discard();throw error;}}
   async function checkResearch(answer,sourceHash,proposalId,checkCanceled=()=>{}){
@@ -382,7 +383,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       }else if(!answer.discussion&&!answer.planning){proposal=proposals.create(target,baseline,input.dayId,answer);
         if(proposal.changed){
           // 直接套用；寫入失敗（例如檔案剛被別的程式改過）才退回舊的提案確認流程。
-          try{applied=await applyPendingNow(target);proposal={changed:false,applied:true,summary:answer.summary,...applied};}
+          try{applied=await applyPendingNow(target,{needsResearch:answer.needsResearch===true});proposal={changed:false,applied:true,summary:answer.summary,...applied};}
           catch(e){if(!proposals.pending)throw e;if(e.code!=='CONTENT_CHANGED'){proposals.discard();throw e;}await assertPendingClean(target);candidateCreated=true;await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}
         }}
       checkCanceled();

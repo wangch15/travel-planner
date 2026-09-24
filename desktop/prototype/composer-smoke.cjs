@@ -22,8 +22,8 @@ app.whenReady().then(async()=>{
     makeProvider:id=>{const a=new EventEmitter();a.account={state:'needs-login',provider:id};a.connect=async()=>a.account;a.refresh=a.connect;a.models=async()=>[];a.stop=async()=>{};return {account:a,editor:{active:null,stop:async()=>{}}};},
     makeEditor:()=>({active:null,stop:async()=>({requested:true}),generate:async({model,dayId,mode,text,snapshot,attachments})=>{calls.push({dayId,mode,attachments:(attachments||[]).length});const base={model,threadId:'t',turnId:'u'+calls.length};
       if(mode==='research')return {...base,summary:'查核完成',research:true,sources:[{url:'https://example.invalid/official',title:'官方網站',evidence:'This is a verified example source for the trip'}],unresolved:['停車場是否需要預約'],feasibility:'路線順序可行',privateNotes:''};
-      // 自動判斷：使用者說「請套用修改」就同一輪直接出修改（這裡改路線順序，所以要先查核）。
-      if(text.includes('請套用修改')){const day=parseLiteralModule(snapshot.dataSource).DAYS[0];return {...base,summary:'已把第 1 天的順序對調。',replacementDays:[{...day,stops:[...day.stops].reverse()}]};}
+      // 自動判斷：使用者說「請套用修改」就同一輪直接出修改；AI 判斷調換順序影響車程，回報 needsResearch。
+      if(text.includes('請套用修改')){const day=parseLiteralModule(snapshot.dataSource).DAYS[0];return {...base,summary:'已把第 1 天的順序對調。',needsResearch:true,replacementDays:[{...day,stops:[...day.stops].reverse()}]};}
       return {...base,summary:'整體建議',discussion:true,suggestion:{reply:'請套用修改'}};}})});
   await until('document.documentElement.dataset.ready==="true" && document.getElementById("chat-model").options.length===2 && !document.getElementById("edit-day").disabled');
   // 記錄兩個選單的子節點變動
@@ -57,7 +57,7 @@ app.whenReady().then(async()=>{
   await until('document.querySelector(".message.assistant .applied-actions") && !document.getElementById("message").disabled');
   assert.equal(calls.at(-1).dayId,null);assert.equal(await js('Boolean(pendingProposal)'),false);assert.equal(await js('document.getElementById("proposal-review").hidden'),true);
   assert.notEqual(await fs.readFile(path.join(project,'trips/sample/data.js'),'utf8'),before,'檔案要直接改好');
-  // 改到路線：不擋保存，只在回覆下方提供「開始查核」。
+  // AI 判斷需要查核：不擋保存，只在回覆下方提供「開始查核」。
   assert.match(await js('document.querySelector(".message.assistant:last-child").textContent'),/開始查核/);
   // 查看修改對照：列出改了哪裡。
   await js('[...document.querySelectorAll(".applied-actions button")].find(b=>b.textContent==="查看修改對照").click()');
