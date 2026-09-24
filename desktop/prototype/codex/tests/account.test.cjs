@@ -128,3 +128,17 @@ test('research mode adds only the App research MCP server with its token in the 
   assert.equal(launches.at(-1).env.TP_RESEARCH_TOKEN, undefined);
   await account.stop();
 });
+test('an account/updated notification during connect cannot make connect report a logged-in account as disconnected', async () => {
+  // Real app-server: startup emits account/updated while the connect-time account/read is still in flight.
+  class NotifyingTransport extends FakeTransport {
+    async start() { this.starts++; this.state = 'ready'; setImmediate(() => this.emit('notification', 'account/updated', {})); return {}; }
+    async request(method) {
+      if (method === 'account/read') { await new Promise(r => setTimeout(r, 20)); return { account: { type: 'chatgpt', email: 'traveler@example.invalid', planType: 'plus' } }; }
+      return {};
+    }
+  }
+  const account = new CodexAccount('/fake', options({ makeTransport: () => new NotifyingTransport() }));
+  assert.equal((await account.connect()).state, 'connected');
+  assert.equal((await account.ensureMode('research', { name: 'tp_research', url: 'http://127.0.0.1:9/mcp', token: 't' })).state, 'connected');
+  await account.stop();
+});

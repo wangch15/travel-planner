@@ -74,11 +74,18 @@ class CodexAccount extends EventEmitter {
       return await this.refresh();
     } catch (error) { await transport.stop().catch(() => {}); throw error; }
   }
-  async refresh() {
-    if (!this.transport || this.transport.state !== 'ready') return this.account;
-    const transport = this.transport, epoch = this.authEpoch, sequence = ++this.readSequence;
+  refresh() {
+    if (!this.transport || this.transport.state !== 'ready') return Promise.resolve(this.account);
+    const read = this._read(this.transport, this.authEpoch, ++this.readSequence);
+    this.latestRead = read;
+    return read;
+  }
+  async _read(transport, epoch, sequence) {
     const response = await transport.request('account/read', { refreshToken: false });
-    if (transport !== this.transport || epoch !== this.authEpoch || sequence !== this.readSequence) return this.account;
+    if (transport !== this.transport || epoch !== this.authEpoch) return this.account;
+    // A newer read started meanwhile (app-server emits account/updated at startup). Its answer is the
+    // current one; returning the not-yet-updated account here made connect() report "disconnected".
+    if (sequence !== this.readSequence) return this.latestRead;
     if (response.account && response.account.type !== 'chatgpt') throw Error('unsupported-account-type');
     this.account = { state: response.account ? 'connected' : 'needs-login', label: response.account?.email || null, plan: response.account?.planType || null, version: this.cliVersion };
     this.emit('changed', this.account);
