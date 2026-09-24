@@ -109,3 +109,18 @@ test('URL scoped credential commands cannot execute from an imported repository'
   await assert.rejects(() => f.service.prepare({ root: f.root, slug: 'sample' }), { code: 'UNSAFE_GIT_CONFIG' });
   assert.equal(f.state.calls.some(c => c.bin === 'gh'), false);
 });
+test('unstage puts staged edits back as ordinary changes without touching file contents', async t => {
+  // 以前只說「請先完成或取消原本的提交」；現在燈箱的「取消暫存」用這個，備份就能繼續。
+  const f = await fixture(t);
+  await fs.writeFile(path.join(f.root, 'trips/sample/data.js'), 'const DAYS = [1];\n'); await f.git(['add', 'trips/sample/data.js']);
+  await assert.rejects(() => f.service.prepare({ root: f.root, slug: 'sample' }), { code: 'STAGED_CHANGES' });
+  await f.service.unstage(f.root);
+  assert.equal(await fs.readFile(path.join(f.root, 'trips/sample/data.js'), 'utf8'), 'const DAYS = [1];\n');
+  const prepared = await f.service.prepare({ root: f.root, slug: 'sample' });
+  assert.deepEqual(prepared.files.map(file => file.path), ['trips/sample/data.js']);
+});
+test('a GitHub visibility lookup failure is reported as a connection problem, not as a public repo', async t => {
+  const f = await fixture(t);
+  const original = f.service.run; f.service.run = async (bin, args, options) => bin === 'gh' ? { status: 1, stdout: '' } : original(bin, args, options);
+  await assert.rejects(() => f.service.prepare({ root: f.root, slug: 'sample' }), error => error.code === 'PRIVATE_REPO_REQUIRED' && /網路不通|還沒連接/.test(error.message));
+});

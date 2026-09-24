@@ -100,7 +100,7 @@ class TripTrashService {
     if (privateCheck && await this.checkPrivate(root) === false) throw fail('PRIVATE_REPO_REQUIRED');
     const trips = await anchor(path.join(root, 'trips'));
     for (const directory of [path.join(root, '.local'), path.join(root, '.local/desktop-trash')]) { if (await exists(directory)) await anchor(directory); }
-    if (!await this.checkIgnored(root, '.local/')) throw fail('TRASH_NOT_IGNORED', '專案尚未忽略本機回收區，請先修復 .local/ 的 Git 忽略設定。');
+    if (!await this.checkIgnored(root, '.local/')) throw fail('TRASH_NOT_IGNORED', '這個專案的設定比較舊，App 無法確定回收區不會被一起備份上去，所以旅程先不移除。請先到「設定 → 專案管理」按「更新專案」，完成後再試。');
     const anchors = [project, trips];
     for (const directory of [path.join(root, '.local'), path.join(root, '.local/desktop-trash')]) {
       if (create) { try { await fs.mkdir(directory, { mode: 0o700 }); } catch (error) { if (error.code !== 'EEXIST') throw error; } }

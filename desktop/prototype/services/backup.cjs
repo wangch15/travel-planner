@@ -57,7 +57,7 @@ class BackupService {
         || ['core.fsmonitor', 'core.sshcommand', 'core.gitproxy', 'core.askpass', 'diff.external', 'core.alternateRefsCommand'.toLowerCase()].includes(key)
         || (['commit.gpgsign', 'push.gpgsign'].includes(key) && !['false', 'no', '0'].includes(value))
         || (/^credential(?:\..+)?\.helper$/.test(key) && !/^(|osxkeychain|manager|manager-core|wincred|cache(?: --timeout=\d+)?|!gh auth git-credential|!\/(?:opt\/homebrew|usr\/local)\/bin\/gh auth git-credential)$/.test(value))) {
-        throw fail('UNSAFE_GIT_CONFIG', '專案含會執行外部程式的 Git 設定，請先由可信的工具核對。');
+        throw fail('UNSAFE_GIT_CONFIG', `這個專案的 Git 設定裡有會執行其他程式的項目（${key}），為了安全 App 這次沒有備份。這通常是其他工具加進去的，請把這個畫面給幫你設定電腦的人看。`);
       }
     }
     if (values.get('core.hookspath') !== '.githooks') throw fail('TRUSTED_HOOK_REQUIRED', '需要安裝並核對專案的私人備份 pre-push 保護。');
@@ -66,7 +66,7 @@ class BackupService {
     // Keep the canonical root check above; normalize only Git's path representation.
     if (path.resolve((await this.git(root, ['rev-parse', '--show-toplevel'])).trim()) !== root) throw fail('UNSAFE_PATH');
     const hookStat = await fs.lstat(path.join(root, '.githooks/pre-push'));
-    if (process.platform !== 'win32' && !(hookStat.mode & 0o111)) throw fail('TRUSTED_HOOK_REQUIRED', '備份保護 hook 未啟用，請先修復安裝。');
+    if (process.platform !== 'win32' && !(hookStat.mode & 0o111)) throw fail('TRUSTED_HOOK_REQUIRED', '專案的備份保護程式沒有執行權限，App 無法啟用，這次沒有備份。請把這個畫面給幫你設定電腦的人看。');
     const entries = await fs.readdir(path.join(root, '.githooks'));
     for (const entry of entries) {
       if (entry.endsWith('.sample')) continue;
@@ -82,17 +82,21 @@ class BackupService {
     }
     for (const marker of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REBASE_HEAD']) {
       const file = (await this.git(root, ['rev-parse', '--git-path', marker])).trim();
-      try { await fs.lstat(path.resolve(root, file)); throw fail('GIT_OPERATION_ACTIVE', '請先完成目前的 Git 合併或重排操作。'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      try { await fs.lstat(path.resolve(root, file)); throw fail('GIT_OPERATION_ACTIVE', '這個專案有一個還沒完成的 Git 合併（通常是其他工具留下的）。App 不會替你決定怎麼處理，這次沒有備份。請把這個畫面給幫你設定電腦的人看。'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
     }
     return hash(config);
   }
+  // 取消暫存：把其他工具 git add 過的改動放回一般修改，檔案內容不變（等同 git reset，不動工作檔）。
+  async unstage(root) { await this.git(root, ['reset', '-q']); }
   async destination(root) {
     const urls = (await this.git(root, ['remote', 'get-url', '--push', '--all', 'origin'])).trim().split(/\r?\n/);
     const repo = urls.length === 1 && destinationRepo(urls[0]);
     const branch = (await this.git(root, ['branch', '--show-current'])).trim();
-    if (!repo || repo.toLowerCase() === 'wangch15/travel-planner' || !branch || /[\s:~^?*\[\\]/.test(branch) || branch.startsWith('-')) throw fail('PRIVATE_REPO_REQUIRED', '無法確認唯一的私人備份目的地與分支。');
+    if (!repo || repo.toLowerCase() === 'wangch15/travel-planner' || !branch || /[\s:~^?*\[\\]/.test(branch) || branch.startsWith('-')) throw fail('PRIVATE_REPO_REQUIRED', '這個專案的 GitHub 備份位置不明確（沒有設定、設了不只一個，或指向公開模板），App 不會猜要推到哪裡，這次沒有備份。請把這個畫面給幫你設定電腦的人看。');
     const response = await this.run('gh', ['repo', 'view', repo, '--json', 'visibility'], { cwd: root });
-    if (response?.status && response.status !== 0 || JSON.parse(response.stdout).visibility !== 'PRIVATE') throw fail('PRIVATE_REPO_REQUIRED', '備份目的地必須能確認為 PRIVATE。');
+    if (response?.status && response.status !== 0) throw fail('PRIVATE_REPO_REQUIRED', '無法向 GitHub 確認這個專案是私人的（可能是網路不通，或 GitHub 還沒連接），這次沒有備份。確認連線後再試。');
+    let visibility = null; try { visibility = JSON.parse(response.stdout).visibility; } catch {}
+    if (visibility !== 'PRIVATE') throw fail('PRIVATE_REPO_REQUIRED', '備份位置不是「私人」的 GitHub 專案。為了保護訂房等私人資料，App 不會推送。請到 GitHub 網站把這個專案設成 Private 後再備份。');
     return { url: urls[0], repo, branch };
   }
   async inspect(target) {
@@ -103,10 +107,10 @@ class BackupService {
     const configDigest = await this.audit(root), destination = await this.destination(root);
     let authorReady = false;
     try { authorReady = Boolean((await this.git(root, ['config', 'user.name'])).trim() && (await this.git(root, ['config', 'user.email'])).trim()); } catch {}
-    if (!authorReady) throw fail('GIT_IDENTITY_REQUIRED', '尚未設定 Git 提交作者；請先設定姓名與郵件，再重新準備備份。');
+    if (!authorReady) throw fail('GIT_IDENTITY_REQUIRED', '還沒設定備份署名（每次備份會記下的名字與郵件）。');
     const head = (await this.git(root, ['rev-parse', 'HEAD'])).trim();
     const staged = await this.git(root, ['diff', '--no-ext-diff', '--no-textconv', '--cached', '--name-only', '-z']);
-    if (staged) throw fail('STAGED_CHANGES', '已有暫存中的改動；請先完成或取消原本的提交，再使用 App 備份。');
+    if (staged) throw fail('STAGED_CHANGES', '專案裡有被其他工具「暫存」、準備提交的改動。按「取消暫存」會讓它們回到一般的修改（檔案內容不變），App 再一起列出來讓你核對。');
     const prefix = slug === null ? null : slug === '*' ? 'trips/' : `trips/${slug}/`;
     const own = name => slug !== '*' || !name.startsWith('trips/_example/');
     const names = prefix ? (await this.git(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', prefix])).split('\0').filter(Boolean).filter(own) : [];

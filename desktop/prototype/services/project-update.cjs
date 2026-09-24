@@ -11,7 +11,6 @@ const { SCHEMA_VERSION } = require('../../../packages/engine/schema.cjs');
 const { TRUSTED_FILES, sameTrusted } = require('./backup.cjs');
 
 const execute = promisify(execFile);
-const TEMPLATE_URL = /^(?:https:\/\/github\.com\/|git@github\.com:)wangch15\/travel-planner(?:\.git)?\/?$/i;
 const OFFICIAL_TEMPLATE = 'https://github.com/wangch15/travel-planner.git';
 const SLUG = /^[a-z0-9][a-z0-9-]{0,99}$/;
 // userMessage：給使用者看的說明，App 會原樣顯示。
@@ -29,12 +28,12 @@ async function readJSON(file) { try { return JSON.parse(await fs.readFile(file, 
 async function sameBytes(a, b) { try { return sameTrusted(await fs.readFile(a), await fs.readFile(b)); } catch { return false; } }
 
 class ProjectUpdateService {
-  constructor({ run = defaultRun, trustedRoot = path.resolve(__dirname, '../../..'), appCommit = null, engineVersion = null, templatePattern = TEMPLATE_URL, templateUrl = OFFICIAL_TEMPLATE } = {}) {
-    Object.assign(this, { run, trustedRoot, appCommit, engineVersion, templatePattern, templateUrl }); this.pending = new Map(); this.busy = false;
+  constructor({ run = defaultRun, trustedRoot = path.resolve(__dirname, '../../..'), appCommit = null, engineVersion = null, templateUrl = OFFICIAL_TEMPLATE } = {}) {
+    Object.assign(this, { run, trustedRoot, appCommit, engineVersion, templateUrl }); this.pending = new Map(); this.busy = false;
   }
   async git(root, args, { allowFail = false, ...options } = {}) {
     const result = await this.run('git', ['--no-replace-objects', '--no-pager', '-C', root, ...args], { cwd: root, ...options });
-    if (result.status !== 0 && !allowFail) throw fail('GIT_FAILED', '專案的 Git 操作沒有完成，原檔未變。');
+    if (result.status !== 0 && !allowFail) throw fail('GIT_FAILED', '更新時有一個步驟沒有完成，你的檔案沒有被改動。請再試一次；還是不行的話，請把這個畫面給幫你設定電腦的人看。');
     return allowFail ? result : String(result.stdout || '');
   }
   async appVersion() { return this.engineVersion || (await readJSON(path.join(this.trustedRoot, 'package.json')))?.version || null; }
@@ -54,15 +53,9 @@ class ProjectUpdateService {
     return { state, projectVersion, appVersion, trusted, migrateTrips: trips.filter(t => t.schemaVersion < SCHEMA_VERSION).map(t => t.slug) };
   }
 
-  // 要抓更新的來源。App 下載的私人專案通常只有 origin：沒有 upstream 就直接用官方模板網址，不替使用者加 remote。
-  // 有 upstream 卻指向別處（可能是刻意設定），不猜，照舊拒絕。
-  async upstream(root) {
-    const urls = (await this.git(root, ['remote', 'get-url', '--all', 'upstream'], { allowFail: true }));
-    const list = String(urls.stdout || '').trim().split(/\r?\n/).filter(Boolean);
-    if (!list.length) return this.templateUrl;
-    if (list.length !== 1 || !this.templatePattern.test(list[0])) throw fail('UPSTREAM_REQUIRED', '這個專案的 upstream 沒有指向官方模板（wangch15/travel-planner），App 不會從其他來源更新。請把 upstream 改回官方模板，或移除它。');
-    return 'upstream';
-  }
+  // 更新一律從官方模板網址取得，不看專案裡的 upstream 設定：App 下載的私人專案通常沒有 upstream，
+  // 有也可能指向別處。合併目標仍必須是官方 main 歷史裡、App 內建的那個 commit，所以來源固定不會被換掉。
+  async upstream() { return this.templateUrl; }
 
   // 使用者行程以外的未提交改動會被合併影響，先擋下。
   async dirtyEngineFiles(root) {
@@ -78,11 +71,11 @@ class ProjectUpdateService {
     const source = await this.upstream(root);
     for (const marker of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REBASE_HEAD']) {
       const file = (await this.git(root, ['rev-parse', '--git-path', marker])).trim();
-      if (await fs.lstat(path.resolve(root, file)).then(() => true, () => false)) throw fail('GIT_OPERATION_ACTIVE', '專案有尚未完成的 Git 合併或重排，請先處理。');
+      if (await fs.lstat(path.resolve(root, file)).then(() => true, () => false)) throw fail('GIT_OPERATION_ACTIVE', '這個專案有一個還沒完成的 Git 合併（通常是其他工具留下的）。App 不會替你決定怎麼處理，這次沒有更新。請把這個畫面給幫你設定電腦的人看。');
     }
-    if ((await this.git(root, ['diff', '--cached', '--name-only'])).trim()) throw fail('STAGED_CHANGES', '專案有暫存中的改動，請先完成或取消原本的提交。');
+    if ((await this.git(root, ['diff', '--cached', '--name-only'])).trim()) throw fail('STAGED_CHANGES', '專案裡有被其他工具「暫存」、準備提交的改動，這次沒有更新。先到「備份與發布」備份一次（備份時可以按「取消暫存」），再回來更新。');
     const dirty = await this.dirtyEngineFiles(root);
-    if (dirty.length) throw fail('ENGINE_FILES_CHANGED', '專案的引擎檔案有未提交的修改，App 不會覆蓋：' + dirty.slice(0, 5).join('、'));
+    if (dirty.length) throw fail('ENGINE_FILES_CHANGED', '行程資料夾以外有被改過、還沒備份的檔案，更新可能會蓋掉它們，所以這次沒有更新：' + dirty.slice(0, 5).join('、') + '。如果不是你刻意改的，請把這個畫面給幫你設定電腦的人看。');
     const head = (await this.git(root, ['rev-parse', 'HEAD'])).trim();
     const fetched = await this.git(root, ['fetch', '--no-tags', '--no-recurse-submodules', source, 'main'], { allowFail: true });
     if (fetched.status !== 0) throw fail('UPSTREAM_FETCH_FAILED', '無法從 GitHub 取得模板更新，請確認網路後再試。');

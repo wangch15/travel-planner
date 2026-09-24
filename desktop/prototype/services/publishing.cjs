@@ -17,7 +17,7 @@ async function runWrangler(args, { cwd, env = {} } = {}) {
   let binary;
   // 啟動器只接受 wrangler-dist/cli.js（登入與工具檢查也用這個）；bin/wrangler.js 會被拒絕，發布就在查帳號前失敗。
   try { binary = path.join(path.dirname(require.resolve('wrangler/package.json')), 'wrangler-dist', 'cli.js'); require('node:fs').accessSync(binary); }
-  catch { throw fail('WRANGLER_REQUIRED', '請先完成桌面版工具安裝，找不到可信的 Wrangler。'); }
+  catch { throw fail('WRANGLER_REQUIRED', '找不到 App 內建的發布工具，App 可能安裝不完整。請重新下載並安裝 Travel Planner。'); }
   const inherited = Object.fromEntries(Object.entries({ ...process.env, ...env }).filter(([key]) => !/^(NODE_OPTIONS|NODE_PATH|LD_|DYLD_)/.test(key)));
   return new Promise(resolve => {
     const child = execFile(process.execPath, wranglerArgs(binary, args), { cwd, env: { ...inherited, ELECTRON_RUN_AS_NODE: '1', CI: 'true', NO_COLOR: '1', FORCE_COLOR: '0', WRANGLER_SEND_METRICS: 'false' },

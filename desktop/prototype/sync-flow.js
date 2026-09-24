@@ -33,12 +33,13 @@
     const b = el('button', label, variant || undefined); b.type = 'button'; b.dataset.flowAction = flowAction; b.onclick = onclick; return b;
   }
   // 要等結果的動作：按鈕顯示轉圈，錯誤寫在按鈕上方的狀態列。
-  function act(label, flowAction, work, { variant = '', busy } = {}) {
+  // onError：錯誤是 App 能處理的狀況時，回傳要放在左下的處理按鈕。
+  function act(label, flowAction, work, { variant = '', busy, onError } = {}) {
     const b = button(label, flowAction, null, variant);
     b.onclick = () => withBusy(b, busy, async () => {
       const mine = flow; if (!mine) return;
       mine.busy = true; setLocked(true); say('');
-      try { await work(); } catch (e) { if (flow === mine) say(e.message || '沒有完成，請再試一次。', 'warn'); }
+      try { await work(); } catch (e) { if (flow === mine) { say(e.message || '沒有完成，請再試一次。', 'warn'); const help = onError?.(e) || []; if (help.length) $('sync-dialog-left').replaceChildren(...help); } }
       finally { mine.busy = false; setLocked(false); }
     });
     return b;
@@ -90,11 +91,22 @@
     if (p.unrelatedCommittedFiles?.length) nodes.push(fold(`既有未推送提交另包含 ${p.unrelatedCommittedFiles.length} 個檔案`, p.unrelatedCommittedFiles, false));
     return nodes;
   }
-  const identityHelp = e => /提交作者/.test(e.message || '') ? [button('設定備份署名', 'identity', () => { dialog.close(); openSettings('backup'); $('identity-card').hidden = false; }, 'text-button')] : [];
+  // 備份前卡住、但 App 自己能處理的狀況：在燈箱裡給按鈕，不叫人去設定頁或終端機。
+  // next：處理完要接著做什麼（備份流程重新檢查；發布流程接著發布）。
+  const backupHelp = (opts, next = () => backup(opts)) => e => e.code === 'GIT_IDENTITY_REQUIRED' ? [act('用我的 GitHub 帳號設定', 'identity', () => identity(opts, next), { variant: 'primary', busy: '查詢中…' })]
+    : e.code === 'STAGED_CHANGES' ? [act('取消暫存', 'unstage', async () => { await api('backup-unstage'); await next(); }, { busy: '處理中…' })] : [];
+  // 備份署名：先給人看要用的名字與郵件，確認後才寫進這個專案（不動全域 Git 設定），接著重新檢查。
+  async function identity(opts, next = () => backup(opts)) {
+    const { preparation: p } = await api('git-identity-prepare');
+    steps(BACKUP_STEPS, 0);
+    body(el('p', '每次備份都會記下一個名字與郵件。App 會用你的 GitHub 帳號設定這個專案：'), facts([['名字', p.author.name], ['郵件', p.author.email]]), p.warning ? el('p', p.warning, 'flow-meta') : null);
+    say('郵件是 GitHub 提供的隱私地址，不會公開你的真實信箱。');
+    footer([], [closeButton('取消'), act('用這個署名', 'confirm', async () => { const { result } = await api('git-identity-confirm', { token: p.token }); if (!result.ready) throw Error(result.message); await next(); }, { variant: 'primary', busy: '設定中…' })]);
+  }
   async function backup(opts) {
     const scope = opts.scope || 'trip';
     title(scope === 'all' ? '備份所有旅程到 GitHub' : scope === 'project' ? '備份專案到 GitHub' : '備份到 GitHub');
-    const p = await checking(BACKUP_STEPS, '正在列出這次要備份的內容…', async () => { const [name, input] = backupRequest(scope); return (await api(name, input)).preparation; }, () => backup(opts), identityHelp);
+    const p = await checking(BACKUP_STEPS, '正在列出這次要備份的內容…', async () => { const [name, input] = backupRequest(scope); return (await api(name, input)).preparation; }, () => backup(opts), backupHelp(opts));
     if (!p) return;
     if (!p.files.length && !p.unpublishedCommits) { const text = '目前沒有需要備份的內容，已經是最新。'; done(BACKUP_STEPS, '已經是最新的備份', text, 'ok', { status: 'done', message: text, tone: 'ok' }); return; }
     steps(BACKUP_STEPS, 1); body(...backupReview(p)); say('核對以上內容，確認後才推送到你的私人 GitHub。');
@@ -162,7 +174,7 @@
     const ack = el('input'); ack.type = 'checkbox'; ack.id = 'sync-publish-ack';
     const confirm = act('確認發布', 'confirm', async () => {
       const { result } = await api('publish-confirm', { token: p.token, ...conversationTarget() }); refresh(); publishResult(result, opts);
-    }, { variant: 'primary', busy: '發布中…' });
+    }, { variant: 'primary', busy: '發布中…', onError: backupHelp(opts, () => publish(opts)) });
     confirm.disabled = true; ack.onchange = () => { confirm.disabled = !ack.checked; };
     const label = el('label', undefined, 'flow-ack'); label.htmlFor = ack.id;
     label.append(ack, document.createTextNode('我已看過目前預覽，並了解網站是公開的，拿到網址的人都能打開。'));

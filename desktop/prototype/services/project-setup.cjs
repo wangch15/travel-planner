@@ -53,7 +53,7 @@ class ProjectSetupService {
   }
   async privateRepo(repo, cwd) {
     let info; try { info = JSON.parse(await this.github(['repo', 'view', repo, '--json', 'nameWithOwner,visibility'], cwd)); } catch { throw fail('PRIVATE_REPO_REQUIRED', '請先連接 GitHub，並確認你能存取這個私人專案。'); }
-    if (info.visibility !== 'PRIVATE' || typeof info.nameWithOwner !== 'string' || info.nameWithOwner.toLowerCase() !== repo.toLowerCase()) throw fail('PRIVATE_REPO_REQUIRED', '此專案必須是可確認的 PRIVATE GitHub repository。');
+    if (info.visibility !== 'PRIVATE' || typeof info.nameWithOwner !== 'string' || info.nameWithOwner.toLowerCase() !== repo.toLowerCase()) throw fail('PRIVATE_REPO_REQUIRED', '這個 GitHub 專案不是「私人」的（或無法確認）。為了保護訂房等私人資料，App 只使用私人專案；請到 GitHub 網站把它設成 Private，或換一個私人專案。');
     return info;
   }
   async parent(parentDirectory, name) {
@@ -99,7 +99,7 @@ class ProjectSetupService {
     if (this.busy) throw fail('PROJECT_SETUP_BUSY');
     const target = await this.identityTarget(root), account = await this.authenticatedAuthor(target.root);
     const token = this.keep('identity', { ...target, ...account });
-    return { token, root: target.root, repo: target.repo, author: account.author, warning: '確認後只會設定這份專案的 Git 提交作者，使用目前 GitHub 帳號的 noreply 郵件；不更動全域設定、不提交或推送資料。' };
+    return { token, root: target.root, repo: target.repo, author: account.author, warning: '只會設定這個專案的備份署名，不影響電腦上的其他專案，也不會備份或推送任何資料。' };
   }
   async confirmIdentity(token) {
     const pending = this.take(token, 'identity');
@@ -116,8 +116,8 @@ class ProjectSetupService {
       await this.git(['config', '--local', 'user.email', pending.author.email], { cwd: pending.root });
       const name = String(await this.git(['config', 'user.name'], { cwd: pending.root })).trim(), email = String(await this.git(['config', 'user.email'], { cwd: pending.root })).trim();
       if (name !== pending.author.name || email !== pending.author.email) throw fail('IDENTITY_NOT_EFFECTIVE');
-      return { ready: true, identityReady: true, root: pending.root, repo: pending.repo, message: '本機提交作者已設定；沒有提交或推送資料，現在可以重新準備私人備份。' };
-    } catch (error) { return { ready: false, identityReady: false, root: pending.root, repo: pending.repo, code: error.code || 'IDENTITY_SETUP_FAILED', message: '本機提交作者尚未確認設定完成。全域 Git 設定未更動；請重新核對專案與 GitHub 帳號後再試。' }; }
+      return { ready: true, identityReady: true, root: pending.root, repo: pending.repo, message: '備份署名已設定好，現在可以備份了。' };
+    } catch (error) { return { ready: false, identityReady: false, root: pending.root, repo: pending.repo, code: error.code || 'IDENTITY_SETUP_FAILED', message: '備份署名沒有設定成功，專案其他設定沒有變動。請確認 GitHub 已連接後再試一次。' }; }
     finally { this.busy = false; }
   }
   // 首次引導用：在預設位置找一個本機與 GitHub 都還沒用過的名稱（travel-planner-trips、-2、-3…）。
@@ -180,7 +180,15 @@ class ProjectSetupService {
   // 已經設成別的值就不覆蓋（跟 npm install 的 prepare 一樣），仍由備份核對擋下。
   async enableTrustedHooks(root) {
     const current = await this.git(['config', '--get', 'core.hooksPath'], { cwd: root }).then(out => String(out || '').trim(), () => '');
-    if (current) return current === '.githooks';
+    if (current && current !== '.githooks') return false;
+    // 內容和 App 的可信版本一字不差、只是少了執行權限（例如從壓縮檔或其他電腦複製過來）：補上權限。
+    const hook = path.join(root, '.githooks/pre-push');
+    try {
+      const stat = await fs.lstat(hook);
+      if (process.platform !== 'win32' && stat.isFile() && !stat.isSymbolicLink() && !(stat.mode & 0o111)
+        && sameTrusted(await fs.readFile(hook), await fs.readFile(path.join(this.trustedRoot, '.githooks/pre-push')))) await fs.chmod(hook, stat.mode | 0o755);
+    } catch {}
+    if (current) return true;
     return this.installTrustedHooks(root);
   }
   async installTrustedHooks(root) {
@@ -209,7 +217,7 @@ class ProjectSetupService {
       localCreated = true; await this.materialize(pending, pending.url);
       await this.privateRepo(pending.repo, pending.destination);
       const backupReady = await this.installTrustedHooks(pending.destination), identityReady = await this.identityReady(pending.destination);
-      return { ready: true, root: pending.destination, repo: pending.repo, backupReady, identityReady, warning: !backupReady ? '專案可讀取；備份保護程式尚未通過核對，GitHub 備份暫時停用。' : !identityReady ? '專案已下載；尚未設定 Git 提交作者，第一次備份前請設定姓名與郵件。原有 Git 設定未被更動。' : null };
+      return { ready: true, root: pending.destination, repo: pending.repo, backupReady, identityReady, warning: !backupReady ? '專案已下載。它的備份保護程式和 App 的版本不同，第一次備份前請到「設定 → 專案管理」按「更新專案」。' : !identityReady ? '專案已下載。第一次備份時 App 會請你確認備份署名（用你的 GitHub 帳號）。' : null };
     } catch (error) { return { ready: false, ...(localCreated ? { root: pending.destination } : {}), repo: pending.repo, code: error.code || 'PROJECT_DOWNLOAD_FAILED', message: '下載未完成；已產生的本機資料保留，沒有覆蓋既有資料夾，也沒有推送。請核對位置、權限與網路。' }; }
     finally { this.busy = false; }
   }

@@ -37,11 +37,13 @@
   window.refreshBackupStatus=()=>{clearTimeout(backupStatusTimer);backupStatusTimer=setTimeout(()=>updateBackupStatus().catch(()=>{}),400);};
   async function updateBackupStatus(){
     const button=$('backup-status');if(!project||!selected||selected.demo||!window.travelDesktop){button.hidden=true;return;}
-    const request=++backupStatusRequest;let status=null;try{status=(await window.travelDesktop.feature('backup-status',{slug:selected.trip.slug})).status;}catch{}
+    const request=++backupStatusRequest;let status=null,failure=null;try{const r=await window.travelDesktop.feature('backup-status',{slug:selected.trip.slug});status=r.status;failure=r.ok?r.error||null:r.message||'無法確認備份狀態。';}catch(e){failure=e.message||'無法確認備份狀態。';}
     if(request!==backupStatusRequest)return;
+    // 讀不到狀態時不假裝已備份：顯示「無法確認」，按下去在燈箱裡看原因。
     const pending=status&&(status.neverBackedUp||status.pendingFiles>0||status.unpushedCommits>0);
-    button.hidden=!pending||$('versions-open').hidden;if(!pending)return;
-    button.textContent=status.neverBackedUp?'尚未備份到 GitHub':'尚未備份'+(status.pendingFiles?` · ${status.pendingFiles} 個檔案`:'');
+    button.hidden=!(pending||failure)||$('versions-open').hidden;if(button.hidden)return;
+    button.title=failure||'有改動還沒推送到你的私人 GitHub，點這裡核對並備份';
+    button.textContent=failure?'無法確認備份狀態':status.neverBackedUp?'尚未備份到 GitHub':'尚未備份'+(status.pendingFiles?` · ${status.pendingFiles} 個檔案`:'');
   }
   $('backup-status').onclick=()=>window.openSyncFlow({kind:'backup',scope:'trip'});
   window.addEventListener('focus',()=>window.refreshBackupStatus());
@@ -321,13 +323,14 @@
   // ---------- 備份與發布：目前旅程下拉、狀態與第一次發布清單 ----------
   let syncScope='trip',syncRequest=0;
   const syncDate=iso=>{try{const d=new Date(iso);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch{return '';}};
-  function backupWords(st){if(!st)return {tone:'muted',head:'無法讀取備份狀態',sub:'請確認專案資料夾還在，或到「專案管理」重新連接。'};if(st.neverBackedUp)return {tone:'warn',head:'還沒有備份到 GitHub',sub:'第一次備份會把專案推送到你的私人 GitHub。'};if(st.pendingFiles>0)return {tone:'warn',head:`有 ${st.pendingFiles} 個檔案還沒備份`,sub:'備份會先列出這些檔案，你確認後才推送。'};if(st.unpushedCommits>0)return {tone:'warn',head:`有 ${st.unpushedCommits} 個提交還沒推送`,sub:'例如專案更新；備份時會一起推送。'};return {tone:'ok',head:'已經是最新的備份',sub:'這台電腦的內容都已經在你的私人 GitHub。'};}
+  function backupWords(st){if(!st)return {tone:'muted',head:'無法讀取備份狀態',sub:'請確認專案資料夾還在，或到「專案管理」重新連接。'};if(st.error)return {tone:'warn',head:'無法讀取備份狀態',sub:st.error};if(st.neverBackedUp)return {tone:'warn',head:'還沒有備份到 GitHub',sub:'第一次備份會把專案推送到你的私人 GitHub。'};if(st.pendingFiles>0)return {tone:'warn',head:`有 ${st.pendingFiles} 個檔案還沒備份`,sub:'備份會先列出這些檔案，你確認後才推送。'};if(st.unpushedCommits>0)return {tone:'warn',head:`有 ${st.unpushedCommits} 個提交還沒推送`,sub:'例如專案更新；備份時會一起推送。'};return {tone:'ok',head:'已經是最新的備份',sub:'這台電腦的內容都已經在你的私人 GitHub。'};}
   function setStatus(prefix,{tone,head,sub}){$(prefix+'-dot').dataset.tone=tone;$(prefix+'-headline').textContent=head;$(prefix+'-sub').textContent=sub;}
   window.renderSync=async()=>{
     if(!window.travelDesktop||$('setting-sync').hidden)return;
     const request=++syncRequest,tab=ui.syncTab,real=selected&&!selected.demo?selected.trip:null;
-    let overview=null;try{overview=(await api('sync-overview',{slug:real?.slug})).overview;}catch{}
+    let overview=null,overviewError=null;try{overview=(await api('sync-overview',{slug:real?.slug})).overview;}catch(e){overviewError=e.message||'讀取時發生未預期的錯誤。';}
     if(request!==syncRequest)return;
+    if(overviewError){$('sync-trip-select').replaceChildren(el('option','無法讀取'));$('sync-trip-select').disabled=true;for(const kind of ['backup','publish'])setStatus(kind,{tone:'warn',head:'無法讀取目前狀態',sub:overviewError});return;}
     const menu=$('sync-trip-select');menu.replaceChildren();
     if(!project||!overview){menu.append(el('option','尚未連接專案'));menu.disabled=true;setStatus('backup',{tone:'muted',head:'尚未連接私人專案',sub:'先到「專案管理」連接或建立專案。'});setStatus('publish',{tone:'muted',head:'尚未連接私人專案',sub:''});return;}
     menu.disabled=false;
@@ -345,12 +348,13 @@
     const checklist=$('publish-checklist');checklist.replaceChildren();$('publish-open-site').hidden=true;
     if(!real){setStatus('publish',{tone:'muted',head:'請先選擇一趟旅程',sub:'網站是一趟旅程一個網址。'});$('publish-prepare').disabled=true;return;}
     $('publish-prepare').disabled=false;
-    const cf=await api('auth-status',{provider:'cloudflare'}).then(r=>r.auth.connected).catch(()=>false);if(request!==syncRequest)return;
+    const cf=await api('auth-status',{provider:'cloudflare'}).then(r=>r.auth.connected).catch(()=>null);if(request!==syncRequest)return;
     const site=overview.site;
-    if(site?.url){setStatus('publish',{tone:'ok',head:'網站已上線',sub:`${site.url.replace(/^https:\/\//,'')} · 上次發布 ${syncDate(site.publishedAt)}${site.source==='cli'?'（之前用終端機發布）':''}`});$('publish-open-site').hidden=false;$('publish-open-site').onclick=()=>api('open-link',{url:site.url}).catch(e=>notify(e.message));}
+    if(site?.error)setStatus('publish',{tone:'warn',head:'無法讀取網站狀態',sub:site.error});
+    else if(site?.url){setStatus('publish',{tone:'ok',head:'網站已上線',sub:`${site.url.replace(/^https:\/\//,'')} · 上次發布 ${syncDate(site.publishedAt)}${site.source==='cli'?'（之前用終端機發布）':''}`});$('publish-open-site').hidden=false;$('publish-open-site').onclick=()=>api('open-link',{url:site.url}).catch(e=>notify(e.message));}
     else setStatus('publish',{tone:'muted',head:'這趟旅程還沒有網站',sub:'第一次發布前，先完成下面的步驟。'});
     const step=(done,text,action)=>{const row=el('div',undefined,'sync-step');row.dataset.done=String(done);row.append(el('span',done?'✓':'','sync-step-mark'),el('span',text));if(!done&&action)row.append(action);checklist.append(row);};
-    step(cf,cf?'Cloudflare 已連接':'連接 Cloudflare（免費帳號，在瀏覽器登入一次）',cf?null:button('連接 Cloudflare',()=>$('cloudflare-connect').click()));
+    step(cf===true,cf===true?'Cloudflare 已連接':cf===null?'無法確認 Cloudflare 連線，按「發布網站…」時會再檢查一次':'連接 Cloudflare（免費帳號，在瀏覽器登入一次）',cf===false?button('連接 Cloudflare',()=>$('cloudflare-connect').click()):null);
     step(overview.previewSeen,overview.previewSeen?'已在右側預覽看過目前版本':'在右側預覽看過目前版本',overview.previewSeen?null:button('打開預覽',()=>{closeSettings();setPreview(true);}));
     // 不停用按鈕：按下時由後端檢查（登入、預覽），缺什麼直接寫在卡片裡。
   };

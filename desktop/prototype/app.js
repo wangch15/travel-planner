@@ -22,6 +22,7 @@ const tripExpanded=new Map();
 let aiBusy = false;
 let savingProposal = false;
 let pendingProposal = null;
+let headerWasHidden = true;
 let proposalBusy=false;
 let modelRequest = 0;
 let draftTimer;
@@ -517,7 +518,9 @@ function updateComposer() {
   // 發布入口只是帶到設定；核對、預覽確認與發布仍在「公開網站」分頁完成。
   $('publish-open').hidden=$('versions-open').hidden;
   $('publish-open').disabled=!ready||aiBusy;
-  if($('versions-open').hidden)$('backup-status').hidden=true;
+  // 離開設定頁等情況，頁首重新出現時要重新判斷備份狀態，不然有改動也看不到「尚未備份」。
+  if($('versions-open').hidden)$('backup-status').hidden=true;else if(headerWasHidden)window.refreshBackupStatus?.();
+  headerWasHidden=$('versions-open').hidden;
   $('ai-day-controls').hidden = !real;
   $('connect-from-chat').hidden = accountState.state === 'connected' || activeProvider === 'gemini';
   const options = realPreview?.summary?.dayOptions || [];
@@ -749,7 +752,7 @@ async function initializeWorkspace() {
       navigation(); renderProject();
       const trip = project?.trips.find(item => item.slug === saved.selectedSlug);
       if (trip) { selectTrip(trip); setPreview(true); }
-      if (saved.warning) notify(saved.warning === 'project-recovery-required' ? '上次的資料保存需要重新核對。可先到設定連接 GitHub，再重新選取原專案；原檔保留。' : saved.warning === 'project-unavailable' ? '上次的專案目前無法讀取，請到設定重新選擇資料夾。' : '連接紀錄無法讀取，原紀錄已保留，請讓 coding agent 協助處理。');
+      if (saved.warning) notify(saved.warning === 'project-recovery-required' ? '上次關閉時有一次保存沒有完成，App 需要重新確認專案。請到「設定 → 專案管理」重新選取原本的專案資料夾；你的檔案都還在。' : saved.warning === 'project-unavailable' ? '上次的專案目前無法讀取，請到設定重新選擇資料夾。' : '連接紀錄無法讀取，原紀錄已保留，請讓 coding agent 協助處理。');
     } catch { notify('無法恢復上次的專案連接，請到設定重新選擇。'); }
   }
   renderTheme();

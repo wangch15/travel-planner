@@ -31,7 +31,7 @@ function fixture(t) {
   const v2 = git(upstream, 'rev-parse', 'HEAD');
   // App 內建的是 v2
   write(app, { 'package.json': '{"version":"1.1.0"}\n', ...trusted('v2') });
-  const service = new ProjectUpdateService({ trustedRoot: app, appCommit: v2, engineVersion: '1.1.0', templatePattern: /.*/ });
+  const service = new ProjectUpdateService({ trustedRoot: app, appCommit: v2, engineVersion: '1.1.0', templateUrl: upstream });
   return { root, upstream, project, app, v2, service };
 }
 
@@ -75,20 +75,23 @@ test('uncommitted engine edits block the update; trip edits do not', async t => 
 test('an upstream change inside a user trip folder is never merged', async t => {
   const { project, upstream, service } = fixture(t);
   write(upstream, { 'trips/my-trip/extra.txt': 'x\n' }); git(upstream, 'add', '-A'); git(upstream, 'commit', '-qm', 'bad');
-  const s = new ProjectUpdateService({ trustedRoot: service.trustedRoot, appCommit: null, engineVersion: '1.1.0', templatePattern: /.*/ });
+  const s = new ProjectUpdateService({ trustedRoot: service.trustedRoot, appCommit: null, engineVersion: '1.1.0', templateUrl: upstream });
   await assert.rejects(s.prepare(project), { code: 'UPDATE_TOUCHES_TRIPS' });
 });
 
 test('a project newer than the App asks for an App update', async t => {
   const { project, app } = fixture(t);
-  const s = new ProjectUpdateService({ trustedRoot: app, engineVersion: '0.9.0', templatePattern: /.*/ });
+  const s = new ProjectUpdateService({ trustedRoot: app, engineVersion: '0.9.0' });
   await assert.rejects(s.prepare(project), { code: 'APP_UPDATE_REQUIRED' });
 });
 
-test('a project without the official upstream is refused', async t => {
-  const { project, app } = fixture(t);
-  const s = new ProjectUpdateService({ trustedRoot: app, engineVersion: '1.1.0' });
-  await assert.rejects(s.prepare(project), { code: 'UPSTREAM_REQUIRED' });
+test('an upstream remote pointing elsewhere is ignored; updates come only from the official template', async t => {
+  const { project, upstream, app, v2, root } = fixture(t);
+  const elsewhere = path.join(root, 'elsewhere'); fs.mkdirSync(elsewhere); git(elsewhere, 'init', '-q');
+  execFileSync('git', ['remote', 'set-url', 'upstream', elsewhere], { cwd: project });
+  const s = new ProjectUpdateService({ trustedRoot: app, appCommit: v2, engineVersion: '1.1.0', templateUrl: upstream });
+  assert.ok((await s.prepare(project)).token);
+  assert.equal(execFileSync('git', ['remote', 'get-url', 'upstream'], { cwd: project, encoding: 'utf8' }).trim(), elsewhere, '不改使用者的 remote');
 });
 
 test('App migrate scripts upgrade an old trip config', t => {

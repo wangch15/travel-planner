@@ -118,7 +118,7 @@ test('create then new trip supports the first private backup to an empty origin 
 });
 test('existing clone identity is previewed and set only on explicit confirmation, without commit or push', async t => {
   const f = await fixture(t), clone = await f.service.prepareClone({ repo: 'sample/private-trip', parentDirectory: f.parentDirectory });
-  const result = await f.service.confirmClone(clone.token); assert.equal(result.identityReady, false); assert.match(result.warning, /提交作者/);
+  const result = await f.service.confirmClone(clone.token); assert.equal(result.identityReady, false); assert.match(result.warning, /備份署名/);
   const config = path.join(result.root, '.git/config'), before = await fs.readFile(config, 'utf8');
   const prepared = await f.service.prepareIdentity(result.root); assert.deepEqual(prepared.author, { name: 'sample', email: '123456+sample@users.noreply.github.com' });
   assert.equal(await fs.readFile(config, 'utf8'), before);
@@ -145,4 +145,14 @@ test('a different existing hooksPath is never overwritten', async t => {
   await f.git(['config', '--local', 'core.hooksPath', 'my-hooks']);
   assert.equal(await f.service.enableTrustedHooks(f.source), false);
   assert.equal((await f.git(['config', 'core.hooksPath'])).stdout.trim(), 'my-hooks');
+});
+test('a trusted hook copied without its executable bit is repaired, a changed one is not', async t => {
+  const f = await fixture(t); const hook = path.join(f.source, '.githooks/pre-push');
+  await fs.chmod(hook, 0o644);
+  assert.equal(await f.service.enableTrustedHooks(f.source), true);
+  assert.ok((await fs.stat(hook)).mode & 0o111, '內容可信時補上執行權限');
+  await f.git(['config', '--local', '--unset', 'core.hooksPath']);
+  await fs.appendFile(hook, '\necho changed\n'); await fs.chmod(hook, 0o644);
+  assert.equal(await f.service.enableTrustedHooks(f.source), false);
+  assert.equal((await fs.stat(hook)).mode & 0o111, 0, '內容不同就不動');
 });
