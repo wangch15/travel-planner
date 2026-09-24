@@ -16,3 +16,13 @@ test('local backup status: never pushed, pending trip files, unpushed commits',a
   assert.equal((await backup.localStatus(work,'a')).unpushedCommits,1);
   await assert.rejects(backup.localStatus(work,'../x'),{code:'INVALID_TARGET'});
 });
+
+test('all-trips status counts every trip folder but not the template example',async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'backup-all-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  git(root,'init','-q');for(const d of ['trips/a','trips/b','trips/_example'])fs.mkdirSync(path.join(root,d),{recursive:true});
+  for(const f of ['trips/a/data.js','trips/b/data.js','trips/_example/data.js'])fs.writeFileSync(path.join(root,f),'1');git(root,'add','-A');git(root,'commit','-qm','one');
+  for(const f of ['trips/a/data.js','trips/b/data.js','trips/_example/data.js'])fs.writeFileSync(path.join(root,f),'2');fs.writeFileSync(path.join(root,'trips/_profile.md'),'x');
+  const backup=new BackupService();
+  assert.equal((await backup.localStatus(root,'*')).pendingFiles,3);
+  assert.equal((await backup.localStatus(root,'a')).pendingFiles,1);
+});

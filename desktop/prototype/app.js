@@ -154,7 +154,7 @@ function openSettings(section = ui.setting) {
   $('workbench').hidden = true;
   $('settings').hidden = false;
   $('preview-toggle').hidden = true;
-  $('versions-open').hidden=true;
+  $('versions-open').hidden=true;$('publish-open').hidden=true;$('backup-status').hidden=true;
   document.querySelector('.chat-heading').hidden=true;
   $('settings-heading').hidden=false;closeActionMenu(false);
   settingTab(section,false);

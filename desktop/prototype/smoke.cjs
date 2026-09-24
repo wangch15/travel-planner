@@ -34,7 +34,10 @@ async function capture(name) {
     const r = frame.getBoundingClientRect();
     return { x:r.x, y:r.y, width:r.width, height:r.height, viewport:innerWidth, dark:document.documentElement.dataset.theme === 'dark' };
   })()`);
-  for (let attempt = 0; attempt < 30; attempt++) {
+  // 背景執行時視窗不顯示，可能晚一點才重繪：每次先要求重繪，最多等 5 秒。
+  win.webContents.setBackgroundThrottling(false);
+  for (let attempt = 0; attempt < 100; attempt++) {
+    win.webContents.invalidate();
     const buffer = (await win.webContents.capturePage()).toPNG();
     let painted = !bounds;
     if (bounds) {

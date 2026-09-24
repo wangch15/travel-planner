@@ -86,6 +86,13 @@ class PublishingService {
       return { connected: true, accounts, selectedAccountId: this.selectedAccount || this.env.CLOUDFLARE_ACCOUNT_ID || this.env.CF_ACCOUNT_ID || null };
     } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
   }
+  // 不連網的網站狀態：App 自己的發布紀錄優先，沒有的話看專案裡 CLI 留下的紀錄（.local/deployments）。
+  async status({ root, slug }) {
+    if (!path.isAbsolute(root) || !/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug)) throw fail('INVALID_TARGET');
+    const canonicalRoot = await fsp.realpath(root);
+    const read = async (file, source) => { try { const stat = await fsp.lstat(file); if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 65536) return null; const state = JSON.parse(await fsp.readFile(file, 'utf8')); return typeof state?.url === 'string' && /^https:\/\//.test(state.url) ? { url: state.url, publishedAt: stat.mtime.toISOString(), source } : null; } catch { return null; } };
+    return await read(path.join(this.directory, hash(canonicalRoot), `${slug}.json`), 'app') || await read(path.join(canonicalRoot, '.local', 'deployments', `${slug}.json`), 'cli') || { url: null, publishedAt: null, source: null };
+  }
   async target({ root, slug }) {
     if (!path.isAbsolute(root) || !/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug)) throw fail('INVALID_TARGET');
     const canonicalRoot = await fsp.realpath(root);

@@ -650,7 +650,13 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   feature('cloudflare-account',async input=>publisher.setAccount(input.id||null),{exclusive:true});
   feature('git-identity-prepare',async()=>{if(!currentProject)throw Object.assign(Error('NO_PROJECT'),{code:'NO_PROJECT'});return {preparation:await projectSetup.prepareIdentity(currentProject.root)};},{exclusive:true});
   feature('git-identity-confirm',async input=>({result:await projectSetup.confirmIdentity(input.token)}),{exclusive:true});
-  feature('backup-prepare',async input=>({preparation:await backup.prepare(selectedTarget(input))}),{exclusive:true});
+  // scope all：所有旅程一起備份；否則只備份目前這趟。
+  feature('backup-prepare',async input=>({preparation:await backup.prepare(input?.scope==='all'?(()=>{if(!currentProject)throw Error('PROJECT_REQUIRED');return {root:currentProject.root,slug:'*'};})():selectedTarget(input))}),{exclusive:true});
+  // 「備份與發布」頁用：每趟的本機備份狀態、全部旅程的狀態，以及目前這趟的網站與預覽狀態。都不連網。
+  feature('sync-overview',async input=>{if(!currentProject)return {overview:null};const root=currentProject.root,safe=async run=>{try{return await run();}catch{return null;}};
+    const trips=await Promise.all(currentProject.trips.map(async t=>({slug:t.slug,title:t.title,dates:t.dates||null,backup:await safe(()=>backup.localStatus(root,t.slug))})));
+    const slug=input?.slug&&currentProject.trips.some(t=>t.slug===input.slug)?input.slug:null;
+    return {overview:{trips,all:await safe(()=>backup.localStatus(root,'*')),project:await safe(()=>backup.localStatus(root,null)),site:slug?await safe(()=>publisher.status({root,slug})):null,previewSeen:Boolean(slug&&slug===activeSlug&&artifact&&previewSeenURL===artifact.url)}};});
   feature('backup-confirm',async input=>({result:await backup.confirm(input.token)}),{exclusive:true});
   // 專案層級備份：還沒有旅程、或只有引擎更新時，也能推送到私人 GitHub。
   feature('backup-project-prepare',async()=>{if(!currentProject)throw Error('PROJECT_REQUIRED');return {preparation:await backup.prepare({root:currentProject.root,slug:null})};},{exclusive:true});
