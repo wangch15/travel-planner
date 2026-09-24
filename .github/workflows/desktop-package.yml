@@ -1,0 +1,32 @@
+name: Desktop Windows package
+
+# 手動觸發：在 GitHub 的 Windows 機器上打包免安裝 ZIP，下載後給使用者試用。
+# 未簽章、不發布 release；產物只放在這次執行的 Artifacts。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-portable:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --workspaces --include-workspace-root
+      - name: Build portable ZIP
+        run: powershell -ExecutionPolicy Bypass -File desktop/prototype/distribution/build-windows.ps1
+      - name: Launch packaged app with disposable state
+        run: node desktop/prototype/distribution/smoke.cjs '.local/distribution/Travel Planner-win-x64'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: travel-planner-windows-x64
+          path: |
+            .local/distribution/TravelPlanner-*-windows-*.zip
+            .local/distribution/TravelPlanner-*-windows-*.zip.sha256
+          if-no-files-found: error
+          retention-days: 30

@@ -15,30 +15,43 @@ test('Codex and Claude commands remain detectable when --version is unavailable 
  for(const id of ['codex','claude']){const item=tools.find(tool=>tool.id===id);assert.equal(item.status,'ready');assert.equal(item.version,null);assert.equal(item.requiredVersion,null);}
 });
 test('installed Codex and Claude versions are diagnostic only, while legacy Gemini remains guarded',async t=>{const outputs={claude:'2.1.280 (Claude Code)',gemini:'0.60.0',codex:'codex-cli 0.156.3',node:'v24.16.0',git:'git version 2.50.0',gh:'gh version 2.100.0',wrangler:'4.135.0'};const {service}=await fixture(t,{run:async command=>({stdout:outputs[command]})});service.resolveCommand=async id=>({command:id,args:[],env:{},source:'system'});const tools=(await service.inspect()).tools;assert.equal(tools.find(t=>t.id==='claude').requiredVersion,null);assert.equal(tools.find(t=>t.id==='claude').status,'ready');assert.equal(tools.find(t=>t.id==='codex').version,'0.156.3');assert.equal(tools.find(t=>t.id==='codex').requiredVersion,null);assert.equal(tools.find(t=>t.id==='gemini').requiredVersion,'0.46.0');assert.equal(tools.find(t=>t.id==='gemini').status,'unsupported');assert.equal(tools.find(t=>t.id==='codex').status,'ready');});
-function nodeDownloads(corrupt=false){const bytes=Buffer.from('official node archive'),digest=createHash('sha256').update(bytes).digest('hex');const name='node-v24.9.0-darwin-arm64.tar.gz';const seen=[];const fn=async url=>{seen.push(url);if(url==='https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt')return Buffer.from('0000  node-v24.9.0-darwin-x64.tar.gz\n'+digest+'  '+name+'\n');if(url==='https://nodejs.org/dist/v24.9.0/'+name)return corrupt?Buffer.from('tampered'):bytes;throw Error('unexpected '+url);};fn.seen=seen;return fn;}
-function nodeFixture(root,calls){return {platform:'darwin',arch:'arm64',env:{PATH:'/usr/bin:/bin'},
-  extract:async(_archive,destination)=>{const base=path.join(destination,'node-v24.9.0-darwin-arm64');await fs.mkdir(path.join(base,'bin'),{recursive:true});await fs.writeFile(path.join(base,'bin','node'),'node-binary');await fs.mkdir(path.join(base,'lib/node_modules/npm/bin'),{recursive:true});await fs.writeFile(path.join(base,'lib/node_modules/npm/bin/npm-cli.js'),'cli');},
-  run:async(command,args=[],options={})=>{calls.push({command,args,options});if(command===process.execPath)return {stdout:'4.135.0'};if(command.endsWith(path.join('bin','node'))&&args[0]==='--version')return {stdout:'v24.9.0'};if(command.endsWith(path.join('bin','node'))&&args.includes('install')){const bin=path.join(root,'tools/npm/node_modules/.bin');await fs.mkdir(bin,{recursive:true});await fs.writeFile(path.join(bin,'codex'),'#!/usr/bin/env node');return {stdout:'added 2 packages'};}if(command.endsWith(path.join('.bin','codex')))return {stdout:'codex-cli 0.156.1'};throw Object.assign(Error('missing'),{code:'ENOENT'});}};}
+// Follow the host platform: path.join and absolute paths must match the simulated OS.
+const NODE_PLATFORM=process.platform==='win32'?'win32':'darwin';
+const NODE_NAME=NODE_PLATFORM==='win32'?'node-v24.9.0-win-arm64.zip':'node-v24.9.0-darwin-arm64.tar.gz';
+const NODE_DIR=path.join('tools/node','24.9.0-'+NODE_PLATFORM+'-arm64');
+const NODE_BIN=NODE_PLATFORM==='win32'?NODE_DIR:path.join(NODE_DIR,'bin');
+const NODE_EXE=NODE_PLATFORM==='win32'?'node.exe':'node';
+const NPM_CLI=path.join(NODE_DIR,NODE_PLATFORM==='win32'?'node_modules/npm/bin/npm-cli.js':'lib/node_modules/npm/bin/npm-cli.js');
+const CODEX_SCRIPT=path.join('tools/npm/node_modules/@openai/codex/bin/codex.js');
+function nodeDownloads(corrupt=false){const bytes=Buffer.from('official node archive'),digest=createHash('sha256').update(bytes).digest('hex');const seen=[];const fn=async url=>{seen.push(url);if(url==='https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt')return Buffer.from('0000  node-v24.9.0-darwin-x64.tar.gz\n0000  node-v24.9.0-win-x64.zip\n'+digest+'  '+NODE_NAME+'\n');if(url==='https://nodejs.org/dist/v24.9.0/'+NODE_NAME)return corrupt?Buffer.from('tampered'):bytes;throw Error('unexpected '+url);};fn.seen=seen;return fn;}
+function nodeFixture(root,calls){const delimiter=NODE_PLATFORM==='win32'?';':':';return {platform:NODE_PLATFORM,arch:'arm64',env:{PATH:NODE_PLATFORM==='win32'?'':'/usr/bin:/bin'},
+  extract:async(_archive,destination)=>{const base=path.join(destination,NODE_NAME.replace(/\.(tar\.gz|zip)$/,''));const bin=NODE_PLATFORM==='win32'?base:path.join(base,'bin');await fs.mkdir(bin,{recursive:true});await fs.writeFile(path.join(bin,NODE_EXE),'node-binary');const cli=path.join(base,NODE_PLATFORM==='win32'?'node_modules/npm/bin':'lib/node_modules/npm/bin');await fs.mkdir(cli,{recursive:true});await fs.writeFile(path.join(cli,'npm-cli.js'),'cli');},
+  run:async(command,args=[],options={})=>{calls.push({command,args,options});if(command===process.execPath)return {stdout:'4.135.0'};const isNode=command.endsWith(path.join(NODE_PLATFORM==='win32'?'':'bin',NODE_EXE));
+    if(isNode&&args[0]==='--version')return {stdout:'v24.9.0'};
+    if(isNode&&args.includes('install')){if(NODE_PLATFORM==='win32'){const script=path.join(root,CODEX_SCRIPT);await fs.mkdir(path.dirname(script),{recursive:true});await fs.writeFile(script,'// codex');}else{const bin=path.join(root,'tools/npm/node_modules/.bin');await fs.mkdir(bin,{recursive:true});await fs.writeFile(path.join(bin,'codex'),'#!/usr/bin/env node');}return {stdout:'added 2 packages'};}
+    if(command.endsWith(path.join('.bin','codex'))||isNode&&args[0]===path.join(root,CODEX_SCRIPT))return {stdout:'codex-cli 0.156.1'};
+    throw Object.assign(Error('missing'),{code:'ENOENT'});},delimiter};}
 
 test('Codex installs in the background with an App-downloaded, checksum-verified Node.js — no Homebrew or terminal',async t=>{
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'tool-node-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));const calls=[],terminal=[];const download=nodeDownloads();
-  const service=new ToolSupport(root,{...nodeFixture(root,calls),home:path.join(root,'home'),download,openTerminal:async v=>{terminal.push(v);}});service.systemNode=async()=>null;
+  const {delimiter,...options}=nodeFixture(root,calls);
+  const service=new ToolSupport(root,{...options,home:path.join(root,'home'),download,openTerminal:async v=>{terminal.push(v);}});service.systemNode=async()=>null;
   const plan=await service.prepare('codex');
   assert.equal(plan.method,'managed-npm');assert.doesNotMatch(plan.commandPreview+plan.steps.join(''),/brew|Homebrew|sudo/);assert.match(plan.commandPreview,/@openai\/codex\b/);
   const result=await service.install(plan.token,{confirmed:true});
   assert.equal(result.state,'installed');assert.equal(result.toolStatus.status,'ready');assert.equal(terminal.length,0);
   const install=calls.find(c=>c.args.includes('install'));
-  assert.equal(install.args[0],path.join(root,'tools/node/24.9.0-darwin-arm64/lib/node_modules/npm/bin/npm-cli.js'));
+  assert.equal(install.args[0],path.join(root,NPM_CLI));
   assert.ok(install.args.includes('@openai/codex'));assert.ok(install.args.includes('--prefix'));assert.equal(install.options.cwd,path.join(root,'tools/npm'));
-  assert.ok(install.options.env.PATH.startsWith(path.join(root,'tools/node/24.9.0-darwin-arm64/bin')));
-  assert.deepEqual(download.seen,['https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt','https://nodejs.org/dist/v24.9.0/node-v24.9.0-darwin-arm64.tar.gz']);
-  assert.ok((await service.environment()).PATH.split(':').includes(path.join(root,'tools/node/24.9.0-darwin-arm64/bin')));
+  assert.ok(install.options.env.PATH.startsWith(path.join(root,NODE_BIN)));
+  assert.deepEqual(download.seen,['https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt','https://nodejs.org/dist/v24.9.0/'+NODE_NAME]);
+  assert.ok((await service.environment()).PATH.split(delimiter).includes(path.join(root,NODE_BIN)));
   const node=(await service.prepare('node'));assert.equal(node.method,'managed-node');
 });
 
 test('a tampered Node.js download is never extracted, and Codex is not reported installed',async t=>{
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'tool-node-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));const calls=[];
-  const service=new ToolSupport(root,{...nodeFixture(root,calls),home:path.join(root,'home'),download:nodeDownloads(true),extract:async()=>{throw Error('must not extract');}});service.systemNode=async()=>null;
+  const {delimiter:_d,...options}=nodeFixture(root,calls);const service=new ToolSupport(root,{...options,home:path.join(root,'home'),download:nodeDownloads(true),extract:async()=>{throw Error('must not extract');}});service.systemNode=async()=>null;
   const plan=await service.prepare('codex');
   await assert.rejects(service.install(plan.token,{confirmed:true}),{code:'TOOL_CHECKSUM_MISMATCH'});
   assert.equal(calls.some(c=>c.args.includes('install')),false);
