@@ -41,6 +41,10 @@ async function waitForOperations(){while(activeOperations.size)await Promise.all
 const APP_URL = 'travel-app://prototype/index.html';
 protocol.registerSchemesAsPrivileged(['travel-app', 'travel-preview'].map(scheme => ({ scheme, privileges: { standard: true, secure: true, supportFetchAPI: true } })));
 app.setName('Travel Planner');
+// 測試（smoke 直接以自己的檔案當入口，或設定 TRAVEL_PLANNER_BACKGROUND=1）在背景跑：
+// 不出現在 Dock、不顯示視窗，也就不會搶走開發者正在用的視窗焦點。
+const backgroundRun = process.env.TRAVEL_PLANNER_BACKGROUND === '1' || !/[\\/]boot\.cjs$/.test(require.main?.filename || '');
+if (backgroundRun && process.platform === 'darwin') app.setActivationPolicy?.('accessory');
 const bundledApp=()=>{const rel=path.relative(path.join(process.resourcesPath,'app'),__dirname);return rel!==''&&!rel.startsWith('..')&&!path.isAbsolute(rel);};
 // 安裝版與從原始碼執行的開發版各用各的資料夾：專案連接、對話與 App 專屬的 AI 登入互不影響。
 app.setPath('userData', process.env.TRAVEL_PLANNER_STATE_DIR || path.join(app.getPath('appData'), bundledApp() ? 'Travel Planner' : 'travel-planner-prototype'));
@@ -103,6 +107,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     });
   });
   const win = new BrowserWindow({
+    show: !backgroundRun,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
     ...(process.platform === 'darwin' ? { trafficLightPosition: { x:18, y:20 } } : {titleBarOverlay:{height:56}}),
     width: 1380, height: 900, minWidth: 860, minHeight: 640,
