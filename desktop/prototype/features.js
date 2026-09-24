@@ -19,9 +19,12 @@
   function useConversation(result){if(result.conversation&&selected){applyConversation(result.conversation,selected.trip);if(accountState.state==='disconnected')restoreAIConnection();}}
   async function reloadProject(result){const changed=project?.projectId!==result.project.projectId;if(changed){clearTimeout(draftTimer);selected=null;window.onFeatureTrip?.();$('welcome').hidden=false;$('messages').hidden=true;$('messages').replaceChildren();$('message').value='';$('trip-title').textContent='選擇一趟旅程';$('trip-status').textContent='已切換專案';}project=result.project;pendingProposal=null;materializedCandidate=false;realPreview=null;navigation();renderProject();updateComposer();if(changed)renderPreview();const trip=project.trips.find(t=>t.slug===result.selectedSlug);if(trip){await selectTrip(trip);setPreview(true);}}
   async function changeConversation(actionName,extra={}){
-    if(aiBusy||pendingProposal||materializedCandidate)return;
+    if(aiBusy||pendingProposal||materializedCandidate){notify('請先停止 AI 工作，或確認／放棄目前的提案，再操作對話。');return;}
+    const archiving=actionName==='conversation-archive'&&extra.archived!==false,archivedTitle=archiving?conversationItems.find(c=>c.id===extra.id)?.title||'這段對話':null,wasCurrent=extra.id===currentConversation;
     aiBusy=true;proposalBusy=true;updateComposer();
-    try{if(!await flushConversationDraft())return;useConversation(await api(actionName,{...target(),...extra}));await loadConversations();}
+    try{if(!await flushConversationDraft())return;useConversation(await api(actionName,{...target(),...extra}));await loadConversations();
+      // 封存目前對話會自動換成一段新的討論，畫面看起來像沒變化，所以明確告知。
+      if(archiving)notify('已封存「'+archivedTitle+'」'+(wasCurrent?'，並開始一段新的討論':'')+'。可從對話清單的「⋯ → 顯示已封存對話」找回。');}
     catch(e){notify(e.message);}finally{aiBusy=false;proposalBusy=false;updateComposer();}
   }
   async function loadConversations(){if(!selected||selected.demo||!window.travelDesktop)return;const request=++conversationRequest;const result=await api('conversations-list',target());if(request!==conversationRequest)return;conversationItems=result.items;currentConversation=result.currentId;navigation();}
@@ -159,6 +162,8 @@
     if(!busy&&elapsedTimer){clearInterval(elapsedTimer);elapsedTimer=null;}
   };
   window.acceptFeatureResult=result=>{
+    // AI 可能替預設名稱的對話取了新名字，側欄清單要跟著更新。
+    if(result.conversation)loadConversations().catch(()=>{});
     if(result.research){featureState.research=result.research;$('show-research').hidden=false;}
     if(result.proposal?.materialization){materializedCandidate=true;viewedPreviewURL=null;realPreview={status:'ready',planning:false,url:result.proposal.previewUrl,summary:result.proposal.previewSummary};setPreview(true);renderPreview();$('confirm-materialization').disabled=true;}
     renderJob();renderPlan();

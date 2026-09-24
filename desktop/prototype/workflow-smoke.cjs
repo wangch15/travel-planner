@@ -37,7 +37,7 @@ app.whenReady().then(async()=>{
       await onThread(thread?.id || "fake-thread");
       if(cancelNext)throw Object.assign(Error('AI_CANCELED'),{code:'AI_CANCELED'});
       generated.push({dayId,model,threadId:thread?.id||null});
-      if(dayId===null)return {summary:"整體建議：每天保留一段自由活動時間。這輪沒有修改行程。",discussion:true,model,threadId:"fake-thread",turnId:"fake-turn-1"};
+      if(dayId===null)return {summary:"整體建議：每天保留一段自由活動時間。這輪沒有修改行程。",conversationTitle:"整體節奏調整",discussion:true,model,threadId:"fake-thread",turnId:"fake-turn-1"};
       onProgress('正在測試提案流程…');
       const day=parseLiteralModule(snapshot.dataSource).DAYS.find(day=>day.id===dayId);
       return {summary:'將這一天的標題改成「悠閒出發」。',replacementDay:{...day,title:'悠閒出發'},model:'fake-model',threadId:'fake-thread',turnId:'fake-turn-2'};
@@ -72,6 +72,8 @@ app.whenReady().then(async()=>{
   assert.equal(await win.webContents.executeJavaScript('document.getElementById("edit-day").value'),'');
   await win.webContents.executeJavaScript('document.getElementById("chat-model").value="other-model";document.getElementById("chat-model").dispatchEvent(new Event("change"));document.getElementById("message").value="希望整趟行程更輕鬆";document.getElementById("chat-form").requestSubmit()');
   await waitFor('document.getElementById("messages").textContent.includes("整體建議") && !document.getElementById("message").disabled');
+  // 預設名稱的對話採用 AI 取的名字，標題列與側欄都更新。
+  await waitFor('document.getElementById("conversation-title").textContent==="整體節奏調整" && document.getElementById("conversation-list").textContent.includes("整體節奏調整")');
   assert.deepEqual(generated[0],{dayId:null,model:'other-model',threadId:null});
   assert.equal(await win.webContents.executeJavaScript('document.getElementById("codex-model").value'),'other-model');
   assert.equal(await win.webContents.executeJavaScript('document.getElementById("proposal-review").hidden'),true);

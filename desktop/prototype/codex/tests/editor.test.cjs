@@ -60,7 +60,7 @@ test('whole-trip discussion sends all raw days with only referenced place descri
   assert.deepEqual(sent.places,{first:{name:'First',cat:'sight',note:'Known note'},second:{name:'Second',cat:'stay'},alternate:{name:'Alternate',cat:'sight'},another:{name:'Another',cat:'food'}});
   assert.equal(JSON.stringify(sent).includes('PRIVATE_ADDRESS'),false);
   assert.equal(JSON.stringify(sent).includes('EXCLUDED_TOKEN'),false);
-  assert.deepEqual(schema,{type:'object',additionalProperties:false,properties:{summary:{type:'string'}},required:['summary']});
+  assert.deepEqual(schema,{type:'object',additionalProperties:false,properties:{summary:{type:'string'},conversationTitle:{type:'string'}},required:['summary','conversationTitle']});
   assert.match(instructions,/整趟/);
   assert.match(instructions,/不可.*(?:修改|保存)/);
   assert.deepEqual(result,{summary:'建議每天留一段休息時間。',discussion:true,threadId:'thread',turnId:'turn',model:'server-model'});
@@ -240,4 +240,13 @@ test('automatic effort explicitly restores the advertised model default after a 
  const f=fixture();f.editor.account.models=async()=>[{id:'server-model',isDefault:true,effort:['low','medium','high'],defaultEffort:'medium'}];const original=f.transport.request,sent=[];
  f.transport.request=async(method,params)=>{if(method==='turn/start')sent.push(params.effort);if(method==='thread/read')return {thread:{id:'thread',cwd:'/fake',modelProvider:'openai',status:{type:'idle'},turns:[{id:'turn',status:'completed'}]}};if(method==='thread/resume')return {thread:{id:'thread',status:{type:'idle'}},modelProvider:'openai',approvalPolicy:'never'};return original(method,params);};
  await f.editor.generate({snapshot:f.snapshot,dayId:1,text:'First',effort:'high'});await f.editor.generate({snapshot:f.snapshot,dayId:1,text:'Next',thread:{id:'thread',lastTurnId:'turn'}});assert.deepEqual(sent,['high','medium']);
+});
+
+test('conversationTitle is optional, cleaned and never mixed into the answer payload',()=>{
+  const {decodeAnswer}=require('../editor.cjs');
+  const titled=decodeAnswer(JSON.stringify({summary:'好',conversationTitle:'「仙台第三天午餐調整」。'}),{mode:'discussion'});
+  assert.equal(titled.conversationTitle,'仙台第三天午餐調整');assert.equal(titled.discussion,true);
+  assert.equal(decodeAnswer(JSON.stringify({summary:'好'}),{mode:'discussion'}).conversationTitle,undefined);
+  assert.equal(decodeAnswer(JSON.stringify({summary:'好',conversationTitle:'x'.repeat(41)}),{mode:'discussion'}).conversationTitle,undefined);
+  assert.throws(()=>decodeAnswer(JSON.stringify({summary:'好',conversationTitle:3}),{mode:'discussion'}),{code:'AI_OUTPUT_INVALID'});
 });

@@ -7,6 +7,12 @@
 開發中的 commit 不升版，未打包執行時側欄顯示 `vX.Y.Z-dev`。版號只維護在 `desktop/prototype/package.json`（與 root lockfile 對應欄位），側欄品牌後方與「關於」頁都從這裡讀。
 發布放在 GitHub release `desktop-vX.Y.Z`，App 內「檢查新版本」只認這個格式。網頁引擎版號另計（root `package.json` + `CHANGELOG.md`）。
 
+## 對話自動命名與封存提示（開發中）
+
+- Codex app-server 與 Claude `-p` 都不會替 App 的對話自動命名（實查 App 的 Codex profile，threads.name 全是空的；Codex 只在自己的介面命名）。所以每種回覆 schema 多一個 `conversationTitle`，由 AI 用 4–16 字替整段對話取名。名稱仍是「新的討論／旅程討論」且使用者沒改過時才採用；之後不再改名。使用者用「命名對話」改過的名稱記為 `conversationTitleCustom`，封存與切換都會保留，AI 不會覆蓋。缺少或格式不對的名稱會被忽略，不影響回覆本身。
+- 封存目前的對話會自動換成一段新的討論，畫面看起來像沒反應；現在會提示「已封存「…」，並開始一段新的討論」，並告知可從「⋯ → 顯示已封存對話」找回。
+- 驗證：單元測試（名稱清理、只取代預設名稱、使用者命名不被覆蓋）；workflow smoke 以假模型驗證標題列與側欄更新；batch smoke 驗證封存提示。**尚未用真實 Codex／Claude 回覆驗證實際取名品質。**
+
 ## 資料分開與重置（0.3.0）
 
 - **安裝版與開發版各用各的資料夾**：安裝版在 `~/Library/Application Support/Travel Planner`（Windows 為 `%APPDATA%\Travel Planner`），從原始碼執行仍用 `travel-planner-prototype`。專案連接、對話、版本紀錄與 App 專屬的 Codex／Claude 登入互不影響；`TRAVEL_PLANNER_STATE_DIR` 仍可覆寫。GitHub 與 Cloudflare 用的是這台電腦的登入（和終端機共用），兩邊一樣。
