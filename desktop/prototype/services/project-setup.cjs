@@ -176,6 +176,13 @@ class ProjectSetupService {
     }
     await this.git(['read-tree', 'HEAD'], { cwd: pending.destination }); await verify(owned); await verify(gitDir); return owned;
   }
+  // 備份前補裝：之後才連接的專案（或下載當時保護程式版本不同）沒有啟用保護。只在完全沒有 hooksPath 時才設，
+  // 已經設成別的值就不覆蓋（跟 npm install 的 prepare 一樣），仍由備份核對擋下。
+  async enableTrustedHooks(root) {
+    const current = await this.git(['config', '--get', 'core.hooksPath'], { cwd: root }).then(out => String(out || '').trim(), () => '');
+    if (current) return current === '.githooks';
+    return this.installTrustedHooks(root);
+  }
   async installTrustedHooks(root) {
     try {
       for (const directory of ['.githooks', '.git/hooks']) {

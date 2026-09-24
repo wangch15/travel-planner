@@ -134,3 +134,15 @@ test('identity confirmation refuses changed account or changed destination befor
   f.state.owner = 'sample'; prepared = await f.service.prepareIdentity(result.root); await f.git(['remote', 'set-url', 'origin', 'https://github.com/sample/changed.git'], result.root); before = await fs.readFile(config, 'utf8');
   confirmed = await f.service.confirmIdentity(prepared.token); assert.equal(confirmed.ready, false); assert.equal(confirmed.code, 'PROJECT_CHANGED'); assert.equal(await fs.readFile(config, 'utf8'), before);
 });
+test('an already connected project gets its trusted backup protection enabled before backing up', async t => {
+  // 以前只有下載／建立專案那一刻會裝；之後才連接的專案備份時只看到「請先完成 Git hook 設定」。
+  const f = await fixture(t);
+  assert.equal(await f.service.enableTrustedHooks(f.source), true);
+  assert.equal((await f.git(['config', 'core.hooksPath'])).stdout.trim(), '.githooks');
+});
+test('a different existing hooksPath is never overwritten', async t => {
+  const f = await fixture(t);
+  await f.git(['config', '--local', 'core.hooksPath', 'my-hooks']);
+  assert.equal(await f.service.enableTrustedHooks(f.source), false);
+  assert.equal((await f.git(['config', 'core.hooksPath'])).stdout.trim(), 'my-hooks');
+});
