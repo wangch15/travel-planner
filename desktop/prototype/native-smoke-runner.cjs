@@ -8,7 +8,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 
 const allowed = new Set(['updater-smoke.cjs', 'navigation-smoke.cjs', 'settings-smoke.cjs',
-  'session-settings-smoke.cjs', 'menu-smoke.cjs']);
+  'session-settings-smoke.cjs', 'menu-smoke.cjs', 'onboarding-smoke.cjs']);
 const script = process.argv[2];
 if (!allowed.has(script)) throw Error('Unknown native smoke test');
 

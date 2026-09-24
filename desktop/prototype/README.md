@@ -7,6 +7,17 @@
 開發中的 commit 不升版，未打包執行時側欄顯示 `vX.Y.Z-dev`。版號只維護在 `desktop/prototype/package.json`（與 root lockfile 對應欄位），側欄品牌後方與「關於」頁都從這裡讀。
 發布放在 GitHub release `desktop-vX.Y.Z`，App 內「檢查新版本」只認這個格式。網頁引擎版號另計（root `package.json` + `CHANGELOG.md`）。
 
+## 首次引導（開發中，隨下一版發布）
+
+第一次打開 App 就進入「開始前的準備」，一次一步：GitHub → Git → 私人專案 → AI 助手 → Cloudflare（可跳過），最後直接帶著描述打開「新增旅程」。每一步是否完成都由實際狀態判斷（登入、工具、專案），所以關掉 App 再開會從還沒完成的那一步繼續；只有「完成」與「Cloudflare 先跳過」記在 App 設定。已經有專案且 AI 已連接的人直接視為完成，不強迫重走；「關於 → 重新顯示引導」可再打開。
+
+- **GitHub**：沒有 GitHub 工具就先下載官方版本；以一次性代碼在瀏覽器授權，畫面大字顯示代碼。授權失敗或逾時顯示原因與重試。
+- **Git**：Mac 直接叫出 Apple 的「指令列開發者工具」安裝視窗（不開終端機），偵測到安裝完成才繼續；Windows 在背景用 WinGet 安裝。
+- **私人專案**：預設名稱 `travel-planner-trips`（本機或 GitHub 已有同名就改用 `-2`、`-3`…），預設放在「文件／Travel Planner」，可改名稱與位置。建立後立即完成第一次備份並核對遠端。
+- **AI 助手**：Codex 或 Claude 二選一；沒裝就在背景安裝（Claude 改用官方安裝程式背景執行，不再開終端機），登入後設為預設。
+- **Cloudflare**：可跳過；跳過不影響規劃與備份。
+- 驗證：`smoke:onboarding` 用假帳號從頭走到尾；真實環境只截圖驗證偵測與畫面（這台電腦 GitHub／Git 已就緒，直接從私人專案開始）。
+
 ## 備份與專案維護（0.4.0）
 
 - **不必另外安裝 Node.js 也能備份**：備份保護 hook（`.githooks/pre-push`）需要 `node`。App 在自己的資料夾放一個名為 `node` 的小腳本，以 App 內建的執行環境（`ELECTRON_RUN_AS_NODE`）執行 hook，只在 App 自己發起的推送中放進 PATH。已用真實 hook 驗證：PATH 裡沒有 Node 時，hook 仍完成 PRIVATE 查核並放行。

@@ -54,7 +54,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   makeVersions = directory => new VersionStore(directory),
   makeConversations = directory => new ConversationStore(directory),
   makeEditor = account => new CodexEditor(account), makeProposals = directory => new ProposalStore(directory),
-  openLoginURL = url => shell.openExternal(url), copyLoginURL = url => clipboard.writeText(url), openPreviewURL = url => shell.openExternal(url) } = {}) {
+  defaultProjectParentDirectory = null, openLoginURL = url => shell.openExternal(url), copyLoginURL = url => clipboard.writeText(url), openPreviewURL = url => shell.openExternal(url) } = {}) {
   const handle=(channel,fn)=>ipcMain.handle(channel,(...args)=>{if((shuttingDown||windowClosing)&&channel!=='conversation:preferences')throw Error('APP_CLOSING');return tracked(()=>fn(...args));});
   let sendToolProgress=()=>{};const toolSupport=makeToolSupport(stateDirectory,{onProgress:value=>sendToolProgress(value)});await toolSupport.applyEnvironment();
   const store = createProjectStore(stateDirectory);
@@ -456,6 +456,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   feature('conversation-copy',async input=>{const state=await conversations.read(selectedTarget(input));const messages=!input.id||state.conversationId===input.id?state.messages:state.archives?.find(c=>c.id===input.id)?.payload.messages;if(!messages)throw Error('CONVERSATION_NOT_FOUND');clipboard.writeText(messages.map(m=>`${m.role==='user'?'你':'Travel Planner'}：\n${m.text}`).join('\n\n'));return {copied:true};});
   feature('conversation-rename',async input=>{if(typeof input.title!=='string'||!input.title.trim()||input.title.length>80)throw Error('INVALID_INPUT');const state=await conversations.update(selectedTarget(input),s=>{ensureSessions(s);if(s.conversationId===input.id){s.conversationTitle=input.title.trim();s.conversationTitleCustom=true;}else{const c=s.archives.find(c=>c.id===input.id);if(!c)throw Error('CONVERSATION_NOT_FOUND');c.title=input.title.trim();c.titleCustom=true;}});return {conversation:displayConversation(state)};},{exclusive:true});
   feature('conversation-archive',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});const state=await conversations.update(selectedTarget(input),s=>{ensureSessions(s);if(s.conversationId===input.id){stashSession(s,true);freshSession(s,'新的討論');}else{const c=s.archives.find(c=>c.id===input.id);if(!c)throw Error('CONVERSATION_NOT_FOUND');c.archived=input.archived!==false;}});await activateProvider(sessionProvider(state));return {conversation:displayConversation(state)};},{exclusive:true});
+  let pickedProjectParent=null;
   feature('project-setup-prepare',async input=>{
     if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});
     if(!['clone','create'].includes(input.kind))throw Error('INVALID_INPUT');
@@ -464,6 +465,13 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     const preparation=await projectSetup[input.kind==='clone'?'prepareClone':'prepareCreate']({...input,parentDirectory:choice.filePaths[0]});
     return {preparation,kind:input.kind};
   },{exclusive:true});
+  // 首次引導：預設放在「文件／Travel Planner」，使用者可改名稱或位置。
+  const defaultProjectParent=async()=>{const dir=defaultProjectParentDirectory||path.join(app.getPath('documents'),'Travel Planner');await fs.mkdir(dir,{recursive:true});return dir;};
+  feature('onboarding-project-plan',async()=>{if(!pickedProjectParent)pickedProjectParent=await defaultProjectParent();return {suggestion:await projectSetup.suggestCreate({parentDirectory:pickedProjectParent})};});
+  feature('onboarding-project-location',async()=>{const choice=await(pickProjectParent?pickProjectParent():dialog.showOpenDialog(win,{title:'選擇專案存放位置',properties:['openDirectory','createDirectory']}));if(choice.canceled||!choice.filePaths?.length)return {canceled:true};pickedProjectParent=choice.filePaths[0];return {suggestion:await projectSetup.suggestCreate({parentDirectory:pickedProjectParent})};});
+  feature('onboarding-project-prepare',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});if(!pickedProjectParent)pickedProjectParent=await defaultProjectParent();return {preparation:await projectSetup.prepareCreate({name:input.name,parentDirectory:pickedProjectParent}),kind:'create'};},{exclusive:true});
+  feature('onboarding-state',async()=>({onboarding:(await store.read()).state.onboarding||{completed:false,cloudflareSkipped:false}}));
+  feature('onboarding-save',async input=>{await store.setOnboarding({completed:input.completed===true,cloudflareSkipped:input.cloudflareSkipped===true});return {saved:true};});
   feature('project-setup-confirm',async input=>{
     if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});
     if(!['clone','create'].includes(input.kind))throw Error('INVALID_INPUT');

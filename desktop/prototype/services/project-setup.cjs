@@ -120,6 +120,18 @@ class ProjectSetupService {
     } catch (error) { return { ready: false, identityReady: false, root: pending.root, repo: pending.repo, code: error.code || 'IDENTITY_SETUP_FAILED', message: '本機提交作者尚未確認設定完成。全域 Git 設定未更動；請重新核對專案與 GitHub 帳號後再試。' }; }
     finally { this.busy = false; }
   }
+  // 首次引導用：在預設位置找一個本機與 GitHub 都還沒用過的名稱（travel-planner-trips、-2、-3…）。
+  async suggestCreate({ parentDirectory, base = 'travel-planner-trips' }) {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,90}$/.test(base)) throw fail('INVALID_REPOSITORY');
+    const parent = await anchor(parentDirectory), account = await this.authenticatedAuthor(parent.canonical);
+    for (let n = 1; n <= 20; n++) {
+      const name = n === 1 ? base : `${base}-${n}`;
+      if (await fs.lstat(path.join(parent.canonical, name)).then(() => true, () => false)) continue;
+      const taken = await this.gh(['repo', 'view', `${account.owner}/${name}`, '--json', 'name'], { cwd: parent.canonical }).then(r => !r || !r.error && (r.status === undefined || r.status === 0), () => false);
+      if (!taken) return { name, owner: account.owner, parentDirectory: parent.canonical, destination: path.join(parent.canonical, name) };
+    }
+    throw fail('NAME_UNAVAILABLE', '找不到可用的專案名稱，請自行輸入一個。');
+  }
   async prepareCreate({ name, parentDirectory }) {
     if (this.busy) throw fail('PROJECT_SETUP_BUSY');
     if (typeof name !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,99}$/.test(name) || !safePart(name)) throw fail('INVALID_REPOSITORY');

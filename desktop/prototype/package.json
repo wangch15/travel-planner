@@ -21,6 +21,7 @@
     "smoke:updater": "node native-smoke-runner.cjs updater-smoke.cjs",
     "smoke:navigation": "node native-smoke-runner.cjs navigation-smoke.cjs",
     "smoke:menus": "node native-smoke-runner.cjs menu-smoke.cjs",
+    "smoke:onboarding": "node native-smoke-runner.cjs onboarding-smoke.cjs",
     "smoke:settings": "node native-smoke-runner.cjs settings-smoke.cjs",
     "smoke:stop": "electron stop-continuation-smoke.cjs",
     "smoke:session-settings": "node native-smoke-runner.cjs session-settings-smoke.cjs"

@@ -250,7 +250,8 @@ const settingsOpenTrips=new Set();
 function renderSetupChecklist() {
   const list = $('setup-checklist'); if (!list) return;
   const hasProject = Boolean(project && window.travelDesktop), state = accountState?.state, aiReady = state === 'connected';
-  list.hidden = !window.travelDesktop || (hasProject && aiReady); list.replaceChildren();
+  // 桌面版改用完整的首次引導（onboarding.js）；這份清單只在瀏覽器預覽模式保留。
+  list.hidden = true; list.replaceChildren(); if (window.travelDesktop) return;
   const steps = [
     { done: hasProject, title: '連接或建立你的私人專案', hint: '行程資料會存在你自己的私人 GitHub 專案，換電腦也不會不見。', label: '前往專案管理', go: () => openSettings('projects') },
     { done: aiReady, title: '安裝並連接 AI（Codex 或 Claude）', hint: state === 'unavailable' ? '這台電腦還沒有 AI 工具，App 可以幫你下載安裝。' : '用你的 ChatGPT 或 Claude 帳號登入一次。', label: state === 'unavailable' ? '安裝 AI 工具' : '連接 AI', go: () => { openSettings(state === 'unavailable' ? 'tools' : 'ai'); if (state === 'unavailable') window.openToolSetup?.(activeProvider === 'claude' ? 'claude' : 'codex'); } },

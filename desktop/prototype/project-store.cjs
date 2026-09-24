@@ -7,6 +7,7 @@ const providers=['codex','claude','gemini'];
 const defaultsOK=v=>v&&providers.includes(v.provider)&&v.models&&typeof v.models==='object'&&!Array.isArray(v.models)&&Object.entries(v.models).every(([id,model])=>providers.includes(id)&&typeof model==='string'&&model.length<=200)&&(v.effort===undefined||['none','minimal','low','medium','high','xhigh','max'].includes(v.effort));
 const empty = () => ({ schemaVersion: 1, theme: 'system', project: null });
 const slugOK = value => typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,100}$/.test(value);
+const onboardingOK = value => value && typeof value === 'object' && typeof value.completed === 'boolean' && typeof value.cloudflareSkipped === 'boolean';
 const projectOK = value => value && typeof value.id === 'string' && /^[a-zA-Z0-9-]{1,100}$/.test(value.id)
   && typeof value.root === 'string' && path.isAbsolute(value.root) && value.root.length < 4096;
 const sameFile = (a, b) => a.dev === b.dev && a.ino === b.ino;
@@ -57,10 +58,11 @@ function createProjectStore(directory) {
       if (state.schemaVersion !== 1 || !THEMES.has(state.theme)
         || (state.aiDefaults!==undefined&&!defaultsOK(state.aiDefaults))
         || (state.demoHidden!==undefined&&typeof state.demoHidden!=='boolean')
+        || (state.onboarding!==undefined&&!onboardingOK(state.onboarding))
         || (state.aiProvider!==undefined&&!['codex','claude','gemini'].includes(state.aiProvider))
         || (state.project !== null && (!projectOK(state.project)
           || (state.project.selectedSlug !== null && !slugOK(state.project.selectedSlug))))) throw Error('store-invalid');
-      return { ok: true, state: { schemaVersion: 1, theme: state.theme,...(state.aiDefaults?{aiDefaults:state.aiDefaults}:{}),...(state.aiProvider?{aiProvider:state.aiProvider}:{}),...(state.demoHidden!==undefined?{demoHidden:state.demoHidden}:{}), project: state.project && {
+      return { ok: true, state: { schemaVersion: 1, theme: state.theme,...(state.aiDefaults?{aiDefaults:state.aiDefaults}:{}),...(state.aiProvider?{aiProvider:state.aiProvider}:{}),...(state.demoHidden!==undefined?{demoHidden:state.demoHidden}:{}),...(state.onboarding?{onboarding:{completed:state.onboarding.completed,cloudflareSkipped:state.onboarding.cloudflareSkipped}}:{}), project: state.project && {
         id: state.project.id, root: state.project.root, selectedSlug: state.project.selectedSlug,
       } } };
     } catch (error) {
@@ -118,6 +120,8 @@ function createProjectStore(directory) {
         return { ...state, project: { ...state.project, selectedSlug: slug } };
       });
     },
+    // 首次引導：完成與否、Cloudflare 是否先跳過。其他步驟都由實際狀態判斷，不存在這裡。
+    setOnboarding: async value=>{if(!onboardingOK(value))throw Error('invalid-onboarding');return mutate(state=>({...state,onboarding:{completed:value.completed,cloudflareSkipped:value.cloudflareSkipped}}));},
     setDemoHidden: async demoHidden=>{if(typeof demoHidden!=='boolean')throw Error('invalid-demo-preference');return mutate(state=>({...state,demoHidden}));},
     setAIDefaults:async value=>{if(!defaultsOK(value))throw Error('invalid-ai-defaults');return mutate(state=>({...state,aiDefaults:{provider:value.provider,models:{...value.models},effort:value.effort??'medium'}}));},
     setAIProvider: async aiProvider=>{if(!['codex','claude','gemini'].includes(aiProvider))throw Error('invalid-provider');return mutate(state=>({...state,aiProvider}));},
