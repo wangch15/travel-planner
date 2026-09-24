@@ -25,9 +25,8 @@ function hasRealTrip(root) {
   let entries;
   try { entries = fs.readdirSync(path.join(root, 'trips'), { withFileTypes: true }); }
   catch (e) { if (e.code === 'ENOENT') return false; throw e; }
-  // 模板裡 trips/ 只能有 _example。底線開頭不代表是模板內容：trips/_archived/（App 封存的旅程）
-  // 與 trips/_profile.md（跨行程的私人偏好）都是行程擁有者的資料。系統產生的隱藏檔（.DS_Store）不算。
-  return entries.some((e) => e.name !== '_example' && !e.name.startsWith('.'));
+  return entries.some((e) => !e.name.startsWith('_') &&
+    (e.isDirectory() || (e.isSymbolicLink() && fs.statSync(path.join(root, 'trips', e.name)).isDirectory())));
 }
 
 function checkPush({ remoteUrl, remoteName, updates, root = process.cwd() }, { run = spawnSync } = {}) {

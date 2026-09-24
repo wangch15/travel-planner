@@ -213,7 +213,7 @@ function tripMenu(trip,demo){const blocked=aiBusy||Boolean(pendingProposal)||Boo
   {label:'開啟旅程',icon:'folder',disabled:blocked,action:()=>selectTrip(trip,demo)},
   ...(!demo?[{label:'新增對話',icon:'plus',disabled:blocked,action:()=>window.newTripConversation?.(trip)}]:[]),
   ...(!demo?[{label:'發布網站…',icon:'globe',disabled:blocked,action:()=>openPublishFor(trip)}]:[]),
-  {separator:true},{label:demo?'刪除示範旅程':'移除旅程…',icon:'trash',danger:true,disabled:blocked,action:()=>window.requestTripRemoval?.(trip,demo)}];}
+  {separator:true},{label:demo?'刪除示範旅程':'封存旅程…',icon:demo?'trash':'folder',danger:demo,disabled:blocked,action:()=>window.requestTripRemoval?.(trip,demo)}];}
 async function openPublishFor(trip){if(selected?.trip!==trip){await selectTrip(trip);if(selected?.trip!==trip)return;}window.openSyncFlow({kind:'publish'});}
 function navigation() {
   const query=$('trip-search').value.trim().toLocaleLowerCase();

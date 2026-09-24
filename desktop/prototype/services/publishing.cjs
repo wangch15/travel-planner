@@ -212,5 +212,72 @@ class PublishingService {
       return { adopted: true, published: false, message: '已接管網站紀錄。請重新預覽並準備發布。' };
     } finally { if (output) fs.rmSync(output.temporary, { recursive: true, force: true }); this.busy = false; }
   }
+  // ---- 下架（刪除 Worker）----
+  // 只讀旅程設定裡的 Worker 名稱（封存的旅程也可以），不建置網站。Cloudflare 上的網站必須就是 App（或終端機）
+  // 上次發布的那一個——帳號與線上版本都要相符——才可能刪到自己的網站。兩段式：先核對給代號，確認時全部重查一次。
+  async unshipTarget({ root, slug, archived = false }) {
+    if (!path.isAbsolute(root) || !/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug)) throw fail('INVALID_TARGET');
+    const canonicalRoot = await fsp.realpath(root);
+    const dir = path.join(canonicalRoot, 'trips', ...(archived ? ['_archived'] : []), slug);
+    let config; try { config = JSON.parse(await fsp.readFile(path.join(dir, 'trip.config.json'), 'utf8')); } catch { throw fail('INVALID_TARGET', '讀不到這趟旅程的設定，無法確認網站名稱。'); }
+    if ((config.deploy?.target || 'workers') !== 'workers') throw fail('WORKERS_ONLY', '桌面版目前只能下架 Workers 網站。');
+    if (!NAME.test(config.deploy?.name || '')) throw fail('NOT_PUBLISHED', '這趟旅程沒有設定網站名稱，看起來還沒發布過。');
+    return { root: canonicalRoot, slug, archived, name: config.deploy.name, title: config.title || slug, stateDir: path.join(this.directory, hash(canonicalRoot)) };
+  }
+  workerConfig(name) {
+    ownedDirectory(this.directory);
+    const temporary = fs.mkdtempSync(path.join(this.directory, '.unship-'));
+    const configFile = path.join(temporary, 'wrangler.json');
+    fs.writeFileSync(configFile, JSON.stringify({ name, compatibility_date: new Date().toISOString().slice(0, 10) }), { flag: 'wx', mode: 0o600 });
+    return { temporary, configFile };
+  }
+  // App 的發布紀錄優先；沒有的話用終端機留在專案裡的紀錄（.local/deployments）。
+  unshipRecord(target) {
+    const app = receiptAt(target.stateDir, target.slug);
+    if (app.state) return { ...app, source: 'app' };
+    const file = path.join(target.root, '.local', 'deployments', `${target.slug}.json`);
+    let state = null; try { const stat = fs.lstatSync(file); if (stat.isFile() && !stat.isSymbolicLink() && stat.size <= 65536) state = readState(file); } catch {}
+    return { file, state, source: 'cli' };
+  }
+  matchesRecord(target, remote, state) {
+    const versions = remote.latest?.versions || [];
+    return Boolean(state && state.name === target.name && state.accountId === remote.accountId && versions.length === 1 && versions[0].percentage === 100 && versions[0].version_id === state.versionId);
+  }
+  async prepareUnship(input) {
+    if (this.busy) throw fail('PUBLISH_BUSY');
+    const target = await this.unshipTarget(input), output = this.workerConfig(target.name);
+    try {
+      const remote = await this.inspect(target, output.configFile);
+      if (!remote.latest) throw fail('NOT_PUBLISHED', `Cloudflare 上沒有「${target.name}」這個網站，不需要下架。`);
+      const record = this.unshipRecord(target);
+      if (!this.matchesRecord(target, remote, record.state)) throw fail('UNSHIP_ADOPTION_REQUIRED', 'App 沒有這個網站的發布紀錄，或線上版本不是上次發布的那一個。為了避免刪到別人的網站，請先確認這是你之前發布的網站（發布燈箱或「公開網站」的進階），再下架。');
+      const token = randomUUID(); this.pending.clear();
+      this.pending.set(token, { kind: 'unship', root: target.root, slug: target.slug, archived: target.archived, name: target.name, remote: remoteIdentity(remote), expires: Date.now() + 10 * 60 * 1000 });
+      return { token, name: target.name, title: target.title, url: record.state.url || null, accountId: remote.accountId, accountName: remote.accountName,
+        warning: '下架後這個網址會立刻失效，已經傳出去的連結都打不開。行程資料不會被刪；之後想再上線，重新發布就可以。' };
+    } finally { fs.rmSync(output.temporary, { recursive: true, force: true }); }
+  }
+  async confirmUnship(token) {
+    if (this.busy) throw fail('PUBLISH_BUSY');
+    const pending = this.pending.get(token); this.pending.delete(token);
+    if (!pending || pending.kind !== 'unship' || Date.now() > pending.expires) throw fail('STALE_CONFIRMATION', '確認已過期，請重新開始。');
+    this.busy = true; let output;
+    try {
+      const target = await this.unshipTarget(pending); output = this.workerConfig(target.name);
+      const remote = await this.inspect(target, output.configFile);
+      const record = this.unshipRecord(target);
+      if (target.name !== pending.name || remoteIdentity(remote) !== pending.remote || !this.matchesRecord(target, remote, record.state)) throw fail('REMOTE_CHANGED', '網站或帳號在確認後有變動，沒有下架；請重新核對。');
+      const result = await this.run(['delete', target.name, '--config', output.configFile], { cwd: output.temporary, env: { ...this.env, CLOUDFLARE_ACCOUNT_ID: remote.accountId, CF_ACCOUNT_ID: remote.accountId } });
+      // 不相信 wrangler 的退出碼：刪完一定再查一次遠端，還在就照實說。
+      let after;
+      try { after = await this.inspect(target, output.configFile); }
+      catch (error) { throw fail('UNSHIP_UNKNOWN', `刪除已送出，但無法確認結果（${error.message}）。請到 Cloudflare 的 Workers & Pages 核對，不要直接重試。`); }
+      if (after.latest) throw fail('UNSHIP_NOT_CONFIRMED', `Cloudflare 上的網站「${target.name}」還在，沒有下架成功（退出碼 ${result.status ?? '未知'}）。可能有其他網站依賴它；請到 Cloudflare 的 Workers & Pages 確認後再處理。`);
+      fs.rmSync(record.file, { force: true });
+      if (record.source === 'app') { const cli = path.join(target.root, '.local', 'deployments', `${target.slug}.json`); try { if (readState(cli)?.name === target.name) fs.rmSync(cli, { force: true }); } catch {} }
+      const url = record.state.url || null;
+      return { unshipped: true, name: target.name, url, message: `網站已下架：${url || target.name} 已停止服務。行程資料沒有變動。` };
+    } finally { if (output) fs.rmSync(output.temporary, { recursive: true, force: true }); this.busy = false; }
+  }
 }
 module.exports = { PublishingService, runWrangler };

@@ -124,3 +124,28 @@ test('a GitHub visibility lookup failure is reported as a connection problem, no
   const original = f.service.run; f.service.run = async (bin, args, options) => bin === 'gh' ? { status: 1, stdout: '' } : original(bin, args, options);
   await assert.rejects(() => f.service.prepare({ root: f.root, slug: 'sample' }), error => error.code === 'PRIVATE_REPO_REQUIRED' && /網路不通|還沒連接/.test(error.message));
 });
+test('archive scope backs up the trip leaving the list and arriving in trips/_archived together', async t => {
+  const f = await fixture(t);
+  await fs.mkdir(path.join(f.root, 'trips/_archived'), { recursive: true });
+  await fs.rename(path.join(f.root, 'trips/sample'), path.join(f.root, 'trips/_archived/sample'));
+  const prepared = await f.service.prepare({ root: f.root, slug: 'sample', scope: 'archive' });
+  assert.deepEqual(prepared.files.map(file => `${file.status} ${file.path}`), [
+    'present trips/_archived/sample/data.js', 'present trips/_archived/sample/docs/status.md',
+    'deleted trips/sample/data.js', 'deleted trips/sample/docs/status.md']);
+  const plain = await f.service.prepare({ root: f.root, slug: 'sample' });
+  assert.equal(plain.files.some(file => file.path.startsWith('trips/_archived/')), false, '一般範圍不包含封存區');
+  const again = await f.service.prepare({ root: f.root, slug: 'sample', scope: 'archive' });
+  const result = await f.service.confirm(again.token);
+  assert.equal(result.backedUp, true);
+  assert.equal((await f.git(['ls-files', 'trips/'])).stdout.trim().split('\n').sort().join(','), 'trips/_archived/sample/data.js,trips/_archived/sample/docs/status.md');
+});
+test('the pre-push guard from the previous engine is still trusted, anything else is not', () => {
+  // 引擎 1.1.5 收緊了推到公開模板時的檢查；還沒更新專案的人不能因此無法備份。
+  const { trustedFile } = require('../services/backup.cjs');
+  const current = require('node:fs').readFileSync(path.join(trusted, 'scripts/lib/pre-push.js'));
+  const previous = require('node:fs').readFileSync(path.join(__dirname, 'fixtures/pre-push-engine-1.1.4.js'));
+  assert.equal(trustedFile('scripts/lib/pre-push.js', current, current), true);
+  assert.equal(trustedFile('scripts/lib/pre-push.js', previous, current), true);
+  assert.equal(trustedFile('scripts/lib/pre-push.js', Buffer.concat([previous, Buffer.from('\n// changed\n')]), current), false);
+  assert.equal(trustedFile('scripts/pre-push.js', previous, current), false, '舊版只認得對應的那一個檔案');
+});

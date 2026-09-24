@@ -52,6 +52,16 @@ test('模板目的地的非底線 symlink 目錄也不能漏掉', { skip: proces
   refused(h.run({ remoteUrl: 'git@github.com:wangch15/travel-planner.git' }), /模板|行程/);
 });
 
+test('模板目的地的封存旅程與跨行程偏好檔也不能漏掉（底線開頭不等於模板內容）', (t) => {
+  // App 把旅程封存到 trips/_archived/；以前只擋非底線開頭的資料夾，封存旅程與 _profile.md 會被推上公開模板。
+  for (const make of [root => fs.mkdirSync(path.join(root, 'trips/_archived/old-trip'), { recursive: true }), root => fs.writeFileSync(path.join(root, 'trips/_profile.md'), '飲食限制')]) {
+    const h = harness(t); make(h.root);
+    refused(h.run({ remoteUrl: 'git@github.com:wangch15/travel-planner.git' }), /模板|行程/);
+  }
+  const h = harness(t); fs.writeFileSync(path.join(h.root, 'trips/.DS_Store'), '');
+  assert.equal(h.run({ remoteUrl: 'git@github.com:wangch15/travel-planner.git' }).allowed, true, '系統產生的隱藏檔不算行程');
+});
+
 test('私有目的地放行，gh 明確查 argv URL 的 repo 而不是 remote 設定', (t) => {
   const h = harness(t);
   assert.equal(h.run({ remoteName: 'upstream', remoteUrl: 'https://github.com/person/actual-push.git' }).allowed, true);

@@ -81,7 +81,7 @@
   }
 
   const BACKUP_STEPS = ['檢查', '核對', '完成'];
-  function backupRequest(scope) { return scope === 'all' ? ['backup-prepare', { scope: 'all' }] : scope === 'project' ? ['backup-project-prepare', {}] : ['backup-prepare', conversationTarget()]; }
+  function backupRequest(scope, opts) { return scope === 'all' ? ['backup-prepare', { scope: 'all' }] : scope === 'project' ? ['backup-project-prepare', {}] : scope === 'archive' ? ['backup-prepare', { scope: 'archive', projectId: project.projectId, slug: opts.slug }] : ['backup-prepare', conversationTarget()]; }
   function backupReview(p) {
     const nodes = [el('p', `私人專案：${p.repo} · 分支 ${p.branch}`, 'flow-meta'), dayChanges(p.dayChanges)];
     if (p.files.length) nodes.push(fold(`這次 ${p.files.length} 個檔案`, p.files.map(f => `${f.status === 'deleted' ? '刪除' : '保存'} · ${f.path}`), !p.dayChanges?.length && p.files.length <= 12));
@@ -105,8 +105,8 @@
   }
   async function backup(opts) {
     const scope = opts.scope || 'trip';
-    title(scope === 'all' ? '備份所有旅程到 GitHub' : scope === 'project' ? '備份專案到 GitHub' : '備份到 GitHub');
-    const p = await checking(BACKUP_STEPS, '正在列出這次要備份的內容…', async () => { const [name, input] = backupRequest(scope); return (await api(name, input)).preparation; }, () => backup(opts), backupHelp(opts));
+    title(scope === 'all' ? '備份所有旅程到 GitHub' : scope === 'project' ? '備份專案到 GitHub' : scope === 'archive' ? '把這次變動備份到 GitHub' : '備份到 GitHub');
+    const p = await checking(BACKUP_STEPS, '正在列出這次要備份的內容…', async () => { const [name, input] = backupRequest(scope, opts); return (await api(name, input)).preparation; }, () => backup(opts), backupHelp(opts));
     if (!p) return;
     if (!p.files.length && !p.unpublishedCommits) { const text = '目前沒有需要備份的內容，已經是最新。'; done(BACKUP_STEPS, '已經是最新的備份', text, 'ok', { status: 'done', message: text, tone: 'ok' }); return; }
     steps(BACKUP_STEPS, 1); body(...backupReview(p)); say('核對以上內容，確認後才推送到你的私人 GitHub。');
@@ -195,12 +195,90 @@
       const { result } = await api('adoption-confirm', { token: p.token }); refresh();
       const text = result.message || '已記錄網站歸屬，尚未發布。';
       // 從發布流程轉來接管的：記好歸屬後直接接著發布。
-      const next = opts.kind === 'publish' ? [act('繼續發布', 'continue', () => publish(opts), { busy: '檢查中…' })] : [];
+      const next = opts.kind === 'publish' ? [act('繼續發布', 'continue', () => publish(opts), { busy: '檢查中…' })] : opts.then ? [act('繼續下架', 'continue', () => opts.then(), { busy: '檢查中…' })] : [];
       done(ADOPT_STEPS, '已記下網站歸屬', text, 'ok', { status: 'done', message: text, tone: 'ok' }, next);
     }, { variant: 'primary', busy: '記錄中…' })]);
   }
 
-  const runners = { backup: opts => opts.mode === 'discard' ? discard(opts) : backup(opts), publish, adopt };
+  // ---- 旅程封存、還原、永久刪除與網站下架 ----
+  const target = opts => ({ projectId: project.projectId, slug: opts.slug });
+  // 搬移或刪除後接著備份，私人專案的旅程清單才會跟著變；也可以先關掉，之後再備份。
+  const thenBackup = opts => act('接著備份到 GitHub', 'backup', () => backup({ kind: 'backup', scope: 'archive', slug: opts.slug }), { variant: 'primary', busy: '檢查中…' });
+  function movedDone(names, opts, head, text, extra = []) {
+    if (!flow) return;
+    done(names, head, text + ' 這個變動目前只在這台電腦；備份後你的私人 GitHub 才會跟著更新。', 'ok', { status: 'done', message: head, tone: 'ok' }, extra);
+    $('sync-dialog-right').replaceChildren(...extra, closeButton('稍後再備份', 'done'), thenBackup(opts));
+  }
+  const ARCHIVE_STEPS = ['確認', '封存', '備份'];
+  async function archiveTrip(opts) {
+    title(`封存「${opts.title}」`);
+    const checked = await checking(ARCHIVE_STEPS, '正在確認這趟旅程的網站狀態…', async () => ({ site: (await api('sync-overview', { slug: opts.slug })).overview?.site || null }), () => archiveTrip(opts));
+    if (!checked) return;
+    const site = checked.site;
+    steps(ARCHIVE_STEPS, 0);
+    body(el('p', '封存後，這趟旅程會從旅程清單移到「封存的旅程」：資料、照片和私人筆記都還在，隨時可以還原。'),
+      el('p', '確定不要了，可以在「封存的旅程」裡永久刪除。', 'flow-meta'),
+      site?.url ? el('p', `這趟的網站還在線上（${site.url.replace(/^https:\/\//, '')}）。封存不會下架網站；封存完可以接著下架。`, 'flow-warning') : null);
+    say('');
+    footer([], [closeButton('取消'), act('封存', 'confirm', async () => {
+      const result = await api('trip-archive', target(opts)); window.applyProjectResult?.(result, opts.slug);
+      const extra = result.site?.url ? [act('下架網站…', 'unship', () => unship({ ...opts, archived: true }), { busy: '檢查中…' })] : [];
+      movedDone(ARCHIVE_STEPS, opts, '已封存', `「${opts.title}」已移到封存的旅程。`, extra);
+    }, { variant: 'primary', busy: '封存中…' })]);
+  }
+  async function unarchiveTrip(opts) {
+    title(`還原「${opts.title}」`); steps(['確認', '還原', '備份'], 0);
+    body(el('p', '這趟旅程會回到旅程清單，內容和封存前一樣。'));
+    footer([], [closeButton('取消'), act('還原', 'confirm', async () => {
+      const result = await api('trip-unarchive', target(opts)); window.applyProjectResult?.(result);
+      movedDone(['確認', '還原', '備份'], opts, '已還原', `「${opts.title}」回到旅程清單了。`);
+    }, { variant: 'primary', busy: '還原中…' })]);
+  }
+  const PURGE_STEPS = ['確認', '刪除', '備份'];
+  async function purgeTrip(opts) {
+    title(`永久刪除「${opts.title}」`);
+    const p = await checking(PURGE_STEPS, '正在列出要刪除的內容…', async () => (await api('trip-purge-prepare', target(opts))).preparation, () => purgeTrip(opts));
+    if (!p) return;
+    steps(PURGE_STEPS, 0);
+    if (p.site?.url) {
+      body(el('p', `這趟的網站還在線上（${p.site.url.replace(/^https:\/\//, '')}）。請先下架網站，再永久刪除，免得留下一個沒人管的公開網址。`, 'flow-warning'));
+      footer([], [closeButton('取消'), act('先下架網站…', 'unship', () => unship({ ...opts, archived: true, next: () => purgeTrip(opts) }), { variant: 'primary', busy: '檢查中…' })]);
+      return;
+    }
+    const input = el('input'); input.type = 'text'; input.id = 'sync-purge-name'; input.autocomplete = 'off'; input.setAttribute('aria-label', '輸入旅程名稱以確認');
+    const confirm = act('永久刪除', 'confirm', async () => {
+      const { result } = await api('trip-purge-confirm', { ...target(opts), token: p.token, title: input.value });
+      movedDone(PURGE_STEPS, opts, '已永久刪除', `「${result.title}」的資料夾、照片、私人筆記，以及 App 裡這趟的對話與版本紀錄都已刪除。`);
+    }, { variant: 'danger', busy: '刪除中…' });
+    confirm.disabled = true; input.oninput = () => { confirm.disabled = input.value.trim() !== p.title; };
+    const size = p.bytes >= 1048576 ? `${(p.bytes / 1048576).toFixed(1)} MB` : `${Math.ceil(p.bytes / 1024)} KB`;
+    const label = el('label', `請輸入旅程名稱「${p.title}」確認：`, 'flow-confirm-label'); label.htmlFor = input.id;
+    body(el('p', '這一步無法復原。會刪除：', 'flow-danger'),
+      (() => { const ul = el('ul', undefined, 'flow-plain-list'); for (const t of [`這趟旅程的資料夾（${p.files} 個檔案，${size}），包括照片與私人筆記`, 'App 裡這趟的所有對話、版本紀錄與參考資料']) ul.append(el('li', t)); return ul; })(),
+      el('p', '備份之後，你的私人 GitHub 目前的內容裡也不會再有這趟；但 GitHub 的歷史紀錄裡仍查得到舊版本，App 不會改寫歷史。', 'flow-meta'),
+      label, input);
+    say(''); footer([], [closeButton('取消'), confirm]); input.focus();
+  }
+  const UNSHIP_STEPS = ['核對', '下架', '完成'];
+  async function unship(opts) {
+    title(`下架「${opts.title}」的網站`);
+    const p = await checking(UNSHIP_STEPS, '正在核對 Cloudflare 上的網站…', async () => (await api('unship-prepare', { ...target(opts), archived: Boolean(opts.archived) })).preparation, () => unship(opts),
+      e => e.code === 'UNSHIP_ADOPTION_REQUIRED' && !opts.archived ? [act('這是我之前發布的網站…', 'adopt', () => adopt({ kind: 'unship', then: () => unship(opts) }), { variant: 'text-button', busy: '查詢中…' })] : []);
+    if (!p) return;
+    steps(UNSHIP_STEPS, 0);
+    const ack = el('input'); ack.type = 'checkbox'; ack.id = 'sync-unship-ack';
+    const confirm = act('下架網站', 'confirm', async () => {
+      const { result } = await api('unship-confirm', { token: p.token }); refresh();
+      const next = opts.next ? [act('繼續永久刪除', 'continue', () => opts.next(), { variant: 'primary', busy: '檢查中…' })] : [];
+      done(UNSHIP_STEPS, '網站已下架', result.message, 'ok', { status: 'done', message: result.message, tone: 'ok' }, next);
+    }, { variant: 'danger', busy: '下架中…' });
+    confirm.disabled = true; ack.onchange = () => { confirm.disabled = !ack.checked; };
+    const label = el('label', undefined, 'flow-ack'); label.htmlFor = ack.id; label.append(ack, document.createTextNode('我了解下架後網址會立刻失效，已經傳給別人的連結都會打不開。'));
+    body(facts([['網址', p.url || '（沒有紀錄）'], ['網站名稱', p.name], ['Cloudflare', p.accountName || p.accountId]]), el('p', p.warning), label);
+    say(''); footer([], [closeButton('取消'), confirm]);
+  }
+
+  const runners = { backup: opts => opts.mode === 'discard' ? discard(opts) : backup(opts), publish, adopt, archive: archiveTrip, unarchive: unarchiveTrip, purge: purgeTrip, unship };
   // 執行中不能關：Chromium 連按 Esc 時 cancel 事件不一定能取消，所以 keydown 先攔，真的被關掉就立刻重開，
   // 免得推送照樣完成、卡片卻寫成「已取消」。
   dialog.addEventListener('keydown', event => { if (event.key === 'Escape' && flow?.busy) event.preventDefault(); });
@@ -212,6 +290,8 @@
   $('sync-dialog-close').onclick = () => { if (!flow?.busy) dialog.close(); };
   // 回傳 Promise：燈箱關閉時給結果 {status:'done'|'failed'|'canceled'|'blocked', message, tone, url}。
   window.openSyncFlow = (opts = {}) => {
+    // 燈箱已經關了、close 事件還沒處理到：先把上一個流程收尾，不要把下一次點擊默默擋掉。
+    if (flow && !dialog.open && !flow.busy) { const ended = flow; flow = null; ended.resolve(ended.outcome || { status: 'canceled' }); }
     if (flow || !runners[opts.kind]) return Promise.resolve({ status: 'blocked' });
     if (aiBusy || pendingProposal || window.hasMaterialization?.()) { const message = '請先等 AI 回覆完成，或確認／放棄目前的提案。'; notify(message); return Promise.resolve({ status: 'blocked', message, tone: 'warn' }); }
     return new Promise(resolve => {

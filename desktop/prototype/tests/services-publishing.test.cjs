@@ -26,6 +26,7 @@ async function fixture(t) {
       if (state.failDeploy) return { status: 1, stderr: 'network timed out' };
       state.latest = remote(); return { status: 0, stdout: `https://sample-trip.test.workers.dev\nCurrent Version ID: ${version}\n` };
     }
+    if (args[0] === 'delete') { state.deleted = (state.deleted || 0) + 1; if (!state.keepAfterDelete) state.latest = null; return { status: 0, stdout: '' }; }
     throw Error('unexpected command');
   };
   const service = new PublishingService(root, { loadPreview, runWrangler: async (...args) => runWrangler(...args), env: {} });
@@ -126,4 +127,39 @@ test('the real publisher launches the installed wrangler through the App launche
   const result = await runWrangler(['--version'], { env: {} });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /\d+\.\d+\.\d+/);
+});
+
+async function publishedTrip(t) {
+  const f = await fixture(t);
+  sync.mkdirSync(path.join(f.root, 'trips/sample'), { recursive: true });
+  sync.writeFileSync(path.join(f.root, 'trips/sample/trip.config.json'), JSON.stringify({ title: 'Sample', deploy: { target: 'workers', name: 'sample-trip' } }));
+  const p = await f.service.prepare(f.input); assert.equal((await f.service.confirm(p.token, f.input)).published, true);
+  return f;
+}
+test('unship deletes only the Worker the App published, after a separate confirmation, and verifies it is gone', async t => {
+  const f = await publishedTrip(t);
+  const plan = await f.service.prepareUnship({ root: f.root, slug: 'sample' });
+  assert.equal(plan.url, 'https://sample-trip.test.workers.dev'); assert.equal(f.state.deleted, undefined, '核對時不刪');
+  const result = await f.service.confirmUnship(plan.token);
+  assert.equal(result.unshipped, true); assert.equal(f.state.deleted, 1);
+  assert.equal((await f.service.status({ root: f.root, slug: 'sample' })).url, null, '下架後不再顯示網址');
+  assert.ok(sync.existsSync(path.join(f.root, 'trips/sample/trip.config.json')), '行程資料不動');
+});
+test('unship refuses a Worker whose live version is not the one the App recorded', async t => {
+  const f = await publishedTrip(t);
+  f.state.latest = { ...f.state.latest, versions: [{ version_id: '22222222-2222-2222-2222-222222222222', percentage: 100 }] };
+  await assert.rejects(f.service.prepareUnship({ root: f.root, slug: 'sample' }), { code: 'UNSHIP_ADOPTION_REQUIRED' });
+  assert.equal(f.state.deleted, undefined);
+});
+test('unship reports honestly when the Worker is still there after delete', async t => {
+  const f = await publishedTrip(t); f.state.keepAfterDelete = true;
+  const plan = await f.service.prepareUnship({ root: f.root, slug: 'sample' });
+  await assert.rejects(f.service.confirmUnship(plan.token), { code: 'UNSHIP_NOT_CONFIRMED' });
+  assert.equal((await f.service.status({ root: f.root, slug: 'sample' })).url, 'https://sample-trip.test.workers.dev', '沒刪成功就保留紀錄');
+});
+test('an archived trip can be unshipped from its archive folder', async t => {
+  const f = await publishedTrip(t);
+  sync.mkdirSync(path.join(f.root, 'trips/_archived'), { recursive: true }); sync.renameSync(path.join(f.root, 'trips/sample'), path.join(f.root, 'trips/_archived/sample'));
+  const plan = await f.service.prepareUnship({ root: f.root, slug: 'sample', archived: true });
+  assert.equal((await f.service.confirmUnship(plan.token)).unshipped, true);
 });

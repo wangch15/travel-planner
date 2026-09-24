@@ -716,7 +716,7 @@ git remote -v
 → 這是正常的，繼續做。但 `trips/` 底下只能有 `_example`（見下一節）。
 
 分不出來是哪一種就問使用者一句。**有一個情況不用問：`origin` 是模板、
-而 `trips/` 底下有非底線開頭的行程——那一定是 (a)，停下來。**
+而 `trips/` 底下有 `_example` 以外的東西（包括 `_archived/` 封存的旅程）——那一定是 (a)，停下來。**
 
 ## 取得專案的正確方式
 
@@ -756,7 +756,8 @@ HTTPS／git SSH URL 才能查核；不支援的 SSH alias、其他主機或含�
 它每次都查可見度，不管只改 README、新增／強推分支，或刪除分支的全零 refs；不快取許可。
 PUBLIC 才依 stdin 掃描完整新增歷史，PRIVATE 不掃，因為私人行程本來就應備份到私有 repo。
 
-- 目的地是 `wangch15/travel-planner`：只有工作目錄 trips/ 沒有非底線開頭的資料夾才允許。
+- 目的地是 `wangch15/travel-planner`：只有工作目錄 trips/ 底下除了 `_example` 以外沒有其他項目（隱藏檔除外）才允許。
+  `trips/_archived/`（App 封存的旅程）與 `trips/_profile.md` 雖然是底線開頭，也是行程擁有者的資料，一樣會擋。
   這個例外只判斷目錄，不是歷史資料掃描，也不是模板帳號所有權驗證；模板仍只能放 `_example`。
 - 其他目的地：對 URL 指定的 owner/repo 執行 gh 可見度查核，10 秒逾時即拒絕。
   PUBLIC 時仍提醒既有 repo 內容已公開，可能含訂房資訊；本次放行不代表舊資料乾淨，也不會撤回外洩資料。

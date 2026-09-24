@@ -676,3 +676,12 @@ button.primary[aria-busy="true"] { opacity:.88; }
 .flow-actions>div { display:flex; align-items:center; gap:8px; }
 .flow-actions>div:last-child { margin-left:auto; }
 @media (max-width:560px) { .flow-steps li:not(:last-child)::after { width:12px; } .flow-actions { flex-wrap:wrap; } }
+
+/* 封存、永久刪除、下架 */
+.flow-danger { color:var(--error); font-weight:600; }
+.flow-body ul.flow-plain-list { font-family:inherit; font-size:13px; color:var(--text); }
+.flow-confirm-label { margin-top:4px; font-size:13px; }
+.flow-body input[type="text"] { width:100%; min-height:var(--control-h); padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; }
+.flow-body input[type="text"]:focus-visible { outline:2px solid var(--focus); outline-offset:1px; }
+.archive-row .tool-copy p { margin:4px 0 0; }
+.archive-live { color:#b06a10; } :root[data-theme="dark"] .archive-live { color:#e3a65b; }

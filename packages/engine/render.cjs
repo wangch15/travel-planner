@@ -7,8 +7,7 @@ const json = (v) => JSON.stringify(v).replace(/<\/script/gi, '<\\/script');
 
 function documentHTML(trip, head, body) {
   const { config } = trip;
-  const favicon = 'data:image/svg+xml,' + encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="82" font-size="82">${(config.theme && config.theme.favicon) || '🗺'}</text></svg>`);
+  // 網站圖示一律用 Travel Planner 標誌，內嵌在 src/index.html（App 發布只送固定幾個檔案）；theme.favicon 已停用。
   return `<!doctype html>
 <html lang="${config.lang || 'zh-Hant'}">
 <head>
@@ -19,7 +18,6 @@ function documentHTML(trip, head, body) {
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#F4F0E5" media="(prefers-color-scheme:light)">
 <meta name="theme-color" content="#15130F" media="(prefers-color-scheme:dark)">
-<link rel="icon" href="${favicon}">
 <style>
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 img{max-width:100%}

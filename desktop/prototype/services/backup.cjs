@@ -11,6 +11,13 @@ const fail = (code, message) => Object.assign(new Error(message || code), { code
 const TRUSTED_FILES = ['.githooks/pre-push', 'scripts/pre-push.js', 'scripts/lib/pre-push.js', 'scripts/lib/push-history.js', 'scripts/lib/contribution-history.js'];
 // Git for Windows 預設 autocrlf，檢出的檔案可能是 CRLF；比對可信版本時忽略換行差異。
 const sameTrusted = (a, b) => a.toString('latin1').replace(/\r\n/g, '\n') === b.toString('latin1').replace(/\r\n/g, '\n');
+// 上一版引擎裡、由模板發布過的保護程式也算可信：它們只在「推到公開模板」時比較寬鬆，推到自己的私人 repo 行為一樣。
+// 引擎改了保護程式之後，還沒「更新專案」的人仍能備份；再舊的版本照舊要求更新專案。
+const PREVIOUS_TRUSTED = Object.freeze({
+  'scripts/lib/pre-push.js': new Set(['d2bd506b68d622a3794e65357ac02b84fc413532cdc8cc00e21257861f64b7da']), // 引擎 1.1.4
+});
+const trustedFile = (relative, bytes, current) => sameTrusted(bytes, current)
+  || Boolean(PREVIOUS_TRUSTED[relative]?.has(createHash('sha256').update(bytes.toString('latin1').replace(/\r\n/g, '\n'), 'latin1').digest('hex')));
 // Git LFS 官方安裝會在全域設定寫入這幾個 filter；只放行這些標準值，其他 filter 仍視為會執行未知程式。
 const LFS_FILTERS = Object.freeze({ 'filter.lfs.clean': ['git-lfs clean -- %f'], 'filter.lfs.smudge': ['git-lfs smudge -- %f', 'git-lfs smudge --skip -- %f'], 'filter.lfs.process': ['git-lfs filter-process', 'git-lfs filter-process --skip'], 'filter.lfs.required': ['true'] });
 const trustedFilter = (key, value) => Object.hasOwn(LFS_FILTERS, key) && LFS_FILTERS[key].includes(String(value).trim());
@@ -73,7 +80,7 @@ class BackupService {
       if (entry !== 'pre-push') throw fail('UNTRUSTED_HOOK', '專案的 .githooks 裡有 App 不認得的程式（除了備份保護以外的 Git hook），App 不會執行它，這次沒有備份。');
     }
     for (const relative of TRUSTED_FILES) {
-      if (!sameTrusted(await regularBytes(path.join(root, relative), 1024 * 1024), await regularBytes(path.join(this.trustedRoot, relative), 1024 * 1024))) throw fail('UNTRUSTED_HOOK', '專案裡的備份保護程式和 App 內建的版本不同。請先到「設定 → 專案管理」按「更新專案」，完成後再備份。');
+      if (!trustedFile(relative, await regularBytes(path.join(root, relative), 1024 * 1024), await regularBytes(path.join(this.trustedRoot, relative), 1024 * 1024))) throw fail('UNTRUSTED_HOOK', '專案裡的備份保護程式和 App 內建的版本不同。請先到「設定 → 專案管理」按「更新專案」，完成後再備份。');
     }
     // A package type override would change how the trusted hook imports are executed.
     for (const folder of ['', 'scripts', 'scripts/lib']) {
@@ -100,7 +107,7 @@ class BackupService {
     return { url: urls[0], repo, branch };
   }
   async inspect(target) {
-    const { root, slug } = target;
+    const { root, slug } = target, scope = target.scope === 'archive' ? 'archive' : 'trip';
     // slug 為 null：整個專案層級的備份，只推送既有提交（例如剛建立、還沒有旅程的專案，或引擎更新的合併）。
     // slug 為 '*'：所有旅程一起備份（trips/ 底下，不含模板附的 _example）。
     if (slug !== null && slug !== '*' && !/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug)) throw fail('INVALID_TARGET');
@@ -111,12 +118,14 @@ class BackupService {
     const head = (await this.git(root, ['rev-parse', 'HEAD'])).trim();
     const staged = await this.git(root, ['diff', '--no-ext-diff', '--no-textconv', '--cached', '--name-only', '-z']);
     if (staged) throw fail('STAGED_CHANGES', '專案裡有被其他工具「暫存」、準備提交的改動。按「取消暫存」會讓它們回到一般的修改（檔案內容不變），App 再一起列出來讓你核對。');
-    const prefix = slug === null ? null : slug === '*' ? 'trips/' : `trips/${slug}/`;
+    // scope 'archive'：封存、還原或永久刪除一趟旅程時，旅程原位置與 trips/_archived/ 的同名資料夾一起備份。
+    const prefixes = slug === null ? [] : slug === '*' ? ['trips/'] : scope === 'archive' ? [`trips/${slug}/`, `trips/_archived/${slug}/`] : [`trips/${slug}/`];
+    const inScope = name => prefixes.some(prefix => name.startsWith(prefix));
     const own = name => slug !== '*' || !name.startsWith('trips/_example/');
-    const names = prefix ? (await this.git(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', prefix])).split('\0').filter(Boolean).filter(own) : [];
+    const names = prefixes.length ? (await this.git(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...prefixes])).split('\0').filter(Boolean).filter(own) : [];
     const files = []; let total = 0;
     for (const name of [...new Set(names)].sort()) {
-      if (!name.startsWith(prefix) || name.split('/').some(p => p === '..') || /[\x00-\x1f\x7f]/.test(name)) throw fail('UNSAFE_PATH');
+      if (!inScope(name) || name.split('/').some(p => p === '..') || /[\x00-\x1f\x7f]/.test(name)) throw fail('UNSAFE_PATH');
       let bytes;
       try { bytes = await regularBytes(path.join(root, name)); }
       catch (error) { if (error.code !== 'ENOENT') throw error; }
@@ -124,8 +133,8 @@ class BackupService {
       if (total > 256 * 1024 * 1024 || files.length >= 5000) throw fail('BACKUP_TOO_LARGE');
       files.push({ path: name, status: bytes ? 'present' : 'deleted', bytes: bytes?.length || 0, digest: bytes ? hash(bytes) : null });
     }
-    const changedNames = new Set(prefix ? (await this.git(root, ['diff', '--no-ext-diff', '--no-textconv', '--name-only', '--no-renames', '-z', 'HEAD', '--', prefix])).split('\0').filter(Boolean).filter(own) : []);
-    if (prefix) for (const name of (await this.git(root, ['ls-files', '--others', '--exclude-standard', '-z', '--', prefix])).split('\0').filter(Boolean).filter(own)) changedNames.add(name);
+    const changedNames = new Set(prefixes.length ? (await this.git(root, ['diff', '--no-ext-diff', '--no-textconv', '--name-only', '--no-renames', '-z', 'HEAD', '--', ...prefixes])).split('\0').filter(Boolean).filter(own) : []);
+    if (prefixes.length) for (const name of (await this.git(root, ['ls-files', '--others', '--exclude-standard', '-z', '--', ...prefixes])).split('\0').filter(Boolean).filter(own)) changedNames.add(name);
     const changed = files.filter(file => changedNames.has(file.path));
     const remote = (await this.git(root, ['ls-remote', destination.url, `refs/heads/${destination.branch}`])).trim();
     const remoteHead = remote ? remote.split(/\s+/)[0] : null;
@@ -140,8 +149,8 @@ class BackupService {
         unpublishedFiles = (await this.git(root, ['ls-tree', '-r', '--name-only', '-z', head])).split('\0').filter(Boolean);
       }
     }
-    return { ...destination, root, slug, head, remoteHead, configDigest, files: changed, allFilesDigest: hash(JSON.stringify(files)), unpublishedCommits,
-      unrelatedCommittedFiles: unpublishedFiles.filter(name => !prefix || !name.startsWith(prefix)), firstPush: !remoteHead,
+    return { ...destination, root, slug, scope, head, remoteHead, configDigest, files: changed, allFilesDigest: hash(JSON.stringify(files)), unpublishedCommits,
+      unrelatedCommittedFiles: unpublishedFiles.filter(name => !inScope(name)), firstPush: !remoteHead,
       warnings: unpublishedCommits ? ['推送會包含目前分支尚未備份的既有提交，請一併核對。'] : [] };
   }
   // 不連網的備份狀態：這趟旅程有沒有尚未提交的改動、目前分支有沒有尚未推送的提交。
@@ -224,7 +233,7 @@ class BackupService {
         }
         await this.audit(current.root);
         if ((await this.git(current.root, ['rev-parse', 'HEAD'])).trim() !== head) throw fail('CONTENT_CHANGED');
-        await this.git(current.root, ['commit', '-m', current.slug === '*' ? 'Save all trips from Travel Planner' : `Save trip ${current.slug} from Travel Planner`]);
+        await this.git(current.root, ['commit', '-m', current.slug === '*' ? 'Save all trips from Travel Planner' : current.scope === 'archive' ? `Archive or remove trip ${current.slug} from Travel Planner` : `Save trip ${current.slug} from Travel Planner`]);
         committed = true; head = (await this.git(current.root, ['rev-parse', 'HEAD'])).trim();
       }
       await this.audit(current.root);
@@ -243,4 +252,4 @@ class BackupService {
     } finally { this.busy = false; }
   }
 }
-module.exports = { BackupService, defaultRun, regularBytes, TRUSTED_FILES, sameTrusted, trustedFilter };
+module.exports = { BackupService, defaultRun, regularBytes, TRUSTED_FILES, sameTrusted, trustedFile, trustedFilter };

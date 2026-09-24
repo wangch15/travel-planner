@@ -31,7 +31,7 @@
 | `sections.mapLists` | ✔ | boolean | 開啟時每天的 Maps 清單必須涵蓋當天所有地點。 | `false` |
 | `sections.checklist` | ✔ | boolean | 開啟且 `CHECKLIST` 為空時 `check` 會擋。 | `true` |
 | `theme.accent` | ✔ | string | 主色，hex。更細的調整用 `theme.css`。 | `"#B0552D"` |
-| `theme.favicon` | ✔ | string | 一個 emoji，build 時轉成 SVG favicon。 | `"🗾"` |
+| `theme.favicon` | | string | **已停用**（引擎 1.1.5 起）：網站圖示一律是 Travel Planner 標誌。舊設定留著不會出錯，只是不再使用。 | `"🗾"` |
 | `basemap.dem` | ✔ | string | `auto`（JP → 国土地理院，其他 → Terrarium）、`gsi`、`terrarium`。 | `"auto"` |
 | `basemap.detail` | ✔ | string | `low` \| `normal` \| `high`，控制簡化容差。 | `"normal"` |
 | `basemap.contourLevels` | ✔ | number \| null | `null` 時自動選層級。 | `null` |

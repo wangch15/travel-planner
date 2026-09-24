@@ -32,6 +32,8 @@ class VersionStore {
  async checkParent(){
   try{const stat=await fs.lstat(this.parent),canonical=await fs.realpath(this.parent);if(!stat.isDirectory()||stat.isSymbolicLink()||!same(stat,await fs.lstat(canonical))||!same(stat,await fs.lstat(this.parent)))throw invalid();if(this.parentAnchor&&(!same(stat,this.parentAnchor.stat)||canonical!==this.parentAnchor.canonical))throw invalid();this.parentAnchor||={stat,canonical};return true;}catch(e){if(e.code==='ENOENT'&&!this.parentAnchor&&!this.anchor)return false;throw invalid();}
  }
+ // 永久刪除旅程時一起刪掉這趟的本機版本紀錄。
+ forget(target){const operation=this.queue.then(async()=>{const file=this.filename(target);if(!await this.checkDirectory())return;try{const stat=await fs.lstat(file);if(regular(stat))await fs.unlink(file);}catch(e){if(e.code!=='ENOENT')throw invalid();}});this.queue=operation.catch(()=>{});return operation;}
  async checkDirectory(){
   if(!await this.checkParent())return false;
   try{const stat=await fs.lstat(this.directory),canonical=await fs.realpath(this.directory);if(!stat.isDirectory()||stat.isSymbolicLink()||!same(stat,await fs.lstat(canonical))||!same(stat,await fs.lstat(this.directory)))throw invalid();if(this.anchor&&(!same(stat,this.anchor.stat)||canonical!==this.anchor.canonical))throw invalid();this.anchor||={stat,canonical};await this.checkParent();return true;}catch(e){if(e.code==='ENOENT'&&!this.anchor)return false;throw invalid();}

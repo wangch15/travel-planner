@@ -5,7 +5,7 @@
   let models=[],references=[],selectedRefs=new Set(),referenceScope='',lastAccount='',featureState={},materializedCandidate=false,viewedPreviewURL=null;
   let conversationItems=[],currentConversation=null,showArchived=false,conversationRequest=0,renameConversationId=null;
   let elapsedTimer=null,startedAt=0;
-  const exclusive=new Set(['project-update-prepare','project-update-confirm','tool-prepare','tool-install','provider-select','trip-delete-prepare','trip-delete-confirm','trip-restore','project-setup-prepare','project-setup-confirm','git-identity-prepare','git-identity-confirm','trip-create','plan-confirm','references-add','references-add-bytes','references-url','references-remove','research-confirm','materialize-confirm','materialize-discard','job-wait','job-pause','job-recover','handoff','backup-prepare','backup-confirm','backup-discard-prepare','backup-discard-confirm','publish-prepare','publish-confirm','adoption-prepare','adoption-confirm','archive-export','archive-import','auth-start','auth-cancel','cloudflare-account','conversation-new','conversation-switch','conversation-rename','conversation-archive']);
+  const exclusive=new Set(['project-update-prepare','project-update-confirm','tool-prepare','tool-install','provider-select','trip-archive','trip-unarchive','trip-purge-prepare','trip-purge-confirm','unship-prepare','unship-confirm','trip-restore','project-setup-prepare','project-setup-confirm','git-identity-prepare','git-identity-confirm','trip-create','plan-confirm','references-add','references-add-bytes','references-url','references-remove','research-confirm','materialize-confirm','materialize-discard','job-wait','job-pause','job-recover','handoff','backup-prepare','backup-confirm','backup-discard-prepare','backup-discard-confirm','publish-prepare','publish-confirm','adoption-prepare','adoption-confirm','archive-export','archive-import','auth-start','auth-cancel','cloudflare-account','conversation-new','conversation-switch','conversation-rename','conversation-archive']);
   const api=async(action,input={})=>{
     if(!window.travelDesktop?.feature)throw Error('請在桌面 App 使用這個功能。');
     const owns=exclusive.has(action)&&!aiBusy;if(owns){aiBusy=true;proposalBusy=true;updateComposer();}
@@ -105,17 +105,19 @@
   ]);
   $('journeys-more').onclick=e=>openActionMenu(e.currentTarget,[
     {label:showArchived?'隱藏已封存對話':'顯示已封存對話',icon:'chat',action:()=>{showArchived=!showArchived;navigation();}},
-    {label:'已移除的旅程…',icon:'trash',disabled:!project,action:()=>window.openTripTrash?.()},
+    {label:'封存的旅程…',icon:'folder',disabled:!project,action:()=>window.openTripTrash?.()},
     {separator:true},{label:'恢復示範旅程',icon:'plus',disabled:demos.some(t=>t.id==='welcome-demo'),action:async()=>{if(window.travelDesktop)await api('demo-visibility',{hidden:false});try{localStorage.removeItem('travel-planner.demo-removed');}catch{}seedDemo();navigation();}}
   ]);
   let deletion=null;
   function clearSelectedTrip(){clearTimeout(draftTimer);selected=null;realPreview=null;previewRequest++;pendingProposal=null;window.onFeatureTrip?.();$('welcome').hidden=false;$('messages').hidden=true;$('messages').replaceChildren();$('message').value='';$('trip-title').textContent='選擇一趟旅程';$('trip-status').textContent='Travel Planner';renderPreview();updateComposer();}
+  // 封存、還原、永久刪除後更新旅程清單；被移走的旅程正開著就關掉。
+  window.applyProjectResult=(result,removedSlug)=>{if(removedSlug&&selected&&!selected.demo&&selected.trip.slug===removedSlug)clearSelectedTrip();if(result?.project)project=result.project;navigation();renderProject();window.refreshBackupStatus?.();};
+  // 正式旅程改成「封存」（步驟燈箱）；示範旅程照舊直接刪除。
   window.requestTripRemoval=async(trip,demo)=>{
     if(aiBusy||pendingProposal||materializedCandidate)return;
-    try{const preparation=demo?null:(await api('trip-delete-prepare',{projectId:project.projectId,slug:trip.slug})).preparation;
-      deletion={trip,demo,preparation};$('trip-delete-title').textContent=demo?'刪除示範旅程':'移除「'+trip.title+'」';$('trip-delete-description').textContent=demo?'這份示範與示範對話會移除。你可以從旅程清單的更多選單重新加入示範。':preparation.warning;
-      $('confirm-trip-delete').textContent=demo?'刪除示範旅程':'移到本機回收區';$('trip-delete-error').hidden=true;$('trip-delete-dialog').showModal();
-    }catch(e){notify(e.message);}
+    if(!demo){if(!await flushConversationDraft())return;window.openSyncFlow({kind:'archive',slug:trip.slug,title:trip.title});return;}
+    deletion={trip,demo:true,preparation:null};$('trip-delete-title').textContent='刪除示範旅程';$('trip-delete-description').textContent='這份示範與示範對話會移除。你可以從旅程清單的更多選單重新加入示範。';
+    $('confirm-trip-delete').textContent='刪除示範旅程';$('trip-delete-error').hidden=true;$('trip-delete-dialog').showModal();
   };
   $('cancel-trip-delete').onclick=()=>$('trip-delete-dialog').close();
   $('reset-app-open').hidden=!window.travelDesktop;
@@ -127,14 +129,24 @@
     catch(e){$('reset-app-error').textContent=e.message;$('reset-app-error').hidden=false;$('confirm-reset-app').disabled=false;$('confirm-reset-app').textContent='重置並重新啟動';}
   };
   $('confirm-trip-delete').onclick=()=>action('confirm-trip-delete',async()=>{
-    if(!deletion||aiBusy)return;const {trip,demo,preparation}=deletion;
+    if(!deletion||aiBusy)return;const {trip,demo}=deletion;if(!demo)return;
     aiBusy=true;proposalBusy=true;updateComposer();try{if(!await flushConversationDraft())return;
       if(demo){if(trip.id==='welcome-demo'&&window.travelDesktop)await api('demo-visibility',{hidden:true});const i=demos.indexOf(trip);if(i>=0)demos.splice(i,1);if(trip.id==='welcome-demo')try{localStorage.setItem('travel-planner.demo-removed','true');}catch{}if(selected?.trip===trip)clearSelectedTrip();navigation();}
-      else{const result=await api('trip-delete-confirm',{token:preparation.token});if(selected?.trip===trip)clearSelectedTrip();project=result.project;navigation();renderProject();}
-      $('trip-delete-dialog').close();deletion=null;notify(demo?'示範已刪除。':'旅程已移到本機回收區，可從旅程清單的更多選單還原。');
+      $('trip-delete-dialog').close();deletion=null;notify('示範已刪除。');
     }catch(e){$('trip-delete-error').textContent=e.message;$('trip-delete-error').hidden=false;}finally{aiBusy=false;proposalBusy=false;updateComposer();}
   });
-  window.openTripTrash=async()=>{try{const {items}=await api('trip-trash-list');$('trip-trash-list').replaceChildren();for(const item of items){const row=el('div',undefined,'setting-row');row.append(el('span',item.title||item.slug),button('還原',async()=>{try{const result=await api('trip-restore',{id:item.id});project=result.project;navigation();renderProject();await window.openTripTrash();notify('旅程已還原。');}catch(e){notify(e.message);}}));$('trip-trash-list').append(row);}if(!items.length)$('trip-trash-list').append(el('p','目前沒有已移除的旅程。'));if(!$('trip-trash-dialog').open)$('trip-trash-dialog').showModal();}catch(e){notify(e.message);}};
+  // 封存的旅程：可以還原、下架網站、永久刪除；舊版本機回收區的項目只能還原（還原後可再封存）。
+  window.openTripTrash=async()=>{try{const {items,legacy}=await api('trip-archive-list');const list=$('trip-trash-list');list.replaceChildren();
+    const flow=async opts=>{await window.openSyncFlow(opts);await window.openTripTrash();};
+    for(const item of items){const row=el('div',undefined,'setting-row archive-row'),copy=el('div',undefined,'tool-copy');copy.append(el('h3',item.title));
+      if(item.site?.url)copy.append(el('p','網站仍在線上：'+item.site.url.replace(/^https:\/\//,''),'archive-live'));
+      const actions=el('div',undefined,'tool-actions');actions.append(button('還原',()=>flow({kind:'unarchive',slug:item.slug,title:item.title})));
+      if(item.site?.url)actions.append(button('下架網站…',()=>flow({kind:'unship',slug:item.slug,title:item.title,archived:true})));
+      const purge=button('永久刪除…',()=>flow({kind:'purge',slug:item.slug,title:item.title}));purge.className='text-button danger-text';actions.append(purge);
+      row.append(copy,actions);list.append(row);}
+    for(const item of legacy){const row=el('div',undefined,'setting-row archive-row'),copy=el('div',undefined,'tool-copy');copy.append(el('h3',item.title||item.slug),el('p','舊版的本機回收區（只在這台電腦）。還原後可以再封存或永久刪除。'));
+      const actions=el('div',undefined,'tool-actions');actions.append(button('還原',async()=>{const result=await api('trip-restore',{id:item.id});window.applyProjectResult(result);await window.openTripTrash();notify('旅程已還原。');}));row.append(copy,actions);list.append(row);}
+    if(!items.length&&!legacy.length)list.append(el('p','目前沒有封存的旅程。'));if(!$('trip-trash-dialog').open)$('trip-trash-dialog').showModal();}catch(e){notify(e.message);}};
   $('close-trip-trash').onclick=()=>$('trip-trash-dialog').close();
   window.createRealTripFromForm=async form=>{
     if(!project){$('new-error').textContent='請先在設定連接你的私人專案，再建立正式旅程。';$('new-error').hidden=false;return;}
@@ -345,13 +357,13 @@
     // 這趟有還沒備份的檔案，就直接提供「全部不要」（不用先連網檢查）。
     $('backup-discard').hidden=scopeAll||!(st?.pendingFiles>0);
     // 發布
-    const checklist=$('publish-checklist');checklist.replaceChildren();$('publish-open-site').hidden=true;
+    const checklist=$('publish-checklist');checklist.replaceChildren();$('publish-open-site').hidden=true;$('publish-unship').hidden=true;
     if(!real){setStatus('publish',{tone:'muted',head:'請先選擇一趟旅程',sub:'網站是一趟旅程一個網址。'});$('publish-prepare').disabled=true;return;}
     $('publish-prepare').disabled=false;
     const cf=await api('auth-status',{provider:'cloudflare'}).then(r=>r.auth.connected).catch(()=>null);if(request!==syncRequest)return;
     const site=overview.site;
     if(site?.error)setStatus('publish',{tone:'warn',head:'無法讀取網站狀態',sub:site.error});
-    else if(site?.url){setStatus('publish',{tone:'ok',head:'網站已上線',sub:`${site.url.replace(/^https:\/\//,'')} · 上次發布 ${syncDate(site.publishedAt)}${site.source==='cli'?'（之前用終端機發布）':''}`});$('publish-open-site').hidden=false;$('publish-open-site').onclick=()=>api('open-link',{url:site.url}).catch(e=>notify(e.message));}
+    else if(site?.url){setStatus('publish',{tone:'ok',head:'網站已上線',sub:`${site.url.replace(/^https:\/\//,'')} · 上次發布 ${syncDate(site.publishedAt)}${site.source==='cli'?'（之前用終端機發布）':''}`});$('publish-open-site').hidden=false;$('publish-open-site').onclick=()=>api('open-link',{url:site.url}).catch(e=>notify(e.message));$('publish-unship').hidden=false;$('publish-unship').onclick=async()=>{afterFlow('publish-result',await window.openSyncFlow({kind:'unship',slug:real.slug,title:real.title}));window.renderSync();};}
     else setStatus('publish',{tone:'muted',head:'這趟旅程還沒有網站',sub:'第一次發布前，先完成下面的步驟。'});
     const step=(done,text,action)=>{const row=el('div',undefined,'sync-step');row.dataset.done=String(done);row.append(el('span',done?'✓':'','sync-step-mark'),el('span',text));if(!done&&action)row.append(action);checklist.append(row);};
     step(cf===true,cf===true?'Cloudflare 已連接':cf===null?'無法確認 Cloudflare 連線，按「發布網站…」時會再檢查一次':'連接 Cloudflare（免費帳號，在瀏覽器登入一次）',cf===false?button('連接 Cloudflare',()=>$('cloudflare-connect').click()):null);

@@ -19,6 +19,7 @@ const {AuthTools}=require('./services/auth-tools.cjs');
 const {LocalArchiveService}=require('./services/local-archive.cjs');
 const {ToolSupport}=require('./services/tool-support.cjs');
 const {TripTrashService}=require('./services/trip-trash.cjs');
+const {TripArchiveService}=require('./services/trip-archive.cjs');
 const {ProjectSetupService}=require('./services/project-setup.cjs');
 const {BackupService}=require('./services/backup.cjs');
 const {PublishingService}=require('./services/publishing.cjs');
@@ -68,7 +69,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   const conversations = makeConversations(stateDirectory); chatStores.add(conversations);
   const researchKit=makeResearch({electron:{BrowserWindow,session},stateDirectory});
   const jobs=new JobController(conversations),newTrips=makeNewTrips(),attachments=new AttachmentStore(stateDirectory),backup=makeBackup(await prepareNodeShim(stateDirectory).catch(()=>null)),publisher=makePublisher(stateDirectory),archives=makeArchive(),projectSetup=makeProjectSetup(),trash=makeTrash();
-  let pendingTripRemoval=null,materialization=null,previewSeenURL=null,autoTarget=null,polling=false,windowClosing=false;
+  let materialization=null,previewSeenURL=null,autoTarget=null,polling=false,windowClosing=false;
   const restored = await store.read();
   nativeTheme.themeSource = restored.state.theme;
   let currentProject = null;
@@ -466,7 +467,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       try{return {ok:true,...await handler(input)};}catch(error){const failure=workflowFailure(error);return {...failure,message:featureMessage(error)};}finally{if(exclusive)versionBusy=false;}});
   };
   function featureMessage(error){
-    const texts={RESET_LOGOUT_FAILED:'無法確認 AI 帳號已登出，資料沒有重置。請到 AI 設定重新核對登入狀態後再試。',SESSION_PROVIDER_LOCKED:'這段對話的 AI 服務已固定，請使用「使用其他 AI 開新對話」。',WAIT_UNSUPPORTED:'此 AI 服務目前不支援自動等待額度。請稍後自行重試，不會自動轉用其他付費方式。',TRIP_CHANGED:'旅程已變動，請重新核對移除內容。',TRASH_NOT_IGNORED:'這個專案的設定比較舊，App 無法確定回收區不會被一起備份上去，所以旅程先不移除。請先到「設定 → 專案管理」按「更新專案」，完成後再試。',TRIP_EXISTS:'原位置已有同名旅程，無法覆蓋還原。',GIT_IDENTITY_REQUIRED:'還沒設定備份署名（每次備份會記下的名字與郵件）。按「用我的 GitHub 帳號設定」，App 會用你的 GitHub 名稱與 GitHub 提供的隱私郵件設定好；原檔不變。',INVALID_REPOSITORY:'請填寫正確的 GitHub 擁有者／專案名稱。',NESTED_PROJECT:'這個位置在另一個專案資料夾裡面，請換一個位置（例如「文件」或「桌面」）。',DESTINATION_EXISTS:'目的地資料夾已存在，請選擇其他位置。',STALE_CONFIRMATION:'確認已過期，請重新核對。',CONVERSATION_LIMIT:'這趟旅程已達50段對話上限，舊紀錄完整保留。可先複製重要紀錄，暫時繼續使用既有對話。',NO_PROJECT:'請先從專案管理連接你的私人專案。',PRIVATE_PROJECT_REQUIRED:'建立旅程需要可確認的私人專案。',UNSUPPORTED_ATTACHMENT_TYPE:'目前支援文字、Markdown、JSON、PNG、JPEG 與 WebP；PDF/OCR 尚未支援。',ATTACHMENT_LIMIT:'附件數量已達上限，請先移除不需要的附件。',UNSAFE_REFERENCE_ADDRESS:'參考網址必須是公開網站，不能讀取本機或內部網路。',REFERENCE_TIMEOUT:'網站未在時間內回應，請稍後重試或附上文字。',REFERENCE_HTTP_ERROR:'未能讀取這個網站，請檢查網址或使用文字附件。',PLAN_CONFIRMATION_REQUIRED:'請先確認最新逐日草案。',RESEARCH_CONFIRMATION_REQUIRED:'請先完成查核並確認摘要。',RESEARCH_INCOMPLETE:'仍有未核對的來源或待確認事項，請補充來源並重新查核。',DRAFT_CHANGED:'草稿或候選資料已變動，請重新建立預覽。',PREVIEW_CONFIRMATION_REQUIRED:'請先查看這份候選預覽。',ADOPTION_REQUIRED:'網站已存在，請先查核並明確接管，避免覆蓋其他網站。',TRUSTED_HOOK_REQUIRED:'App 沒辦法自動啟用這個專案的備份保護：專案裡的保護程式和 App 內建的版本不同，或已經設定了其他 Git hook。請先到「設定 → 專案管理」按「更新專案」，完成後再備份。',NO_WAITING_JOB:'目前沒有可自動等待的工作。',STALE_JOB:'工作已更新，請重新載入。',MISSING_TOOL:'所需工具尚未安裝，請查看工具與更新。',PRIVATE_DATA_IN_TRIP:'候選內容含有訂房確認碼或私人網站網址，不能寫進會公開的行程檔，已擋下。請再請 AI 修改一次。',UNSAFE_PRIVATE_NOTES:'這趟的 docs 資料夾狀態異常（可能是捷徑），私人筆記沒有寫入。',PRIVATE_SITE_NOT_CONNECTED:'這個網站尚未連接，請先在「資料來源」連接。',TOOL_CHECKSUM_MISMATCH:'下載的檔案和官方檢查碼不符，已停止安裝，電腦沒有被改動。請稍後重試。',TOOL_INSTALL_UNVERIFIED:'安裝跑完了，但 App 沒找到可用的工具。請按「重新檢查」，或稍後重試。',TOOL_DOWNLOAD_FAILED:'下載失敗，請確認網路連線後重試。',TOOL_DOWNLOAD_TIMEOUT:'下載太久沒有完成，請確認網路連線後重試。',TOOL_INSTALL_BUSY:'另一個工具正在安裝，請等它完成。',PRIVATE_SITE_INVALID:'網站資料不正確，請重新整理後再試。',UNSAFE_ATTACHMENT:'這個檔案無法加入：可能超過 8MB（文字 1MB），或檔名不正確。',INVALID_IMAGE:'無法辨識這張圖片，或尺寸超過 8192px；請換成 PNG、JPEG 或 WebP 截圖。',INVALID_TEXT:'文字檔不是 UTF-8 文字，請另存為純文字後再加入。'};
+    const texts={RESET_LOGOUT_FAILED:'無法確認 AI 帳號已登出，資料沒有重置。請到 AI 設定重新核對登入狀態後再試。',SESSION_PROVIDER_LOCKED:'這段對話的 AI 服務已固定，請使用「使用其他 AI 開新對話」。',WAIT_UNSUPPORTED:'此 AI 服務目前不支援自動等待額度。請稍後自行重試，不會自動轉用其他付費方式。',TRIP_CHANGED:'旅程已變動，請重新核對移除內容。',SITE_STILL_PUBLISHED:'這趟旅程的網站還在線上。請先下架網站，再永久刪除。',TRASH_NOT_IGNORED:'這個專案的設定比較舊，App 無法確定回收區不會被一起備份上去，所以旅程先不移除。請先到「設定 → 專案管理」按「更新專案」，完成後再試。',TRIP_EXISTS:'原位置已有同名旅程，無法覆蓋還原。',GIT_IDENTITY_REQUIRED:'還沒設定備份署名（每次備份會記下的名字與郵件）。按「用我的 GitHub 帳號設定」，App 會用你的 GitHub 名稱與 GitHub 提供的隱私郵件設定好；原檔不變。',INVALID_REPOSITORY:'請填寫正確的 GitHub 擁有者／專案名稱。',NESTED_PROJECT:'這個位置在另一個專案資料夾裡面，請換一個位置（例如「文件」或「桌面」）。',DESTINATION_EXISTS:'目的地資料夾已存在，請選擇其他位置。',STALE_CONFIRMATION:'確認已過期，請重新核對。',CONVERSATION_LIMIT:'這趟旅程已達50段對話上限，舊紀錄完整保留。可先複製重要紀錄，暫時繼續使用既有對話。',NO_PROJECT:'請先從專案管理連接你的私人專案。',PRIVATE_PROJECT_REQUIRED:'建立旅程需要可確認的私人專案。',UNSUPPORTED_ATTACHMENT_TYPE:'目前支援文字、Markdown、JSON、PNG、JPEG 與 WebP；PDF/OCR 尚未支援。',ATTACHMENT_LIMIT:'附件數量已達上限，請先移除不需要的附件。',UNSAFE_REFERENCE_ADDRESS:'參考網址必須是公開網站，不能讀取本機或內部網路。',REFERENCE_TIMEOUT:'網站未在時間內回應，請稍後重試或附上文字。',REFERENCE_HTTP_ERROR:'未能讀取這個網站，請檢查網址或使用文字附件。',PLAN_CONFIRMATION_REQUIRED:'請先確認最新逐日草案。',RESEARCH_CONFIRMATION_REQUIRED:'請先完成查核並確認摘要。',RESEARCH_INCOMPLETE:'仍有未核對的來源或待確認事項，請補充來源並重新查核。',DRAFT_CHANGED:'草稿或候選資料已變動，請重新建立預覽。',PREVIEW_CONFIRMATION_REQUIRED:'請先查看這份候選預覽。',ADOPTION_REQUIRED:'網站已存在，請先查核並明確接管，避免覆蓋其他網站。',TRUSTED_HOOK_REQUIRED:'App 沒辦法自動啟用這個專案的備份保護：專案裡的保護程式和 App 內建的版本不同，或已經設定了其他 Git hook。請先到「設定 → 專案管理」按「更新專案」，完成後再備份。',NO_WAITING_JOB:'目前沒有可自動等待的工作。',STALE_JOB:'工作已更新，請重新載入。',MISSING_TOOL:'所需工具尚未安裝，請查看工具與更新。',PRIVATE_DATA_IN_TRIP:'候選內容含有訂房確認碼或私人網站網址，不能寫進會公開的行程檔，已擋下。請再請 AI 修改一次。',UNSAFE_PRIVATE_NOTES:'這趟的 docs 資料夾狀態異常（可能是捷徑），私人筆記沒有寫入。',PRIVATE_SITE_NOT_CONNECTED:'這個網站尚未連接，請先在「資料來源」連接。',TOOL_CHECKSUM_MISMATCH:'下載的檔案和官方檢查碼不符，已停止安裝，電腦沒有被改動。請稍後重試。',TOOL_INSTALL_UNVERIFIED:'安裝跑完了，但 App 沒找到可用的工具。請按「重新檢查」，或稍後重試。',TOOL_DOWNLOAD_FAILED:'下載失敗，請確認網路連線後重試。',TOOL_DOWNLOAD_TIMEOUT:'下載太久沒有完成，請確認網路連線後重試。',TOOL_INSTALL_BUSY:'另一個工具正在安裝，請等它完成。',PRIVATE_SITE_INVALID:'網站資料不正確，請重新整理後再試。',UNSAFE_ATTACHMENT:'這個檔案無法加入：可能超過 8MB（文字 1MB），或檔名不正確。',INVALID_IMAGE:'無法辨識這張圖片，或尺寸超過 8192px；請換成 PNG、JPEG 或 WebP 截圖。',INVALID_TEXT:'文字檔不是 UTF-8 文字，請另存為純文字後再加入。'};
     if(/^PRIVATE_SITE_/.test(error.code||'')&&error.hint)return error.hint;
     if(typeof error.userMessage==='string')return error.userMessage;
     // 功能操作（備份、發布、專案…）：服務附的說明最貼近實際情況，優先於 AI 保存流程的共用對照表。
@@ -515,7 +516,24 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     currentProject={...checked,projectId};activeSlug=null;autoTarget=null;restoreWarning=null;artifact=null;previewSeenURL=null;previewAttempt++;
     return {result,project:currentProject,selectedSlug:null};
   },{exclusive:true});
-  feature('trip-delete-prepare',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});const target=selectedTarget(input);const preparation=await trash.prepare(target);pendingTripRemoval={token:preparation.token,projectId:currentProject.projectId,root:target.root};return {preparation};},{exclusive:true});
+  // 旅程移除分兩段：封存（搬到 trips/_archived/，跟著備份、可還原）→ 在封存清單永久刪除（要輸入旅程名稱）。
+  const archive=new TripArchiveService();
+  const busyGuard=()=>{if(generating||editor.active||proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});};
+  // 封存清單裡的旅程已不在 currentProject.trips，只核對目前專案與代號格式。
+  const archivedTarget=input=>{if(!currentProject||input?.projectId!==currentProject.projectId||!/^[a-z0-9][a-z0-9-]{0,99}$/.test(input?.slug||''))throw Error('stale-project');return {root:currentProject.root,slug:input.slug,projectId:currentProject.projectId};};
+  const siteOf=async target=>{try{return await publisher.status({root:target.root,slug:target.slug});}catch{return {url:null};}};
+  feature('trip-archive',async input=>{busyGuard();const target=selectedTarget(input);const site=await siteOf(target);await archive.archive(target.root,target.slug);if(activeSlug===target.slug){await store.clearSelection();activeSlug=null;autoTarget=null;}return {archived:{slug:target.slug},site,...await refreshProject(activeSlug)};},{exclusive:true});
+  feature('trip-archive-list',async()=>{if(!currentProject)throw Object.assign(Error('NO_PROJECT'),{code:'NO_PROJECT'});const items=await archive.list(currentProject.root);for(const item of items)item.site=await siteOf({root:currentProject.root,slug:item.slug});return {items,legacy:await trash.list({root:currentProject.root}).catch(()=>[])};});
+  feature('trip-unarchive',async input=>{busyGuard();const target=archivedTarget(input);await archive.restore(target.root,target.slug);return {restored:{slug:target.slug},...await refreshProject(activeSlug)};},{exclusive:true});
+  feature('trip-purge-prepare',async input=>{busyGuard();const target=archivedTarget(input);return {preparation:{...await archive.preparePurge(target.root,target.slug),site:await siteOf(target)}};},{exclusive:true});
+  feature('trip-purge-confirm',async input=>{busyGuard();const target=archivedTarget(input);
+    if((await siteOf(target)).url)throw Object.assign(Error('SITE_STILL_PUBLISHED'),{code:'SITE_STILL_PUBLISHED'});
+    const result=await archive.confirmPurge(input.token,input.title);if(result.root!==currentProject?.root||result.slug!==target.slug)throw Error('PROJECT_CHANGED');
+    // App 裡這趟的對話、版本紀錄與附件一起清掉；之後同名的新旅程不會接到舊資料。
+    await Promise.allSettled([conversations.forget(target),versions.forget(target),attachments.forgetTrip?.({...target,accountKey:accountKey()})]);
+    return {result};},{exclusive:true});
+  feature('unship-prepare',async input=>{busyGuard();const target=input?.archived?archivedTarget(input):selectedTarget(input);return {preparation:await publisher.prepareUnship({root:target.root,slug:target.slug,archived:Boolean(input?.archived)})};},{exclusive:true});
+  feature('unship-confirm',async input=>{busyGuard();return {result:await publisher.confirmUnship(input.token)};},{exclusive:true});
   // 在 App 裡更新私人專案的引擎（相當於 CLI 的 tp-update）。預演與確認分兩段，確認後才合併。
   const buildInfo=readBuildInfo(),projectUpdate=new ProjectUpdateService({appCommit:buildInfo.commit,engineVersion:buildInfo.engineVersion});
   // 同一專案被另一個 Travel Planner 開著時提醒；關閉 App 時釋放。
@@ -526,7 +544,6 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   feature('project-update-status',async()=>{if(!currentProject)throw Error('PROJECT_REQUIRED');return {update:await projectUpdate.status(currentProject.root)};});
   feature('project-update-prepare',async()=>{if(!currentProject)throw Error('PROJECT_REQUIRED');if(generating||editor.active||proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});return {update:await projectUpdate.prepare(currentProject.root)};},{exclusive:true});
   feature('project-update-confirm',async input=>{if(!currentProject)throw Error('PROJECT_REQUIRED');if(generating||editor.active||proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});const result=await projectUpdate.confirm(input.token,{migrate:dir=>migrateWithAppScripts(dir)});return {result,...await refreshProject(activeSlug)};},{exclusive:true});
-  feature('trip-delete-confirm',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});if(!pendingTripRemoval||pendingTripRemoval.token!==input.token||pendingTripRemoval.projectId!==currentProject?.projectId||pendingTripRemoval.root!==currentProject?.root)throw Error('PROJECT_CHANGED');pendingTripRemoval=null;const result=await trash.confirm(input.token);if(result.root!==currentProject?.root)throw Error('PROJECT_CHANGED');if(activeSlug===result.slug){await store.clearSelection();activeSlug=null;autoTarget=null;}return {result,...await refreshProject(activeSlug)};},{exclusive:true});
   feature('trip-trash-list',async()=>{if(!currentProject)throw Object.assign(Error('NO_PROJECT'),{code:'NO_PROJECT'});return {items:await trash.list({root:currentProject.root})};});
   feature('trip-restore',async input=>{if(!currentProject)throw Object.assign(Error('NO_PROJECT'),{code:'NO_PROJECT'});const result=await trash.restore({root:currentProject.root,id:input.id});return {result,...await refreshProject(activeSlug)};},{exclusive:true});
   feature('demo-visibility',async input=>{await store.setDemoHidden(input.hidden===true);return {hidden:input.hidden===true};});
@@ -681,7 +698,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   // 備份前先把專案的可信保護程式啟用好（沒啟用時 App 自己補，不叫使用者去設定 Git hook）。
   // 補裝失敗不擋在這裡：接著的備份核對會說明原因。
   const readyForBackup=async root=>{try{await projectSetup.enableTrustedHooks?.(root);}catch{}};
-  feature('backup-prepare',async input=>{const target=input?.scope==='all'?(()=>{if(!currentProject)throw Error('PROJECT_REQUIRED');return {root:currentProject.root,slug:'*'};})():selectedTarget(input);await readyForBackup(target.root);return {preparation:await backup.prepare(target)};},{exclusive:true});
+  feature('backup-prepare',async input=>{const target=input?.scope==='all'?(()=>{if(!currentProject)throw Error('PROJECT_REQUIRED');return {root:currentProject.root,slug:'*'};})():input?.scope==='archive'?{...archivedTarget(input),scope:'archive'}:selectedTarget(input);await readyForBackup(target.root);return {preparation:await backup.prepare(target)};},{exclusive:true});
   // 「備份與發布」頁用：每趟的本機備份狀態、全部旅程的狀態，以及目前這趟的網站與預覽狀態。都不連網。
   feature('sync-overview',async input=>{if(!currentProject)return {overview:null};// 讀不到的項目帶回原因，畫面寫「無法讀取」而不是假裝沒有變更或沒有網站。
     const root=currentProject.root,safe=async run=>{try{return await run();}catch(error){return {error:featureMessage(error)};}};

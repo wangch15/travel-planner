@@ -87,6 +87,13 @@ class ConversationStore {
       }
     });this.queue=operation.catch(()=>{});return operation;
   }
+  // 永久刪除旅程時一起忘掉這趟的對話紀錄，之後同名的新旅程不會接到舊對話。
+  forget(target) {
+    const operation=this.queue.then(async()=>{
+      const file=this.filename(target);if(!await this.checkDirectory())return;
+      try{const stat=await fs.lstat(file);if(regular(stat))await fs.unlink(file);}catch(e){if(e.code!=='ENOENT')throw fail();}
+    });this.queue=operation.catch(()=>{});return operation;
+  }
   async flush(){await this.queue;}
 }
 module.exports={ConversationStore,SESSION_FIELDS,applySuggestedTitle};

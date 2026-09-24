@@ -1,6 +1,6 @@
 {
   "name": "travel-planner",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "private": true,
   "description": "公開的旅程網頁模板：引擎 + trips/<slug>/ 內容",
   "engines": {
