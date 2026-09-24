@@ -26,3 +26,21 @@ test('all-trips status counts every trip folder but not the template example',as
   assert.equal((await backup.localStatus(root,'*')).pendingFiles,3);
   assert.equal((await backup.localStatus(root,'a')).pendingFiles,1);
 });
+
+test('discard returns only this trip to the last backup, after listing what will change',async t=>{
+  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'backup-discard-')));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  git(root,'init','-q');for(const d of ['trips/a','trips/b'])fs.mkdirSync(path.join(root,d),{recursive:true});
+  const data=fs.readFileSync(path.join(__dirname,'../../../trips/_example/data.js'),'utf8');
+  fs.writeFileSync(path.join(root,'trips/a/data.js'),data);fs.writeFileSync(path.join(root,'trips/b/note.md'),'b');git(root,'add','.');git(root,'commit','-qm','base');
+  fs.writeFileSync(path.join(root,'trips/a/data.js'),data.replace(/title:\s*'([^']*)'/,"title:'改過的標題'"));fs.writeFileSync(path.join(root,'trips/a/new.md'),'new');fs.writeFileSync(path.join(root,'trips/b/note.md'),'b changed');
+  const service=new BackupService();
+  const prep=await service.discardPrepare({root,slug:'a'});
+  assert.deepEqual(prep.restore,['trips/a/data.js']);assert.deepEqual(prep.remove,['trips/a/new.md']);assert.ok(prep.dayChanges.some(c=>c.after.includes('改過的標題')));
+  // 確認前又改了，就不動檔案
+  fs.appendFileSync(path.join(root,'trips/a/new.md'),'!');await assert.rejects(service.discardConfirm(prep.token),{code:'CONTENT_CHANGED'});
+  const again=await service.discardPrepare({root,slug:'a'});const result=await service.discardConfirm(again.token);
+  assert.deepEqual(result,{discarded:true,restored:1,removed:1});
+  assert.equal(fs.readFileSync(path.join(root,'trips/a/data.js'),'utf8'),data);assert.equal(fs.existsSync(path.join(root,'trips/a/new.md')),false);
+  assert.equal(fs.readFileSync(path.join(root,'trips/b/note.md'),'utf8'),'b changed','別趟旅程不受影響');
+  await assert.rejects(service.discardPrepare({root,slug:'../b'}),{code:'INVALID_TARGET'});
+});

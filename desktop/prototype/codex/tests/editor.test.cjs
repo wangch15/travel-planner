@@ -60,7 +60,7 @@ test('whole-trip discussion sends all raw days with only referenced place descri
   assert.deepEqual(sent.places,{first:{name:'First',cat:'sight',note:'Known note'},second:{name:'Second',cat:'stay'},alternate:{name:'Alternate',cat:'sight'},another:{name:'Another',cat:'food'}});
   assert.equal(JSON.stringify(sent).includes('PRIVATE_ADDRESS'),false);
   assert.equal(JSON.stringify(sent).includes('EXCLUDED_TOKEN'),false);
-  assert.deepEqual(schema,{type:'object',additionalProperties:false,properties:{summary:{type:'string'},conversationTitle:{type:'string'},appAction:{type:'string',enum:['none','backup','publish','project-update','research']},nextScope:{type:'string'},nextReply:{type:'string'}},required:['summary','conversationTitle','appAction','nextScope','nextReply']});
+  assert.deepEqual(schema,{type:'object',additionalProperties:false,properties:{summary:{type:'string'},replacementDaysJson:{type:'string'},conversationTitle:{type:'string'},appAction:{type:'string',enum:['none','backup','publish','project-update','research']},nextReply:{type:'string'}},required:['summary','replacementDaysJson','conversationTitle','appAction','nextReply']});
   assert.match(instructions,/整趟/);
   assert.match(instructions,/不可.*(?:修改|保存)/);
   assert.deepEqual(result,{summary:'建議每天留一段休息時間。',discussion:true,threadId:'thread',turnId:'turn',model:'server-model'});
@@ -262,12 +262,19 @@ test('appAction is an optional App action proposal; unknown actions are rejected
   assert.equal(research.research,true);assert.equal(research.appAction,'publish');
 });
 
-test('nextScope／nextReply become a suggestion; malformed hints are ignored instead of failing the reply',()=>{
+test('nextReply becomes a suggestion; malformed hints are ignored instead of failing the reply',()=>{
   const {decodeAnswer}=require('../editor.cjs');
-  const d=decodeAnswer(JSON.stringify({summary:'好',nextScope:'all',nextReply:'請套用修改'}),{mode:'discussion'});
-  assert.deepEqual(d.suggestion,{scope:'all',reply:'請套用修改'});assert.equal(d.discussion,true);
-  assert.deepEqual(decodeAnswer(JSON.stringify({summary:'好',nextScope:'3',nextReply:''}),{mode:'discussion'}).suggestion,{scope:'3'});
-  assert.equal(decodeAnswer(JSON.stringify({summary:'好',nextScope:'keep',nextReply:''}),{mode:'discussion'}).suggestion,undefined);
-  assert.equal(decodeAnswer(JSON.stringify({summary:'好',nextScope:'rm -rf',nextReply:'x'.repeat(80)}),{mode:'discussion'}).suggestion,undefined);
+  assert.deepEqual(decodeAnswer(JSON.stringify({summary:'好',replacementDaysJson:'',nextReply:'請套用修改'}),{mode:'discussion'}).suggestion,{reply:'請套用修改'});
+  assert.equal(decodeAnswer(JSON.stringify({summary:'好',nextReply:'x'.repeat(80)}),{mode:'discussion'}).suggestion,undefined);
   assert.equal(decodeAnswer(JSON.stringify({summary:'好'}),{mode:'discussion'}).suggestion,undefined);
+});
+
+test('discussion decides by itself: empty replacementDaysJson is a reply, filled one is a cross-day proposal',()=>{
+  const {decodeAnswer}=require('../editor.cjs');
+  assert.equal(decodeAnswer(JSON.stringify({summary:'建議',replacementDaysJson:''}),{mode:'discussion'}).discussion,true);
+  assert.equal(decodeAnswer(JSON.stringify({summary:'建議',replacementDaysJson:'[]'}),{mode:'discussion'}).discussion,true);
+  const edit=decodeAnswer(JSON.stringify({summary:'改好了',replacementDaysJson:JSON.stringify([{id:1,title:'悠閒'}])}),{mode:'discussion'});
+  assert.equal(edit.discussion,undefined);assert.deepEqual(edit.replacementDays,[{id:1,title:'悠閒'}]);
+  assert.throws(()=>decodeAnswer(JSON.stringify({summary:'x',replacementDaysJson:'not json'}),{mode:'discussion'}),{code:'AI_OUTPUT_INVALID'});
+  assert.throws(()=>decodeAnswer(JSON.stringify({summary:'x',replacementDayJson:'{}'}),{mode:'discussion'}),{code:'AI_OUTPUT_INVALID'});
 });

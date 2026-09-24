@@ -588,6 +588,8 @@ body[data-onboarding] .app-header .chat-heading, body[data-onboarding] #preview-
 .action-card-note:empty { display:none; }
 .action-card-note[data-tone="ok"] { color:#2f8f58; } :root[data-theme="dark"] .action-card-note[data-tone="ok"] { color:#6cc08b; }
 .action-card-note[data-tone="warn"] { color:var(--error); }
+.research-ack { display:flex; gap:8px; align-items:flex-start; margin:14px 0 4px; font-size:13px; line-height:1.6; }
+.research-ack input { margin-top:4px; flex-shrink:0; }
 .action-card-buttons { display:flex; flex-wrap:wrap; gap:8px; }
 .action-card-buttons button { padding:5px 12px; font-size:12.5px; border-radius:7px; }
 .action-card-buttons:empty { display:none; }
@@ -628,3 +630,11 @@ body[data-onboarding] .app-header .chat-heading, body[data-onboarding] #preview-
 .sync-advanced-row { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 0; border-top:1px solid var(--line); }
 .sync-advanced-row p { margin:3px 0 0; font-size:12.5px; color:var(--muted); line-height:1.6; }
 .sync-advanced-row strong { font-size:14px; font-weight:500; }
+
+/* 備份前查看差異、全部不要 */
+.day-change { margin:6px 0; border:1px solid var(--line); border-radius:8px; padding:6px 10px; }
+.day-change summary { cursor:pointer; font-size:13px; }
+.day-change .change-pair { margin-top:8px; }
+button.danger-text { color:var(--error); }
+.applied-actions { align-items:center; margin-top:12px; }
+.applied-note { font-size:12px; color:var(--muted); }

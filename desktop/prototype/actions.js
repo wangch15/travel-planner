@@ -51,12 +51,12 @@
       if (!window.previewViewed?.()) { c.say('請先在右側預覽看過目前內容。', 'warn'); c.set(c.btn('打開預覽', async () => { setPreview(true); }), c.btn('我看過了，繼續', start, false)); return; }
       const { preparation: p } = await feature('publish-prepare', conversationTarget());
       const ack = h('input', { type: 'checkbox', id: 'ack-' + Math.random().toString(36).slice(2) });
-      c.body.replaceChildren(h('p', {}, `網站：${p.name}`), h('p', {}, `Cloudflare：${p.accountName || p.accountId}`), h('p', {}, p.warning),
+      c.body.replaceChildren(h('p', {}, `網站：${p.name}`), h('p', {}, `Cloudflare：${p.accountName || p.accountId}`), h('p', {}, p.warning), p.backupFirst ? h('p', {}, `發布前會先把${p.backupFirst.pendingFiles ? ` ${p.backupFirst.pendingFiles} 個` : '尚未備份的'}修改備份（commit + push）到你的私人 GitHub。`) : null,
         h('label', { class: 'action-card-ack', for: ack.id }, ack, '我已看過目前預覽，並了解網站可由持有網址的人開啟。'));
       c.say('');
       c.set(c.btn('確認發布', async () => {
         if (!ack.checked) throw Error('請先勾選上面的提醒。');
-        const { result } = await feature('publish-confirm', { token: p.token });
+        const { result } = await feature('publish-confirm', { token: p.token, ...conversationTarget() });
         c.say(result.message, result.url ? 'ok' : 'warn'); c.body.replaceChildren();
         if (result.code === 'WORKERS_SUBDOMAIN_REQUIRED') { c.set(c.btn('打開 Cloudflare 設定', async () => { await feature('open-link', { url: 'https://dash.cloudflare.com/?to=/:account/workers-and-pages' }); }), c.btn('設定好了，重新準備', start, false)); return; }
         c.set(...(result.url ? [c.btn('開啟網站', async () => { await feature('open-link', { url: result.url }); }, false)] : []));

@@ -279,7 +279,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       POLICY_MISMATCH:'Codex 的執行設定與工作台要求不符，已停止送出。', AI_BUSY:'已有一個 AI 工作正在執行。',
       AI_CANCELED:'這輪未完成，狀態需要確認。', AI_RESULT_UNKNOWN:'回覆結果未能確認，沒有重送，也沒有保存到原專案。',
       UNKNOWN_RESULT:'送出結果未能確認，沒有自動重送。', AI_TURN_FAILED:'Codex 未完成這次回覆，原專案未修改。',
-      CONTENT_CHANGED:'原始行程已有新修改，這份提案已失效，請重新產生。', PRIVATE_REPO_REQUIRED:'無法確認原專案為私人 repo，已停止保存。',
+      CONTENT_CHANGED:'原始行程已有新修改，這份提案已失效，請重新產生。', PRIVATE_REPO_REQUIRED:'無法確認你的 GitHub 專案是私人的（可能是網路不通或 GitHub 沒登入），這次修改沒有保存。確認連線後再說一次即可。',
       PREVIEW_REQUIRED:'請先開啟這份提案的預覽，再確認保存。', RESEARCH_REQUIRED:'停留或交通有變動，需要先完成來源與可行性查核。',
       STALE_PROPOSAL:'這份提案已失效，請重新產生。', INVALID_CANDIDATE:'AI 提案未通過完整資料驗證，原專案未修改。',
       UNSUPPORTED_DAY_CHANGE:'提案修改了本輪不支援的欄位，原專案未修改。', MODEL_UNAVAILABLE:'目前沒有可用模型，請重新確認帳號連接。',
@@ -304,6 +304,18 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   function researchBinding(target,baseline,proposal){return createHash('sha256').update(JSON.stringify([target.root,target.slug,baseline.digest,proposal?.contextDigest||null,proposal?createHash('sha256').update(proposal.source).digest('hex'):null])).digest('hex');}
   // Private codes (from docs/private-notes.md) and connected private sites must never reach public trip files.
   async function assertNoPrivateData(target,texts){const markers=await privateMarkers(path.join(target.root,'trips',target.slug),researchKit.sources.list().map(s=>s.host));const reason=findPrivateData(texts,markers);if(reason)throw Object.assign(Error('PRIVATE_DATA_IN_TRIP'),{code:'PRIVATE_DATA_IN_TRIP',reason});}
+  // AI 的修改直接寫進本機檔案（git 工作區），每次自動記一個版本，改錯可以回到前一版。
+  // 保存前的私有檢查、私人資料檢查與「內容沒被別人改過」的核對仍照舊；需要查核的變更改成提醒，不擋保存。
+  async function applyPendingNow(target){
+    const pending=proposals.pending;const research=pending.requiresResearch&&pending.kind!=='restore';
+    const labels=pending.changes.filter(c=>pending.selectedKeys.includes(c.key)).map(c=>c.label).slice(0,30);
+    pending.seen=true;pending.requiresResearch=false;
+    try{await assertPendingClean(target);const result=await proposals.apply(pending.id,target);
+      artifact=null;previewAttempt++;
+      const history=await versions.read(target).catch(()=>null);const index=history&&result.version?history.revisions.findIndex(r=>r.id===result.version.id):-1;const previous=index>0?history.revisions[index-1]:null;
+      return {versionId:result.version?.id||null,number:result.version?.number||null,previousId:previous?.id||null,previousNumber:previous?.number||null,labels,research};
+    }catch(error){if(proposals.pending===pending){pending.seen=false;pending.requiresResearch=research;}throw error;}
+  }
   async function assertPendingClean(target){if(!proposals.pending)return;try{await assertNoPrivateData(target,[proposals.pending.fullSource||proposals.pending.source||'']);}catch(error){proposals.discard();throw error;}}
   async function checkResearch(answer,sourceHash,proposalId,checkCanceled=()=>{}){
     const sources=[];const unresolved=[...answer.unresolved];let renders=0;
@@ -324,7 +336,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   async function runAI(input,target,{automatic=false}={}){
     if(providerId==='gemini')return workflowFailure({code:'PROVIDER_UNAVAILABLE'});
     if(accountSwitching||versionBusy||generating||editor.active||proposals.saving||materialization)return workflowFailure({code:'AI_BUSY'});
-    generating=true;activeGenerationTarget=target;const nonce=++generationNonce;const checkCanceled=()=>{if(nonce!==generationNonce||win.isDestroyed())throw Object.assign(Error('AI_CANCELED'),{code:'AI_CANCELED'});};let requestSaved=false,candidateCreated=false,editorStarted=false,job,completedAnswer=null;
+    generating=true;activeGenerationTarget=target;const nonce=++generationNonce;const checkCanceled=()=>{if(nonce!==generationNonce||win.isDestroyed())throw Object.assign(Error('AI_CANCELED'),{code:'AI_CANCELED'});};let requestSaved=false,candidateCreated=false,applied=null,editorStarted=false,job,completedAnswer=null;
     try{
       const requestedMode=input.mode|| (input.dayId===null?'discussion':input.dayId===-1?'edit-all':'edit-day');
       if(proposals.pending&&(!sameTarget(proposals.pending.target,target)||requestedMode!=='research'))throw Object.assign(Error('STALE_PROPOSAL'),{code:'STALE_PROPOSAL'});
@@ -366,13 +378,20 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
         await assertNoPrivateData(target,Object.values(answer.files));const preparation=await newTrips.prepareMaterialization(target.root,target.slug,{files:answer.files});
         let candidate;try{candidate=await buildPreview(preparation.root,preparation.slug);checkCanceled();}catch(e){await newTrips.discardMaterialization(preparation.token);throw e;}materialization={...preparation,target,artifact:candidate,planDigest:conversation.plan.approvedDigest,seen:false};artifact=candidate;previewSeenURL=null;previewAttempt++;
         proposal={changed:false,summary:answer.summary,materialization:true,previewUrl:candidate.url,previewSummary:candidate.summary};
-      }else if(!answer.discussion&&!answer.planning){proposal=proposals.create(target,baseline,input.dayId,answer);if(proposal.changed)await assertPendingClean(target);if(proposal.changed){candidateCreated=true;await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}}
+      }else if(!answer.discussion&&!answer.planning){proposal=proposals.create(target,baseline,input.dayId,answer);
+        if(proposal.changed){
+          // 直接套用；寫入失敗（例如檔案剛被別的程式改過）才退回舊的提案確認流程。
+          try{applied=await applyPendingNow(target);proposal={changed:false,applied:true,summary:answer.summary,...applied};}
+          catch(e){if(!proposals.pending)throw e;if(e.code!=='CONTENT_CHANGED'){proposals.discard();throw e;}await assertPendingClean(target);candidateCreated=true;await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}
+        }}
       checkCanceled();
-      const updated=await conversations.update(target,s=>{applySuggestedTitle(s,answer);s.messages.push({role:'assistant',text:answer.summary+(answer.planning?'\n\n'+answer.planMarkdown:''),...(answer.appAction?{action:answer.appAction}:{}),generation:{provider:providerId,model:answer.model||input.model||'',effort:input.effort||'',...(!input.effort&&answer.resolvedEffort?{resolvedEffort:answer.resolvedEffort}:{})}});s.run={id:job.id,status:'complete'};s.thread={id:answer.threadId,accountKey:binding,lastTurnId:answer.turnId};s.model=answer.model;s.pendingProposal=Boolean(proposals.pending);s.lastOutcome=proposals.pending?'提案尚未保存。':'上一輪沒有修改原檔。';if(answer.planning)s.plan={markdown:answer.planMarkdown,approvedDigest:null};if(research)s.research=research;});
+      const updated=await conversations.update(target,s=>{applySuggestedTitle(s,answer);s.messages.push({role:'assistant',text:answer.summary+(answer.planning?'\n\n'+answer.planMarkdown:''),...(answer.appAction?{action:answer.appAction}:applied?.research?{action:'research'}:{}),...(applied?{applied}:{}),generation:{provider:providerId,model:answer.model||input.model||'',effort:input.effort||'',...(!input.effort&&answer.resolvedEffort?{resolvedEffort:answer.resolvedEffort}:{})}});s.run={id:job.id,status:'complete'};s.thread={id:answer.threadId,accountKey:binding,lastTurnId:answer.turnId};s.model=answer.model;s.pendingProposal=Boolean(proposals.pending);s.lastOutcome=proposals.pending?'提案尚未保存。':applied?`上一輪的修改已直接保存到本機檔案（V${applied.number||'?'}），尚未備份到 GitHub。`:'上一輪沒有修改原檔。';if(answer.planning)s.plan={markdown:answer.planMarkdown,approvedDigest:null};if(research)s.research=research;});
       await jobs.finish(target,job.id);return {ok:true,proposal,research,planning:Boolean(planning),model:answer.model,...(answer.suggestion?{suggestion:answer.suggestion}:{}),conversation:displayConversation({...updated,job:{...job,status:'completed',autoResume:false}})};
     }catch(e){
       if(candidateCreated){proposals.discard();artifact=null;previewAttempt++;await versions.saveDraft(target,null).catch(()=>{});}
       const failure={...workflowFailure(e),accepted:requestSaved};
+      // 修改已經寫進檔案之後才失敗（例如對話紀錄寫不進去）：照實說已保存，並告訴人怎麼退回。
+      if(applied){failure.applied=applied;failure.message=`修改已保存到本機（V${applied.number||'?'}），但這次對話紀錄沒有寫入。要退回可以從上方「版本紀錄」回到 V${applied.previousNumber||'前一版'}。`;}
       if(job){try{await jobs.fail(target,job.id,e.code,e.limits);if(automatic&&['QUOTA_UNAVAILABLE','QUOTA_EXHAUSTED'].includes(e.code)&&job.input.autoAttempts<3)await jobs.wait(target,true);}catch{}}
       if(requestSaved){try{const uncertain=!completedAnswer&&!['LOGIN_REQUIRED','QUOTA_UNAVAILABLE','QUOTA_EXHAUSTED','POLICY_MISMATCH','MODEL_UNAVAILABLE','INVALID_DAY','EFFORT_UNAVAILABLE'].includes(e.code);const updated=await conversations.update(target,s=>{
         const stopRequested=s.run?.id===job.id&&(s.run.stopRequested===true||explicitStopNonce===nonce);
@@ -587,12 +606,14 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   feature('references-url',async input=>({item:await attachments.fetchURL({...selectedTarget(input),accountKey:accountKey()},input.url,referenceOptions)}),{exclusive:true});
   feature('references-remove',async input=>({removed:await attachments.remove({...selectedTarget(input),accountKey:accountKey()},input.id)}),{exclusive:true});
   feature('research-confirm',async input=>{
-    const target=selectedTarget(input),state=await conversations.read(target),report=state.research;if(!report||report.unresolved.length||!report.sources.length||report.sources.some(s=>!s.verified))throw Object.assign(Error('RESEARCH_INCOMPLETE'),{code:'RESEARCH_INCOMPLETE'});
+    const target=selectedTarget(input),state=await conversations.read(target),report=state.research;const open=report?report.unresolved.length:0;
+    // 至少一個核對過的來源；仍有待確認或未核對的項目時，要使用者明確勾選「我了解」。
+    if(!report||!report.sources.some(s=>s.verified)||(open&&input.acknowledgeOpen!==true))throw Object.assign(Error('RESEARCH_INCOMPLETE'),{code:'RESEARCH_INCOMPLETE'});
     const {baseline}=await aiBaseline(target,state);if(proposals.pending&&!sameTarget(proposals.pending.target,target))throw Object.assign(Error('STALE_PROPOSAL'),{code:'STALE_PROPOSAL'});
     const bound=researchBinding(target,baseline,proposals.pending);
     if(bound!==report.sourceHash||report.proposalId!==(proposals.pending?.id||null))throw Object.assign(Error('CONTENT_CHANGED'),{code:'CONTENT_CHANGED'});
     const savedNotes=await appendPrivateNotes(path.join(target.root,'trips',target.slug),report.privateNotes);
-    const updated=await conversations.update(target,s=>{s.research.confirmed=true;if(savedNotes)s.research.privateNotes='';s.messages.push({role:'assistant',text:'你已確認來源與可行性查核摘要。內容仍需經預覽後確認保存。'+(savedNotes?'查核時讀到的訂單號等私人資訊已記到這趟的 docs/private-notes.md，不會進公開網站。':'')});});
+    const updated=await conversations.update(target,s=>{s.research.confirmed=true;if(savedNotes)s.research.privateNotes='';s.messages.push({role:'assistant',text:'你已確認來源與可行性查核摘要'+(open?`（其中 ${open} 項仍待確認，出發前請再查）`:'')+'。內容仍需經預覽後確認保存。'+(savedNotes?'查核時讀到的訂單號等私人資訊已記到這趟的 docs/private-notes.md，不會進公開網站。':'')});});
     if(proposals.pending){proposals.pending.requiresResearch=false;proposals.pending.seen=false;previewSeenURL=null;}
     return {conversation:displayConversation(updated),proposal:proposals.view()};
   },{exclusive:true});
@@ -658,12 +679,22 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     const slug=input?.slug&&currentProject.trips.some(t=>t.slug===input.slug)?input.slug:null;
     return {overview:{trips,all:await safe(()=>backup.localStatus(root,'*')),project:await safe(()=>backup.localStatus(root,null)),site:slug?await safe(()=>publisher.status({root,slug})):null,previewSeen:Boolean(slug&&slug===activeSlug&&artifact&&previewSeenURL===artifact.url)}};});
   feature('backup-confirm',async input=>({result:await backup.confirm(input.token)}),{exclusive:true});
+  // 全部不要：這趟旅程回到上次備份。有未處理的提案時不做，避免兩邊互相覆蓋。
+  feature('backup-discard-prepare',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});const target=selectedTarget(input);return {preparation:await backup.discardPrepare({root:target.root,slug:target.slug})};},{exclusive:true});
+  feature('backup-discard-confirm',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});const result=await backup.discardConfirm(input.token);artifact=null;previewAttempt++;return {result};},{exclusive:true});
   // 專案層級備份：還沒有旅程、或只有引擎更新時，也能推送到私人 GitHub。
   feature('backup-project-prepare',async()=>{if(!currentProject)throw Error('PROJECT_REQUIRED');return {preparation:await backup.prepare({root:currentProject.root,slug:null})};},{exclusive:true});
   // 不連網的「尚未備份」提示用；失敗時回報未知，不阻擋其他操作。
   feature('backup-status',async input=>{if(!currentProject)return {status:null};const slug=input?.slug&&currentProject.trips.some(t=>t.slug===input.slug)?input.slug:null;try{return {status:await backup.localStatus(currentProject.root,slug)};}catch{return {status:null};}});
-  feature('publish-prepare',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('PREVIEW_REQUIRED'),{code:'PREVIEW_REQUIRED'});return {preparation:await publisher.prepare({...selectedTarget(input),previewSeen:previewSeenURL===artifact?.url,previewDigest:artifact?.digest,previewOutputDigest:artifact?.outputDigest})};},{exclusive:true});
-  feature('publish-confirm',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('PREVIEW_REQUIRED'),{code:'PREVIEW_REQUIRED'});return {result:await publisher.confirm(input.token,{previewSeen:previewSeenURL===artifact?.url,previewDigest:artifact?.digest,previewOutputDigest:artifact?.outputDigest})};},{exclusive:true});
+  // 發布前如果還有沒備份的修改，先自動 commit + push 到私人 GitHub（備份本身仍會重新確認目的地是私人專案）。
+  const needsBackup=async target=>{try{const st=await backup.localStatus(target.root,target.slug);return st.neverBackedUp||st.pendingFiles>0||st.unpushedCommits>0?{pendingFiles:st.pendingFiles}:null;}catch{return null;}};
+  feature('publish-prepare',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('PREVIEW_REQUIRED'),{code:'PREVIEW_REQUIRED'});const target=selectedTarget(input);return {preparation:{...await publisher.prepare({...target,previewSeen:previewSeenURL===artifact?.url,previewDigest:artifact?.digest,previewOutputDigest:artifact?.outputDigest}),backupFirst:await needsBackup(target)}};},{exclusive:true});
+  feature('publish-confirm',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('PREVIEW_REQUIRED'),{code:'PREVIEW_REQUIRED'});
+    let backedUp=null;
+    if(input.slug){const target=selectedTarget(input);if(await needsBackup(target)){const prep=await backup.prepare({root:target.root,slug:target.slug});backedUp=await backup.confirm(prep.token);
+      if(!backedUp.backedUp)throw Object.assign(Error('BACKUP_BEFORE_PUBLISH'),{code:'BACKUP_BEFORE_PUBLISH',userMessage:'發布前的備份沒有完成，網站沒有更新：'+backedUp.message});}}
+    const result=await publisher.confirm(input.token,{previewSeen:previewSeenURL===artifact?.url,previewDigest:artifact?.digest,previewOutputDigest:artifact?.outputDigest});
+    return {result:backedUp?{...result,message:'已先備份到你的私人 GitHub。'+(result.message||'')}:result};},{exclusive:true});
   feature('adoption-prepare',async input=>({preparation:await publisher.prepareAdoption(selectedTarget(input))}),{exclusive:true});
   feature('adoption-confirm',async input=>({result:await publisher.confirmAdoption(input.token)}),{exclusive:true});
   feature('environment',async()=>{await toolSupport.applyEnvironment();auth.env={...process.env};return environmentService?environmentService.inspectEnvironment():toolSupport.inspect();});
@@ -796,6 +827,15 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       return {ok:true,revisions:history.revisions.map(({id,number,createdAt,label,kind,contextDigest})=>({id,number,createdAt,label,kind,current:id===latest.id,compatible:contextDigest===baseline.snapshot.contextDigest})).reverse()};
     }catch(error){return workflowFailure(error);}finally{versionBusy=false;}
   });
+  // 某一版相對於前一版改了什麼（聊天裡的「查看修改對照」）。
+  handle('versions:changes',async(event,input)=>{
+    assertSender(event);const target=selectedTarget(input);
+    try{const history=await versions.read(target);const index=history.revisions.findIndex(r=>r.id===input.versionId);
+      if(index<1)throw Object.assign(Error('STALE_PROPOSAL'),{code:'STALE_PROPOSAL'});
+      const {changesBetween}=require('./proposal-diff.cjs');
+      return {ok:true,number:history.revisions[index].number,previousNumber:history.revisions[index-1].number,changes:changesBetween(history.revisions[index-1].source,history.revisions[index].source)};
+    }catch(error){return workflowFailure(error);}
+  });
   handle('versions:restore',async(event,input)=>{
     assertSender(event);const target=selectedTarget(input);
     if(versionBusy||generating||proposals.saving||proposals.pending)return workflowFailure({code:'AI_BUSY'});
@@ -806,7 +846,11 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       const revision=history.revisions.find(r=>r.id===input.versionId);if(!revision)throw Object.assign(Error('STALE_PROPOSAL'),{code:'STALE_PROPOSAL'});
       if(revision.contextDigest!==baseline.snapshot.contextDigest)throw Object.assign(Error('VERSION_CONTEXT_CHANGED'),{code:'VERSION_CONTEXT_CHANGED'});
       const proposal=proposals.createSource(target,baseline,revision.source,{kind:'restore',label:`回復 V${revision.number} 的日程內容`});
-      if(proposal.changed){try{await versions.saveDraft(target,proposals.draft());}catch(e){proposals.discard();throw e;}artifact=proposals.pending.artifact;previewAttempt++;}
+      // 回到某個版本也直接套用；它本身會成為新的一版，所以還可以再回來。
+      if(proposal.changed){try{const applied=await applyPendingNow(target);
+          let conversation=null;try{conversation=displayConversation(await conversations.update(target,st=>{st.messages.push({role:'assistant',text:`已回到 V${revision.number} 的內容，存成新的一版 V${applied.number||'?'}。尚未備份到 GitHub。`,applied});st.lastOutcome=`已回到 V${revision.number} 的內容，保存於本機，尚未備份。`;}));}catch{}
+          return {ok:true,proposal:{changed:false,applied:true,...applied},conversation};}
+        catch(e){if(!proposals.pending)throw e;try{await versions.saveDraft(target,proposals.draft());}catch(err){proposals.discard();throw err;}artifact=proposals.pending.artifact;previewAttempt++;}}
       return {ok:true,proposal};
     }catch(error){return workflowFailure(error);}finally{versionBusy=false;}
   });
@@ -883,7 +927,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     if(materialization)newTrips.discardMaterialization(materialization.token).catch(()=>{});
     ipcMain.removeHandler('project:choose');
     ipcMain.removeHandler('appearance:set-theme');
-    for (const channel of ['workspace:read', 'workspace:select', 'preview:build', 'preview:open-browser', 'conversation:read', 'conversation:preferences', 'conversation:restart', 'versions:list', 'versions:restore', 'proposal:select']) ipcMain.removeHandler(channel);
+    for (const channel of ['workspace:read', 'workspace:select', 'preview:build', 'preview:open-browser', 'conversation:read', 'conversation:preferences', 'conversation:restart', 'versions:list', 'versions:restore', 'versions:changes', 'proposal:select']) ipcMain.removeHandler(channel);
     for (const channel of ['codex:connect', 'codex:refresh', 'codex:login', 'codex:cancel-login', 'codex:switch-account', 'codex:copy-login-link']) ipcMain.removeHandler(channel);
     for (const channel of ['codex:models','ai:generate','ai:stop','proposal:discard','proposal:apply','proposal:status']) ipcMain.removeHandler(channel);
     conversations.flush().finally(()=>chatStores.delete(conversations));

@@ -175,3 +175,12 @@ test('history write intent failure prevents file write, while receipt failure re
  f.store.beforeWrite=async()=> 'intent';f.store.afterWrite=async()=>{throw Error('receipt disk full');};
  const saved=await f.store.apply(p.id,f.target);assert.equal(saved.saved,true);assert.equal(saved.versionRecorded,false);assert.equal(parseLiteralModule(await fs.readFile(f.sourceFile,'utf8')).DAYS[0].title,'Candidate');
 });
+test('a verified private project is not re-checked for every local save, but a failed check never caches', async t => {
+  const f = await fixture(t);let checks = 0, fail = true;
+  const store = new ProposalStore(path.join(f.root, 'state2'), { checkPrivate: async () => { checks++; if (fail) throw Object.assign(Error('private'), { code: 'PRIVATE_REPO_REQUIRED' }); } });
+  const save = async title => { const current = await buildPreview(f.root, 'sample'); const day = parseLiteralModule(current.snapshot.dataSource).DAYS[0]; const p = store.create(f.target, current, day.id, { summary: title, replacementDay: { ...day, title } }); store.markViewed(p.previewUrl); return store.apply(p.id, f.target); };
+  await assert.rejects(save('一'), { code: 'PRIVATE_REPO_REQUIRED' });
+  fail = false; await save('二'); await save('三');
+  assert.equal(checks, 2, '失敗不快取；成功後 30 分鐘內不重查');
+  assert.equal(parseLiteralModule(await fs.readFile(f.sourceFile, 'utf8')).DAYS[0].title, '三');
+});

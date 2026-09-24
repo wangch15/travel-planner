@@ -53,6 +53,9 @@ class ProposalStore {
   constructor(stateDirectory, { checkPrivate = verifyPrivateProject, loadPreview = buildPreview, beforeWrite = async()=>null, afterWrite = async()=>null } = {}) {
     this.directory = stateDirectory; this.checkPrivate = checkPrivate; this.loadPreview = loadPreview;
     this.pending = null; this.saving = false; this.beforeWrite=beforeWrite;this.afterWrite=afterWrite;
+    // 寫本機檔案前的私人專案核對：同一個專案通過後 30 分鐘內不重查（AI 修改現在直接保存，每輪都查會慢、離線會失敗）。
+    // 推送到 GitHub 前的核對不受影響，備份每次都重新確認。
+    this.privateVerified = new Map();
   }
   create(target, baseline, dayId, answer) {
     if(answer.replacementDays){let source=baseline.snapshot.dataSource;for(const day of answer.replacementDays)source=replaceDay(source,day.id,day).source;return this.createSource(target,baseline,source,{label:answer.summary,kind:'save'});}
@@ -110,7 +113,7 @@ class ProposalStore {
     let saved = false;
     let writeIntent=null,version=null;
     try {
-      await this.checkPrivate(target.root);
+      if (!(this.privateVerified.get(target.root) > Date.now())) { await this.checkPrivate(target.root); this.privateVerified.set(target.root, Date.now() + 30 * 60 * 1000); }
       const current = await this.loadPreview(target.root, target.slug);
       if (current.digest !== proposal.baselineDigest || current.snapshot.dataSource !== proposal.originalSource) throw fail('CONTENT_CHANGED');
       writeIntent=await this.beforeWrite(proposal);

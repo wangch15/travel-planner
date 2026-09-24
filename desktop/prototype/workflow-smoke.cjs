@@ -102,18 +102,11 @@ app.whenReady().then(async()=>{
 
   await waitFor('!document.getElementById("message").disabled');
   await win.webContents.executeJavaScript('document.getElementById("message").value="把標題改成悠閒出發";document.getElementById("chat-form").requestSubmit()');
-  await waitFor('!document.getElementById("proposal-review").hidden');
+  // 新流程：AI 改完直接保存到本機，不出提案、不用再確認；訊息下方有修改對照與回到修改前。
+  await waitFor('document.querySelector(".message.assistant .applied-actions") && document.getElementById("proposal-review").hidden && !document.getElementById("message").disabled');
   assert.equal(generated[1].threadId,'fake-thread');
-  assert.equal(await fs.readFile(source,'utf8'),before,'proposal must not save automatically');
-  const blockedSwitch=await win.webContents.executeJavaScript('window.travelDesktop.switchCodexAccount()');
-  assert.equal(blockedSwitch.ok,false);assert.equal(switches,2);
-  await waitFor('!document.getElementById("save-proposal").disabled');
-  const frame=win.webContents.mainFrame.frames.find(frame=>frame.url.startsWith('travel-preview://'));
-  assert.ok(frame);
-  const candidate=await frame.executeJavaScript('document.body.textContent');
-  assert.ok(candidate.includes('悠閒出發'));
-  await win.webContents.executeJavaScript('document.getElementById("save-proposal").click()');
-  await waitFor('document.getElementById("proposal-review").hidden && document.getElementById("messages").textContent.includes("已保存到原專案")');
+  await waitFor('Boolean(document.getElementById("preview").getAttribute("src"))');
+  for(let i=0;i<100;i++){const frame=win.webContents.mainFrame.frames.find(frame=>frame.url.startsWith('travel-preview://'));if(frame&&(await frame.executeJavaScript('document.body.textContent').catch(()=>'')).includes('悠閒出發'))break;if(i===99)throw Error('preview did not show the applied change');await new Promise(r=>setTimeout(r,50));}
   assert.equal(parseLiteralModule(await fs.readFile(source,'utf8')).DAYS[0].title,'悠閒出發');
   assert.deepEqual(parseLiteralModule(await fs.readFile(source,'utf8')).DAYS.slice(1),parseLiteralModule(before).DAYS.slice(1));
   assert.equal((await fs.readdir(path.join(state,'backups'))).length,1);
@@ -149,9 +142,10 @@ app.whenReady().then(async()=>{
   await fs.writeFile(source,before);
   failReply=true;
   await win.webContents.executeJavaScript('document.getElementById("edit-day").value="1";document.getElementById("edit-day").dispatchEvent(new Event("change"));document.getElementById("chat-form").requestSubmit()');
-  await waitFor('document.getElementById("messages").textContent.includes("對話紀錄未能安全讀寫")');
+  // 檔案已經改好、只是對話紀錄寫不進去：照實說已保存，並說明怎麼退回。
+  await waitFor('document.getElementById("messages").textContent.includes("修改已保存到本機") && document.getElementById("messages").textContent.includes("版本紀錄")');
   const pending=await win.webContents.executeJavaScript('window.travelDesktop.proposalStatus()');assert.equal(pending.id,null);
-  assert.equal(await fs.readFile(source,'utf8'),before);
+  assert.equal(parseLiteralModule(await fs.readFile(source,'utf8')).DAYS[0].title,'悠閒出發');
   failReply=false;
   await waitFor('!document.getElementById("restart-conversation").disabled');
   await win.webContents.executeJavaScript('document.getElementById("restart-conversation").click()');

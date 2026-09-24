@@ -157,7 +157,48 @@ class BackupService {
     if (this.busy) throw fail('BACKUP_BUSY');
     const snapshot = await this.inspect(target), token = randomUUID();
     this.pending.clear(); this.pending.set(token, { snapshot, expires: Date.now() + 10 * 60 * 1000 });
-    return { token, ...snapshot };
+    return { token, ...snapshot, dayChanges: await this.dayChanges(target.root, target.slug) };
+  }
+  // 跟上次備份（HEAD）相比，這趟行程每天改了什麼；讀不到或格式不支援時回傳 null，只顯示檔案清單。
+  async dayChanges(root, slug) {
+    if (!slug || slug === '*' || !/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug)) return null;
+    try {
+      const file = `trips/${slug}/data.js`;
+      const before = await this.git(root, ['show', `HEAD:${file}`]);
+      const after = (await regularBytes(path.join(root, file))).toString('utf8');
+      return before === after ? [] : require('../proposal-diff.cjs').changesBetween(before, after);
+    } catch { return null; }
+  }
+  // 「全部不要」：把這趟旅程的資料夾回到上次備份（HEAD）。先列出清單與代碼，確認後才動檔案。
+  async discardInspect(root, slug) {
+    if (!/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug || '')) throw fail('INVALID_TARGET');
+    const prefix = `trips/${slug}/`;
+    const safe = name => name.startsWith(prefix) && !name.split('/').some(p => p === '..') && !/[\x00-\x1f\x7f]/.test(name);
+    const restore = (await this.git(root, ['diff', '--no-ext-diff', '--no-textconv', '--name-only', '--no-renames', '-z', 'HEAD', '--', prefix])).split('\0').filter(Boolean).sort();
+    const remove = (await this.git(root, ['ls-files', '--others', '--exclude-standard', '-z', '--', prefix])).split('\0').filter(Boolean).sort();
+    if (![...restore, ...remove].every(safe)) throw fail('UNSAFE_PATH');
+    const digests = {};
+    for (const name of [...restore, ...remove]) { try { digests[name] = hash(await regularBytes(path.join(root, name))); } catch (error) { if (error.code !== 'ENOENT') throw error; digests[name] = null; } }
+    return { root, slug, head: (await this.git(root, ['rev-parse', 'HEAD'])).trim(), restore, remove, digests };
+  }
+  async discardPrepare({ root, slug }) {
+    if (this.busy) throw fail('BACKUP_BUSY');
+    const snapshot = await this.discardInspect(root, slug), token = randomUUID();
+    this.pending.clear(); this.pending.set(token, { discard: snapshot, expires: Date.now() + 10 * 60 * 1000 });
+    return { token, restore: snapshot.restore, remove: snapshot.remove, dayChanges: await this.dayChanges(root, slug) };
+  }
+  async discardConfirm(token) {
+    if (this.busy) throw fail('BACKUP_BUSY');
+    const pending = this.pending.get(token); this.pending.delete(token);
+    if (!pending?.discard || Date.now() > pending.expires) throw fail('STALE_CONFIRMATION');
+    this.busy = true;
+    try {
+      const { root, slug } = pending.discard, current = await this.discardInspect(root, slug);
+      if (JSON.stringify(current) !== JSON.stringify(pending.discard)) throw fail('CONTENT_CHANGED', '檔案在確認前又有變動，請重新查看。');
+      if (current.restore.length) await this.git(root, ['restore', '--source=HEAD', '--staged', '--worktree', '--', ...current.restore]);
+      for (const name of current.remove) await fs.rm(path.join(root, name), { force: true });
+      return { discarded: true, restored: current.restore.length, removed: current.remove.length };
+    } finally { this.busy = false; }
   }
   async confirm(token) {
     if (this.busy) throw fail('BACKUP_BUSY');

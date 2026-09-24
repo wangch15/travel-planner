@@ -297,6 +297,11 @@ function addMessage(message) {
   const content=el('div',undefined,'message-content');if(message.role==='assistant'&&window.renderMarkdown)window.renderMarkdown(content,message.text);else content.textContent=message.text;
   item.append(content);
   // AI 提出的 App 動作（備份、發布…）以確認卡片呈現，由使用者按下才執行。
+  // AI 直接套用的修改：可以看改了什麼，也可以回到修改前（那也會存成新的一版，隨時能再回來）。
+  if(message.role==='assistant'&&message.applied){const a=message.applied,actions=el('div',undefined,'message-actions applied-actions');
+    actions.append(el('span',`已保存到本機${a.number?` · V${a.number}`:''}${a.labels.length?` · ${a.labels.length} 處修改`:''}`,'applied-note'));
+    if(a.versionId&&a.previousId){const act=(text,click)=>{const b=el('button',text);b.type='button';b.onclick=click;return b;};actions.append(act('查看修改對照',()=>showAppliedChanges(a)),act(`回到修改前（V${a.previousNumber}）`,()=>restoreVersion(a.previousId)));}
+    item.append(actions);}
   if(message.role==='assistant'&&message.action){const card=window.actionCard?.(message.action);if(card)item.append(card);}
   if(message.generation){const g=message.generation;item.title=`回覆設定：${g.provider} · ${g.model||'服務預設模型'} · ${g.effort||(g.resolvedEffort?'預設思考強度（'+g.resolvedEffort+'）':'預設思考強度')}`;item.dataset.provider=g.provider;item.dataset.model=g.model;item.dataset.effort=g.effort;}
   $('messages').append(item);
@@ -516,7 +521,7 @@ function updateComposer() {
   const options = realPreview?.summary?.dayOptions || [];
   if (real) {
     const previous = $('edit-day').value;
-    const specs=[{value:'',label:'不指定 · 整體討論'}];
+    const specs=[{value:'',label:'自動判斷 · 討論或直接修改'}];
     if(!realPreview?.planning)specs.push({value:'-1',label:'整趟行程 · 提出跨日修改'});
     for (const day of options) specs.push({value:String(day.id),label:`第 ${day.id} 天 · ${day.title}`});
     const has=v=>specs.some(o=>o.value===v);
@@ -552,7 +557,7 @@ function updateComposer() {
     $('composer-model').textContent = activeProvider === 'gemini' ? 'Gemini 暫停提供' : accountState.state === 'connected' ? hasModels ? ({codex:'Codex',claude:'Claude Code'})[activeProvider] : '正在取得模型…' : '尚未連接 AI';
     const basePlaceholder = activeProvider === 'gemini' ? 'Gemini 暫停提供，請用其他 AI 開新對話' : !ready ? '先開啟右側預覽，驗證這趟行程' : accountState.state !== 'connected' ? '連接 AI 帳號後，就能提出修改' : $('edit-day').value === '' ? '例如：希望整趟行程更輕鬆，可以怎麼調整？' : $('edit-day').value === '-1' ? '例如：請套用剛才的建議' : '例如：把這一天的標題改成「悠閒出發」';
     setIfChanged($('message'),'placeholder',composerSuggestion&&ready&&accountState.state==='connected'?composerSuggestion+'　（按 Tab 帶入）':basePlaceholder);
-    $('composer-note').textContent = activeProvider === 'gemini' ? '舊 Gemini CLI 連線暫停；歷史紀錄保留。可從對話選單使用 Codex 或 Claude 開新對話。' : conversationError ? '對話紀錄無法讀寫，暫停送出以免遺失。' : conversationLoading ? '正在恢復對話…' : selected.trip.needsRestart ? (selected.trip.featureState?.stopRequested?'可以先編輯草稿。停止狀態尚未確認，請先確認停止狀態。':selected.trip.featureState?.legacyStopped?'可以先編輯草稿。上次工作狀態尚未確認，請先確認上次狀態。':'可以先編輯草稿。上次回覆尚未確認，請先找回上次回覆或重新開始（保留紀錄）。') : selected.trip.stopped ? '上一輪已停止，可以在原對話繼續討論。' : !modelReady&&accountState.state==='connected'?'這段對話的模型目前不可用，請選擇其他模型。' : pendingProposal ? '請先確認或放棄提案，再進行下一次修改。' : $('edit-day').value === '' ? '沿用本旅程對話，提供最新整趟安排；這輪只討論，不會直接修改行程。' : '本輪提供這一天與相關地點，沿用本旅程對話；提案經你確認才保存。';
+    $('composer-note').textContent = activeProvider === 'gemini' ? '舊 Gemini CLI 連線暫停；歷史紀錄保留。可從對話選單使用 Codex 或 Claude 開新對話。' : conversationError ? '對話紀錄無法讀寫，暫停送出以免遺失。' : conversationLoading ? '正在恢復對話…' : selected.trip.needsRestart ? (selected.trip.featureState?.stopRequested?'可以先編輯草稿。停止狀態尚未確認，請先確認停止狀態。':selected.trip.featureState?.legacyStopped?'可以先編輯草稿。上次工作狀態尚未確認，請先確認上次狀態。':'可以先編輯草稿。上次回覆尚未確認，請先找回上次回覆或重新開始（保留紀錄）。') : selected.trip.stopped ? '上一輪已停止，可以在原對話繼續討論。' : !modelReady&&accountState.state==='connected'?'這段對話的模型目前不可用，請選擇其他模型。' : pendingProposal ? '請先確認或放棄提案，再進行下一次修改。' : $('edit-day').value === '' ? 'AI 自己判斷：只是問問就回答；要它修改就直接改好存到本機，右邊預覽馬上更新，改錯可以一鍵回到修改前。' : '只改這一天；改好直接存到本機，可以一鍵回到修改前。';
   }
 }
 function renderProposal() {
@@ -560,8 +565,11 @@ function renderProposal() {
   if(!pendingProposal){if($('changes-dialog').open)$('changes-dialog').close();updateComposer();return;}
   $('proposal-heading').textContent=pendingProposal.kind==='restore'?'版本回復提案 · 尚未保存':'修改提案 · 尚未保存';
   $('proposal-changes').textContent=`已選 ${pendingProposal.selectedKeys?.length||0}／${pendingProposal.changes?.length||0} 項修改`;
-  $('proposal-note').textContent=pendingProposal.requiresResearch?'包含停留或交通變動，需要先查核才能保存；可取消這些項目，先保留文字修改。':pendingProposal.previewLoaded?'請檢查候選預覽，確認後建立新的本機版本。':'請先查看右側候選預覽，再確認保存。';
-  $('save-proposal').disabled=!pendingProposal.previewLoaded||pendingProposal.requiresResearch||aiBusy||!pendingProposal.selectedKeys?.length;
+  // 需要查核時，主要按鈕直接開始查核，不讓人對著停用的按鈕不知道下一步。
+  const research=pendingProposal.requiresResearch;
+  $('proposal-note').textContent=research?'這次改到停留或交通，保存前要先查核來源與可行性。按「先查核，再保存」開始；也可以在「查看修改對照」取消這些項目。':pendingProposal.previewLoaded?'請檢查候選預覽，確認後建立新的本機版本。':'請先查看右側候選預覽，再確認保存。';
+  $('save-proposal').textContent=research?'先查核，再保存':'確認保存到原專案';
+  $('save-proposal').disabled=research?aiBusy:!pendingProposal.previewLoaded||aiBusy||!pendingProposal.selectedKeys?.length;
   $('discard-proposal').disabled=aiBusy;$('review-changes').disabled=aiBusy;
   if($('changes-dialog').open)renderChanges();
   updateComposer();
@@ -570,7 +578,18 @@ function stageProposal(proposal){
   pendingProposal={...proposal,...conversationTarget(),previewLoaded:false};
   realPreview={...realPreview,url:proposal.previewUrl};setPreview(true);renderPreview();renderProposal();
 }
+async function showAppliedChanges(applied){
+  if(!selected||selected.demo)return;
+  try{const result=await window.travelDesktop.versionChanges({...conversationTarget(),versionId:applied.versionId});if(!result.ok){notify(result.message);return;}
+    $('changes-heading').textContent=`V${result.previousNumber} → V${result.number} 改了什麼`;$('changes-dialog').querySelector('.dialog-description').textContent='這些修改已經保存到本機檔案。不滿意可以直接在聊天裡請 AI 再調整，或按「回到修改前」。';
+    $('changes-dialog').querySelector('.review-tools').hidden=true;$('change-list').replaceChildren();
+    for(const change of result.changes){const section=el('section',undefined,'change-item');section.append(el('h3',change.label,'change-label'));const pair=el('div',undefined,'change-pair');for(const [name,text] of [['修改前',change.before],['修改後',change.after]]){const column=el('div');column.append(el('h3',name),el('p',text));pair.append(column);}section.append(pair);$('change-list').append(section);}
+    if(!result.changes.length)$('change-list').append(el('p','這一版的日程內容和前一版相同。'));
+    $('changes-dialog').showModal();
+  }catch{notify('修改對照未能載入，請重試。');}
+}
 function renderChanges(){
+  $('changes-heading').textContent='選擇要保留的修改';$('changes-dialog').querySelector('.dialog-description').textContent='取消勾選的部分會保留目前內容。停留安排與備案一起選取，避免拆散相依內容。';$('changes-dialog').querySelector('.review-tools').hidden=false;
   $('change-list').replaceChildren();
   $('selected-changes-count').textContent=`已選 ${pendingProposal.selectedKeys.length} 項`;
   for(const change of pendingProposal.changes){
@@ -622,8 +641,8 @@ async function restoreVersion(versionId){
   aiBusy=true;proposalBusy=true;updateComposer();
   if(!await flushConversationDraft()){aiBusy=false;proposalBusy=false;updateComposer();return;}
   $('history-dialog').close();
-  try{const result=await window.travelDesktop.restoreVersion({...conversationTarget(),versionId});if(!result.ok)notify(result.message);else if(result.proposal.changed){stageProposal(result.proposal);renderChanges();$('changes-dialog').showModal();}else notify(result.proposal.summary);}
-  catch{notify('回復提案未能建立，原行程沒有被改動。');}
+  try{const result=await window.travelDesktop.restoreVersion({...conversationTarget(),versionId});if(!result.ok)notify(result.message);else if(result.proposal.applied){if(result.conversation)applyConversation(result.conversation,selected.trip);realPreview=null;renderPreview();window.refreshBackupStatus?.();}else if(result.proposal.changed){stageProposal(result.proposal);renderChanges();$('changes-dialog').showModal();}else notify(result.proposal.summary);}
+  catch{notify('未能回到那個版本，原行程沒有被改動。');}
   finally{aiBusy=false;proposalBusy=false;renderProposal();}
 }
 $('preview').addEventListener('load', async () => {
@@ -662,6 +681,7 @@ $('chat-form').onsubmit = async event => {
     if(result.conversation)applyConversation(result.conversation,trip);
     window.acceptFeatureResult?.(result);
     if(!result.ok&&!result.accepted){trip.draft=message;$('message').value=message;window.restoreComposerAttachments?.(attachments);}
+    if(!result.ok&&result.applied){realPreview=null;renderPreview();window.refreshBackupStatus?.();}
     if(result.ok&&selected?.trip===trip)applySuggestion(result.suggestion);
     if (!result.ok && !result.conversation) appendRealMessage(trip,{role:'assistant',text:result.message});
     if(result.ok) {
@@ -669,6 +689,8 @@ $('chat-form').onsubmit = async event => {
       if (result.proposal.changed) {
         stageProposal(result.proposal);
       }
+      // 已直接保存：重新載入預覽讓人立刻看到結果，頂部「尚未備份」也跟著更新。
+      if (result.proposal.applied) { realPreview=null; renderPreview(); window.refreshBackupStatus?.(); }
     }
   } catch { progress.remove(); appendRealMessage(trip,{role:'assistant',text:'這次回覆未能確認，沒有自動重送，也沒有保存原行程。'}); }
   finally { aiBusy=false; renderProposal(); updateComposer(); }
@@ -688,6 +710,7 @@ $('discard-proposal').onclick=async()=>{
 };
 $('save-proposal').onclick = async () => {
   if (!pendingProposal || aiBusy) return;
+  if (pendingProposal.requiresResearch) { if($('research-trip').disabled){notify(accountState.state!=='connected'?'請先連接 AI，才能查核。':'目前無法開始查核，請等右側預覽載入完成再試。');return;} $('research-trip').click(); return; }
   aiBusy=true; savingProposal=true; renderProposal();
   try {
     const result=await window.travelDesktop.applyProposal({projectId:pendingProposal.projectId,slug:pendingProposal.slug,proposalId:pendingProposal.id});
@@ -705,17 +728,12 @@ $('save-proposal').onclick = async () => {
 };
 $('message').oninput = () => { if(selected){selected.trip.draft=$('message').value;clearTimeout(draftTimer);draftTimer=setTimeout(queuePreferences,350);} };
 window.addEventListener('blur',()=>queuePreferences());
-// AI 建議的下一步：自動切換「這次調整」，建議的話放在輸入框提示，按 Tab 帶入。
+// AI 建議的下一句話放在輸入框提示，按 Tab 帶入。
 var composerSuggestion='';
 function clearSuggestion(){if(!composerSuggestion)return;composerSuggestion='';updateComposer();}
-function scopeLabel(value){return [...$('edit-day').options].find(o=>o.value===value)?.textContent||'';}
 function applySuggestion(suggestion){
-  clearSuggestion();if(!suggestion||!selected||selected.demo)return;
-  const value=suggestion.scope==='discussion'?'':suggestion.scope==='all'?'-1':suggestion.scope;
-  if(value!==undefined&&value!==$('edit-day').value&&[...$('edit-day').options].some(o=>o.value===value)){
-    $('edit-day').value=value;selected.trip.dayId=value===''?null:Number(value);queuePreferences();notify('已切換「這次調整」為：'+scopeLabel(value));
-  }
-  if(suggestion.reply&&!$('message').value){composerSuggestion=suggestion.reply;updateComposer();}
+  clearSuggestion();if(!suggestion?.reply||!selected||selected.demo||$('message').value)return;
+  composerSuggestion=suggestion.reply;updateComposer();
 }
 $('message').addEventListener('input',()=>{if(composerSuggestion&&$('message').value)clearSuggestion();});
 $('message').onkeydown = event => { if(event.key==='Tab'&&!event.shiftKey&&composerSuggestion&&!$('message').value){event.preventDefault();$('message').value=composerSuggestion;$('message').dispatchEvent(new Event('input'));clearSuggestion();return;} if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) { event.preventDefault(); $('chat-form').requestSubmit(); } };

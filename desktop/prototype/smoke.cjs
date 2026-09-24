@@ -191,7 +191,7 @@ app.whenReady().then(async () => {
   await waitFor('document.documentElement.dataset.theme === "dark"');
   assert.equal(require('electron').nativeTheme.shouldUseDarkColors, true);
   const logos = await win.webContents.executeJavaScript('Promise.all([...document.querySelectorAll("img[data-logo]")].map(async image => { await image.decode(); return { src: image.getAttribute("src"), width: image.naturalWidth }; }))');
-  assert.ok(logos.every(image => image.src.endsWith('-on-dark-v2.svg') && image.width > 0));
+  assert.ok(logos.every(image => image.src.endsWith('-on-dark-v3.svg') && image.width > 0));
   assert.equal(await win.webContents.executeJavaScript('document.getElementById("favicon").getAttribute("href")'), 'assets/brand/favicon-dark.svg');
   await capture('workbench-appearance-dark.png');
   assert.equal(await win.webContents.executeJavaScript('document.querySelector(".chat-heading").hidden && !document.getElementById("settings-heading").hidden'),true);

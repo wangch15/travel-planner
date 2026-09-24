@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('travelDesktop', Object.freeze({
   onPreviewViewed: callback => {const listener=(_event,value)=>callback(value);ipcRenderer.on('preview:viewed',listener);return ()=>ipcRenderer.removeListener('preview:viewed',listener);},
   listVersions: input => ipcRenderer.invoke('versions:list',input),
   restoreVersion: input => ipcRenderer.invoke('versions:restore',input),
+  versionChanges: input => ipcRenderer.invoke('versions:changes',input),
   selectProposalChanges: input => ipcRenderer.invoke('proposal:select',input),
   readConversation: input => ipcRenderer.invoke('conversation:read',input),
   saveConversationPreferences: input => ipcRenderer.invoke('conversation:preferences',input),

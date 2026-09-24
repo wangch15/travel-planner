@@ -5,7 +5,7 @@
   let models=[],references=[],selectedRefs=new Set(),referenceScope='',lastAccount='',featureState={},materializedCandidate=false,viewedPreviewURL=null;
   let conversationItems=[],currentConversation=null,showArchived=false,conversationRequest=0,renameConversationId=null;
   let backupToken=null,publishToken=null,adoptionToken=null,elapsedTimer=null,startedAt=0;
-  const exclusive=new Set(['project-update-prepare','project-update-confirm','tool-prepare','tool-install','provider-select','trip-delete-prepare','trip-delete-confirm','trip-restore','project-setup-prepare','project-setup-confirm','git-identity-prepare','git-identity-confirm','trip-create','plan-confirm','references-add','references-add-bytes','references-url','references-remove','research-confirm','materialize-confirm','materialize-discard','job-wait','job-pause','job-recover','handoff','backup-prepare','backup-confirm','publish-prepare','publish-confirm','adoption-prepare','adoption-confirm','archive-export','archive-import','auth-start','auth-cancel','cloudflare-account','conversation-new','conversation-switch','conversation-rename','conversation-archive']);
+  const exclusive=new Set(['project-update-prepare','project-update-confirm','tool-prepare','tool-install','provider-select','trip-delete-prepare','trip-delete-confirm','trip-restore','project-setup-prepare','project-setup-confirm','git-identity-prepare','git-identity-confirm','trip-create','plan-confirm','references-add','references-add-bytes','references-url','references-remove','research-confirm','materialize-confirm','materialize-discard','job-wait','job-pause','job-recover','handoff','backup-prepare','backup-confirm','backup-discard-prepare','backup-discard-confirm','publish-prepare','publish-confirm','adoption-prepare','adoption-confirm','archive-export','archive-import','auth-start','auth-cancel','cloudflare-account','conversation-new','conversation-switch','conversation-rename','conversation-archive']);
   const api=async(action,input={})=>{
     if(!window.travelDesktop?.feature)throw Error('請在桌面 App 使用這個功能。');
     const owns=exclusive.has(action)&&!aiBusy;if(owns){aiBusy=true;proposalBusy=true;updateComposer();}
@@ -184,7 +184,7 @@
   window.acceptFeatureResult=result=>{
     // AI 可能替預設名稱的對話取了新名字，側欄清單要跟著更新。
     if(result.conversation)loadConversations().catch(()=>{});
-    if(result.research){featureState.research=result.research;$('show-research').hidden=false;}
+    if(result.research){featureState.research=result.research;$('show-research').hidden=false;if(pendingProposal){renderResearch();$('research-dialog').showModal();}}
     if(result.proposal?.materialization){materializedCandidate=true;viewedPreviewURL=null;realPreview={status:'ready',planning:false,url:result.proposal.previewUrl,summary:result.proposal.previewSummary};setPreview(true);renderPreview();$('confirm-materialization').disabled=true;}
     renderJob();renderPlan();
   };
@@ -216,10 +216,15 @@
     for(const source of report.sources){const row=el('section',undefined,'source-row');const link=button(source.title||source.url,()=>api('open-link',{url:source.url}).catch(e=>notify(e.message)));link.className='inline-link';row.append(link,el('small',`${source.verified?'已取得頁面並核對短摘':'尚未核對'} · ${new Date(source.checkedAt).toLocaleString('zh-TW')}`),el('blockquote',source.evidence));$('research-report').append(row);}
     if(report.privateNotes){$('research-report').append(el('h3','私人筆記（確認後存到這趟的 docs/private-notes.md，不進公開網站）'),el('pre',report.privateNotes));}
     if(report.unresolved.length){$('research-report').append(el('h3','待確認事項'));const ul=el('ul');report.unresolved.forEach(item=>ul.append(el('li',item)));$('research-report').append(ul);}
-    $('confirm-research').disabled=report.unresolved.length>0||!report.sources.length||report.sources.some(s=>!s.verified)||aiBusy;
+    // 待確認事項不再擋死：列出來，勾選「我了解」後就能確認；至少要有一個核對過的來源。
+    const open=report.unresolved.length,verified=report.sources.filter(s=>s.verified).length;
+    let ack=null;
+    if(!verified)$('research-report').append(el('p','沒有任何來源核對成功，請重新查核。','action-card-note'));
+    else if(open){ack=document.createElement('input');ack.type='checkbox';ack.id='research-ack';const label=el('label',undefined,'research-ack');label.htmlFor='research-ack';label.append(ack,document.createTextNode(`我了解上面還有 ${open} 項待確認，行程裡這些地方不能寫成確定的事實，出發前我會再查。`));$('research-report').append(label);ack.onchange=()=>{$('confirm-research').disabled=!ack.checked||aiBusy;};}
+    $('confirm-research').disabled=!verified||Boolean(ack)||aiBusy;
   }
   $('show-research').onclick=()=>{renderResearch();$('research-dialog').showModal();};$('close-research').onclick=()=>$('research-dialog').close();
-  $('confirm-research').onclick=()=>action('confirm-research',async()=>{const result=await api('research-confirm',target());useConversation(result);if(result.proposal){pendingProposal={...result.proposal,...target(),previewLoaded:false};$('preview').removeAttribute('src');renderPreview();renderProposal();}$('research-dialog').close();notify('查核摘要已確認，請再次檢查候選預覽。');});
+  $('confirm-research').onclick=()=>action('confirm-research',async()=>{const result=await api('research-confirm',{...target(),acknowledgeOpen:Boolean($('research-ack')?.checked)});useConversation(result);if(result.proposal){pendingProposal={...result.proposal,...target(),previewLoaded:false};$('preview').removeAttribute('src');renderPreview();renderProposal();}$('research-dialog').close();notify('查核摘要已確認，請再次檢查候選預覽。');});
   function updateReferenceCount(){tell('references-count',selectedRefs.size?`${selectedRefs.size} 份參考資料`:'');renderComposerAttachments();}
   function renderComposerAttachments(){
     const tray=$('composer-attachments'),items=references.filter(item=>selectedRefs.has(item.id));tray.replaceChildren();tray.hidden=!items.length;
@@ -279,7 +284,7 @@
   }
   async function refreshJob(){if(!selected||selected.demo)return;try{const result=await api('job-status',target());featureState.job=result.job;renderJob();}catch{}}
   setInterval(()=>{if(featureState.job?.status==='waiting_quota')refreshJob();},15000);
-  window.travelDesktop?.onJobResult?.(event=>{if(project?.projectId!==event.projectId||selected?.trip.slug!==event.slug)return;if(event.started){aiBusy=true;updateComposer();const node=addMessage({role:'assistant',text:'一般額度已恢復，正在繼續原工作…'});markAIProgress(node);return;}aiBusy=false;document.getElementById('ai-progress')?.remove();useConversation(event.result);window.acceptFeatureResult(event.result);if(event.result.proposal?.changed)stageProposal(event.result.proposal);refreshJob();renderProposal();updateComposer();});
+  window.travelDesktop?.onJobResult?.(event=>{if(project?.projectId!==event.projectId||selected?.trip.slug!==event.slug)return;if(event.started){aiBusy=true;updateComposer();const node=addMessage({role:'assistant',text:'一般額度已恢復，正在繼續原工作…'});markAIProgress(node);return;}aiBusy=false;document.getElementById('ai-progress')?.remove();useConversation(event.result);window.acceptFeatureResult(event.result);if(event.result.proposal?.changed)stageProposal(event.result.proposal);if(event.result.proposal?.applied){realPreview=null;renderPreview();window.refreshBackupStatus();}refreshJob();renderProposal();updateComposer();});
   $('handoff-open').onclick=()=>{const messages=selected?.trip.conversation||[];const text=`旅程：${selected?.trip.title||''}\n目前行程內容以 App 最新檔案為準。任何提案、備份與發布都必須重新確認。\n\n最近討論：\n${messages.slice(-12).map(m=>`${m.role==='user'?'使用者':'助手'}：${m.text.slice(0,1000)}`).join('\n\n')}`;$('handoff-summary').value=text.slice(0,16000);$('handoff-dialog').showModal();};$('close-handoff').onclick=()=>$('handoff-dialog').close();
   $('confirm-handoff').onclick=()=>action('confirm-handoff',async()=>{const result=await api('handoff',{...target(),summary:$('handoff-summary').value});useConversation(result);$('handoff-dialog').close();updateComposer();});
   async function prepareRemote(kind){
@@ -287,8 +292,8 @@
     if(!projectLevel&&!allTrips&&(!selected||selected.demo))throw Error('請先選擇一趟正式旅程。');const id=kind==='backup'?'backup':'publish';tell(id+'-result','正在檢查…');const result=allTrips?await api('backup-prepare',{scope:'all'}):projectLevel?await api('backup-project-prepare'):await api(kind+'-prepare',target()),p=result.preparation;
     $(id+'-cancel').hidden=false;
     const box=$(id+'-review');box.hidden=false;box.replaceChildren();
-    if(kind==='backup'){backupToken=p.token;box.append(el('p',`私人專案：${p.repo} · 分支：${p.branch}`),el('p',`本次 ${p.files.length} 個檔案；另有 ${p.unpublishedCommits} 個既有提交會一併推送。`));const list=el('ul');p.files.forEach(f=>list.append(el('li',`${f.status==='deleted'?'刪除':'保存'} · ${f.path}`)));box.append(list);for(const warning of p.warnings||[])box.append(el('p',warning));if(p.firstPush)box.append(el('p','這是第一次推送到這個私人專案，會包含模板本身的所有檔案。'));if(p.unrelatedCommittedFiles?.length){box.append(el('h3','既有未推送提交另包含'));const others=el('ul');p.unrelatedCommittedFiles.slice(0,20).forEach(f=>others.append(el('li',f)));if(p.unrelatedCommittedFiles.length>20)others.append(el('li',`…另外 ${p.unrelatedCommittedFiles.length-20} 個檔案`));box.append(others);}$('backup-confirm').hidden=false;}
-    else {publishToken=p.token;box.append(el('p',`網站：${p.name}`),el('p',`Cloudflare：${p.accountName||p.accountId}`),el('p',p.warning));$('publish-ack').checked=false;$('publish-ack-row').hidden=false;$('publish-confirm').hidden=false;$('adoption-confirm').hidden=true;}
+    if(kind==='backup'){backupToken=p.token;box.append(el('p',`私人專案：${p.repo} · 分支：${p.branch}`),el('p',`本次 ${p.files.length} 個檔案；另有 ${p.unpublishedCommits} 個既有提交會一併推送。`));appendDayChanges(box,p.dayChanges);$('backup-discard').hidden=allTrips||projectLevel||!p.files.length;const list=el('ul');p.files.forEach(f=>list.append(el('li',`${f.status==='deleted'?'刪除':'保存'} · ${f.path}`)));box.append(list);for(const warning of p.warnings||[])box.append(el('p',warning));if(p.firstPush)box.append(el('p','這是第一次推送到這個私人專案，會包含模板本身的所有檔案。'));if(p.unrelatedCommittedFiles?.length){box.append(el('h3','既有未推送提交另包含'));const others=el('ul');p.unrelatedCommittedFiles.slice(0,20).forEach(f=>others.append(el('li',f)));if(p.unrelatedCommittedFiles.length>20)others.append(el('li',`…另外 ${p.unrelatedCommittedFiles.length-20} 個檔案`));box.append(others);}$('backup-confirm').hidden=false;}
+    else {publishToken=p.token;box.append(el('p',`網站：${p.name}`),el('p',`Cloudflare：${p.accountName||p.accountId}`),el('p',p.warning));if(p.backupFirst)box.append(el('p',`發布前會先把${p.backupFirst.pendingFiles?` ${p.backupFirst.pendingFiles} 個`:'尚未備份的'}修改備份（commit + push）到你的私人 GitHub。`));$('publish-ack').checked=false;$('publish-ack-row').hidden=false;$('publish-confirm').hidden=false;$('adoption-confirm').hidden=true;}
     tell(id+'-result','請核對以上資訊，再確認。');
   }
   let setupPending=null;window.resetSetupReview=()=>{setupPending=null;$('setup-confirm').hidden=true;$('setup-review').hidden=true;$('setup-result').textContent='';};
@@ -325,7 +330,21 @@
   const syncDate=iso=>{try{const d=new Date(iso);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch{return '';}};
   function backupWords(st){if(!st)return {tone:'muted',head:'無法讀取備份狀態',sub:'請確認專案資料夾還在，或到「專案管理」重新連接。'};if(st.neverBackedUp)return {tone:'warn',head:'還沒有備份到 GitHub',sub:'第一次備份會把專案推送到你的私人 GitHub。'};if(st.pendingFiles>0)return {tone:'warn',head:`有 ${st.pendingFiles} 個檔案還沒備份`,sub:'備份會先列出這些檔案，你確認後才推送。'};if(st.unpushedCommits>0)return {tone:'warn',head:`有 ${st.unpushedCommits} 個提交還沒推送`,sub:'例如專案更新；備份時會一起推送。'};return {tone:'ok',head:'已經是最新的備份',sub:'這台電腦的內容都已經在你的私人 GitHub。'};}
   function setStatus(prefix,{tone,head,sub}){$(prefix+'-dot').dataset.tone=tone;$(prefix+'-headline').textContent=head;$(prefix+'-sub').textContent=sub;}
-  function resetReview(kind){$(kind+'-review').hidden=true;$(kind+'-review').replaceChildren();$(kind+'-confirm').hidden=true;$(kind+'-cancel').hidden=true;if(kind==='publish'){$('publish-ack-row').hidden=true;$('adoption-confirm').hidden=true;publishToken=null;adoptionToken=null;}else backupToken=null;}
+  // 跟上次備份相比每天改了什麼，展開可看修改前後。
+  function appendDayChanges(box,changes){if(!changes?.length)return;box.append(el('h3','跟上次備份相比，這趟改了'));for(const change of changes){const d=document.createElement('details');d.className='day-change';const summary=el('summary',change.label);const pair=el('div',undefined,'change-pair');for(const [name,text] of [['上次備份',change.before],['現在',change.after]]){const column=el('div');column.append(el('h3',name),el('p',text));pair.append(column);}d.append(summary,pair);box.append(d);}}
+  let discardToken=null;
+  $('backup-discard').onclick=async()=>{const b=$('backup-discard');if(b.disabled)return;b.disabled=true;try{await discardStep();}catch(e){discardToken=null;b.textContent='全部不要（回到上次備份）';tell('backup-result',e.message||'沒有完成，檔案沒有變動。');}finally{b.disabled=false;}};
+  async function discardStep(){
+    if(!discardToken){const {preparation:p}=await api('backup-discard-prepare',target());discardToken=p.token;backupToken=null;$('backup-confirm').hidden=true;
+      const box=$('backup-review');box.replaceChildren(el('p','這趟旅程會回到上次備份的內容，下面這些還沒備份的修改會丟掉，無法從 GitHub 找回（App 的本機版本紀錄仍保留）。'));appendDayChanges(box,p.dayChanges);
+      if(p.restore.length){box.append(el('h3','回到上次備份'));const ul=el('ul');p.restore.forEach(f=>ul.append(el('li',f)));box.append(ul);}
+      if(p.remove.length){box.append(el('h3','新加的檔案會刪除'));const ul=el('ul');p.remove.forEach(f=>ul.append(el('li',f)));box.append(ul);}
+      if(!p.restore.length&&!p.remove.length){discardToken=null;tell('backup-result','這趟沒有還沒備份的修改。');return;}
+      $('backup-discard').textContent='確認全部不要';tell('backup-result','請核對清單，再按「確認全部不要」。');return;}
+    const token=discardToken;discardToken=null;const {result}=await api('backup-discard-confirm',{token});
+    resetReview('backup');tell('backup-result',`已回到上次備份：還原 ${result.restored} 個、刪除 ${result.removed} 個檔案。`);realPreview=null;renderPreview();window.refreshBackupStatus();window.renderSync();
+  }
+  function resetReview(kind){if(kind==='backup'){discardToken=null;$('backup-discard').hidden=true;$('backup-discard').textContent='全部不要（回到上次備份）';}$(kind+'-review').hidden=true;$(kind+'-review').replaceChildren();$(kind+'-confirm').hidden=true;$(kind+'-cancel').hidden=true;if(kind==='publish'){$('publish-ack-row').hidden=true;$('adoption-confirm').hidden=true;publishToken=null;adoptionToken=null;}else backupToken=null;}
   $('backup-cancel').onclick=()=>{resetReview('backup');tell('backup-result','已取消，沒有推送任何東西。');};
   $('publish-cancel').onclick=()=>{resetReview('publish');tell('publish-result','已取消，網站沒有變動。');};
   window.renderSync=async()=>{
@@ -344,6 +363,8 @@
     const scopeAll=tab==='backup'&&(syncScope==='all'||!real);const st=scopeAll?(overview.trips.length?overview.all:overview.project):overview.trips.find(t=>t.slug===real?.slug)?.backup;
     const words=backupWords(st);setStatus('backup',{...words,sub:(scopeAll?'範圍：所有旅程。':'範圍：這趟旅程。')+words.sub});
     $('backup-prepare').textContent=scopeAll?'備份所有旅程到 GitHub':'備份到 GitHub';
+    // 這趟有還沒備份的檔案，就直接提供「全部不要」（不用先連網檢查）。
+    if(!discardToken)$('backup-discard').hidden=scopeAll||!(st?.pendingFiles>0);
     // 發布
     const checklist=$('publish-checklist');checklist.replaceChildren();$('publish-open-site').hidden=true;
     if(!real){setStatus('publish',{tone:'muted',head:'請先選擇一趟旅程',sub:'網站是一趟旅程一個網址。'});$('publish-prepare').disabled=true;return;}
@@ -365,7 +386,7 @@
     if(trip&&selected?.trip!==trip){await selectTrip(trip);await selectionReady;}
     window.renderSync();
   };
-  $('publish-confirm').onclick=()=>action('publish-confirm',async()=>{if(!$('publish-ack').checked)throw Error('請先勾選公開網站提醒。');const token=publishToken;publishToken=null;$('publish-confirm').hidden=true;const {result}=await api('publish-confirm',{token});tell('publish-result',result.message);$('publish-ack-row').hidden=true;$('publish-cancel').hidden=true;$('publish-review').hidden=true;window.renderSync();if(result.code==='WORKERS_SUBDOMAIN_REQUIRED')$('publish-result').append(document.createTextNode(' '),button('打開 Cloudflare 設定',()=>api('open-link',{url:'https://dash.cloudflare.com/?to=/:account/workers-and-pages'})));if(result.url)$('publish-result').append(document.createTextNode(' '),button('開啟網站',()=>api('open-link',{url:result.url})));});
+  $('publish-confirm').onclick=()=>action('publish-confirm',async()=>{if(!$('publish-ack').checked)throw Error('請先勾選公開網站提醒。');const token=publishToken;publishToken=null;$('publish-confirm').hidden=true;const {result}=await api('publish-confirm',{token,...target()});tell('publish-result',result.message);$('publish-ack-row').hidden=true;$('publish-cancel').hidden=true;$('publish-review').hidden=true;window.renderSync();if(result.code==='WORKERS_SUBDOMAIN_REQUIRED')$('publish-result').append(document.createTextNode(' '),button('打開 Cloudflare 設定',()=>api('open-link',{url:'https://dash.cloudflare.com/?to=/:account/workers-and-pages'})));if(result.url)$('publish-result').append(document.createTextNode(' '),button('開啟網站',()=>api('open-link',{url:result.url})));});
   $('adoption-prepare').onclick=()=>action('adoption-prepare',async()=>{const {preparation:p}=await api('adoption-prepare',target());adoptionToken=p.token;const box=$('publish-review');box.hidden=false;box.replaceChildren(el('p',`網站：${p.name}`),el('p',`帳號：${p.accountName||p.accountId}`),el('p',`目前版本：${p.versionId}`),el('p',p.warning));$('adoption-confirm').hidden=false;$('publish-confirm').hidden=true;});
   $('adoption-confirm').onclick=()=>action('adoption-confirm',async()=>{const {result}=await api('adoption-confirm',{token:adoptionToken});adoptionToken=null;$('adoption-confirm').hidden=true;tell('publish-result',result.message||'已記錄網站歸屬，尚未發布。');});
   $('codex-more').onclick=e=>openActionMenu(e.currentTarget,[
