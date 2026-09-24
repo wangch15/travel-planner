@@ -1,7 +1,7 @@
 name: Desktop Windows package
 
 # 手動觸發：在 GitHub 的 Windows 機器上打包免安裝 ZIP，下載後給使用者試用。
-# 未簽章、不發布 release；產物只放在這次執行的 Artifacts。
+# 未簽章。填了 release_tag 才會把 ZIP 附加到既有的 desktop release；否則只放在這次執行的 Artifacts。
 on:
   workflow_dispatch:
     inputs:
