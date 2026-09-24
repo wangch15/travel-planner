@@ -705,7 +705,7 @@ async function initializeWorkspace() {
 }
 if(!window.travelDesktop)seedDemo();setSidebar(ui.sidebar); setPreview(ui.preview); navigation(); renderProject();
 initializeWorkspace();
-if(window.travelDesktop?.appVersion){$('app-version').textContent='v'+window.travelDesktop.appVersion;$('app-version').hidden=false;$('about-version').textContent=window.travelDesktop.appVersion+' · 本機測試版';}
+if(window.travelDesktop?.appVersion){$('app-version').textContent='v'+window.travelDesktop.appVersion;$('app-version').hidden=false;$('about-version').textContent=window.travelDesktop.appVersion+(window.travelDesktop.appVersion.endsWith('-dev')?' · 開發中（從原始碼執行）':' · 測試版（未簽章）');}
 if(window.travelDesktop){window.travelDesktop.feature('provider-status').then(result=>{if(result.ok&&result.provider)activeProvider=result.provider;}).catch(()=>{}).finally(restoreAIConnection);}
 
 function renderCodexAccount(account) {

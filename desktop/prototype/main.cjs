@@ -35,6 +35,7 @@ async function waitForOperations(){while(activeOperations.size)await Promise.all
 const APP_URL = 'travel-app://prototype/index.html';
 protocol.registerSchemesAsPrivileged(['travel-app', 'travel-preview'].map(scheme => ({ scheme, privileges: { standard: true, secure: true, supportFetchAPI: true } })));
 app.setName('Travel Planner');
+const bundledApp=()=>{const rel=path.relative(path.join(process.resourcesPath,'app'),__dirname);return rel!==''&&!rel.startsWith('..')&&!path.isAbsolute(rel);};
 app.setPath('userData', process.env.TRAVEL_PLANNER_STATE_DIR || path.join(app.getPath('appData'), 'travel-planner-prototype'));
 
 async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickArchivePath,pickProjectParent,makeToolSupport=(dir,options)=>new ToolSupport(dir,options),makeTrash=()=>new TripTrashService(),makeProvider=(id,directory,options)=>require('./providers/index.cjs').createProvider(id,directory,options),makeProjectSetup=()=>new ProjectSetupService(),fetchReference=fetchPublicReference,referenceOptions,makeResearch=options=>createResearchTools(options),
@@ -101,8 +102,8 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'), session: isolatedSession,
       nodeIntegration: false, contextIsolation: true, sandbox: true, webviewTag: false,
-      // 開發中（未打包）顯示 -dev，避免與已發布的同號 DMG 混淆。
-      additionalArguments: ['--tp-app-version='+require('./package.json').version+(app.isPackaged?'':'-dev')],
+      // 開發中（未打包）顯示 -dev。不用 app.isPackaged：打包版的執行檔仍叫 Electron，它會誤判為開發中。
+      additionalArguments: ['--tp-app-version='+require('./package.json').version+(bundledApp()?'':'-dev')],
     },
   });
   sendToolProgress=value=>{if(!win.isDestroyed())win.webContents.send('feature:tool-progress',value);};
