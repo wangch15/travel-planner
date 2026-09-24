@@ -34,12 +34,12 @@ app.whenReady().then(async()=>{
  await js('document.querySelector(".applied-actions button").click()');await until('document.getElementById("changes-dialog").open && document.querySelectorAll("#change-list .change-item").length===2');await capture('versions-diff-light.png');await js('document.getElementById("done-changes").click()');
  // 重開 App 後，訊息下方的操作還在。
  const closed=new Promise(r=>win.once('closed',r));win.close();await closed;await launch();
- await until('document.querySelectorAll(".applied-actions button").length===2');
+ await until('document.querySelectorAll(".applied-actions button").length===3');
  await send(originalData.DAYS[1].id);records=(await history.read(target)).revisions;assert.equal(records.length,3);const version3=records[2];
  await js('setTheme("dark")');await restore(records[0].id);await capture('versions-restore-dark.png');assert.equal(await fs.readFile(source,'utf8'),original);
  await restore(version3.id);assert.equal(await fs.readFile(source,'utf8'),version3.source);
  // 「回到修改前」按鈕：回到上一版。
- await js('[...document.querySelectorAll(".applied-actions button")].at(-1).click()');await until('!aiBusy && document.querySelectorAll(".applied-actions").length===5 && realPreview?.status==="ready"');assert.equal(await fs.readFile(source,'utf8'),original);
+ await js('[...document.querySelectorAll(".applied-actions button")].filter(b=>b.textContent.startsWith("回到修改前")).at(-1).click()');await until('!aiBusy && document.querySelectorAll(".applied-actions").length===5 && realPreview?.status==="ready"');assert.equal(await fs.readFile(source,'utf8'),original);
  records=(await history.read(target)).revisions;assert.equal(records.length,6);assert.deepEqual(records.map(r=>r.kind),['initial','save','save','restore','restore','restore']);
  await js('document.getElementById("versions-open").click()');await until('document.querySelectorAll("#history-list .history-row").length === 6');await capture('versions-history-dark.png');await js('document.getElementById("close-history").click()');
  // 發布入口在聊天畫面直接開發布燈箱（不跳到設定頁），燈箱裡要按確認才發布。

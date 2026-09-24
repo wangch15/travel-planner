@@ -12,6 +12,7 @@ const { TRUSTED_FILES, sameTrusted } = require('./backup.cjs');
 
 const execute = promisify(execFile);
 const TEMPLATE_URL = /^(?:https:\/\/github\.com\/|git@github\.com:)wangch15\/travel-planner(?:\.git)?\/?$/i;
+const OFFICIAL_TEMPLATE = 'https://github.com/wangch15/travel-planner.git';
 const SLUG = /^[a-z0-9][a-z0-9-]{0,99}$/;
 // userMessage：給使用者看的說明，App 會原樣顯示。
 const fail = (code, message) => Object.assign(new Error(message || code), { code, ...(message ? { userMessage: message } : {}) });
@@ -28,8 +29,8 @@ async function readJSON(file) { try { return JSON.parse(await fs.readFile(file, 
 async function sameBytes(a, b) { try { return sameTrusted(await fs.readFile(a), await fs.readFile(b)); } catch { return false; } }
 
 class ProjectUpdateService {
-  constructor({ run = defaultRun, trustedRoot = path.resolve(__dirname, '../../..'), appCommit = null, engineVersion = null, templatePattern = TEMPLATE_URL } = {}) {
-    Object.assign(this, { run, trustedRoot, appCommit, engineVersion, templatePattern }); this.pending = new Map(); this.busy = false;
+  constructor({ run = defaultRun, trustedRoot = path.resolve(__dirname, '../../..'), appCommit = null, engineVersion = null, templatePattern = TEMPLATE_URL, templateUrl = OFFICIAL_TEMPLATE } = {}) {
+    Object.assign(this, { run, trustedRoot, appCommit, engineVersion, templatePattern, templateUrl }); this.pending = new Map(); this.busy = false;
   }
   async git(root, args, { allowFail = false, ...options } = {}) {
     const result = await this.run('git', ['--no-replace-objects', '--no-pager', '-C', root, ...args], { cwd: root, ...options });
@@ -53,11 +54,14 @@ class ProjectUpdateService {
     return { state, projectVersion, appVersion, trusted, migrateTrips: trips.filter(t => t.schemaVersion < SCHEMA_VERSION).map(t => t.slug) };
   }
 
+  // 要抓更新的來源。App 下載的私人專案通常只有 origin：沒有 upstream 就直接用官方模板網址，不替使用者加 remote。
+  // 有 upstream 卻指向別處（可能是刻意設定），不猜，照舊拒絕。
   async upstream(root) {
     const urls = (await this.git(root, ['remote', 'get-url', '--all', 'upstream'], { allowFail: true }));
     const list = String(urls.stdout || '').trim().split(/\r?\n/).filter(Boolean);
-    if (list.length !== 1 || !this.templatePattern.test(list[0])) throw fail('UPSTREAM_REQUIRED', '這個專案沒有指向官方模板的 upstream，無法在 App 裡更新。');
-    return list[0];
+    if (!list.length) return this.templateUrl;
+    if (list.length !== 1 || !this.templatePattern.test(list[0])) throw fail('UPSTREAM_REQUIRED', '這個專案的 upstream 沒有指向官方模板（wangch15/travel-planner），App 不會從其他來源更新。請把 upstream 改回官方模板，或移除它。');
+    return 'upstream';
   }
 
   // 使用者行程以外的未提交改動會被合併影響，先擋下。
@@ -71,7 +75,7 @@ class ProjectUpdateService {
     if (typeof root !== 'string' || !path.isAbsolute(root)) throw fail('UNSAFE_PATH');
     const status = await this.status(root);
     if (status.state === 'app-older') throw fail('APP_UPDATE_REQUIRED', '這個專案比 App 內建的版本還新，請先更新 Travel Planner App。');
-    await this.upstream(root);
+    const source = await this.upstream(root);
     for (const marker of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REBASE_HEAD']) {
       const file = (await this.git(root, ['rev-parse', '--git-path', marker])).trim();
       if (await fs.lstat(path.resolve(root, file)).then(() => true, () => false)) throw fail('GIT_OPERATION_ACTIVE', '專案有尚未完成的 Git 合併或重排，請先處理。');
@@ -80,7 +84,7 @@ class ProjectUpdateService {
     const dirty = await this.dirtyEngineFiles(root);
     if (dirty.length) throw fail('ENGINE_FILES_CHANGED', '專案的引擎檔案有未提交的修改，App 不會覆蓋：' + dirty.slice(0, 5).join('、'));
     const head = (await this.git(root, ['rev-parse', 'HEAD'])).trim();
-    const fetched = await this.git(root, ['fetch', '--no-tags', '--no-recurse-submodules', 'upstream', 'main'], { allowFail: true });
+    const fetched = await this.git(root, ['fetch', '--no-tags', '--no-recurse-submodules', source, 'main'], { allowFail: true });
     if (fetched.status !== 0) throw fail('UPSTREAM_FETCH_FAILED', '無法從 GitHub 取得模板更新，請確認網路後再試。');
     const latest = (await this.git(root, ['rev-parse', 'FETCH_HEAD'])).trim();
     // 優先對齊 App 內建引擎的 commit；它必須屬於上游 main 的歷史。

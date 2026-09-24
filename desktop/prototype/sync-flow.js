@@ -154,7 +154,9 @@
     }, () => publish(opts));
     if (!ready) return;
     if (!ready.cloudflare || !ready.preview) { prerequisites(ready, opts); return; }
-    const p = await checking(PUBLISH_STEPS, '正在核對發布目標…', async () => (await api('publish-prepare', conversationTarget())).preparation, () => publish(opts));
+    // 網站之前用終端機發布過、App 還沒紀錄：直接在這裡接管，不用去設定頁的進階找。
+    const adoptHelp = e => e.code === 'ADOPTION_REQUIRED' ? [act('這是我之前發布的網站…', 'adopt', () => adopt(opts), { variant: 'text-button', busy: '查詢中…' })] : [];
+    const p = await checking(PUBLISH_STEPS, '正在核對發布目標…', async () => (await api('publish-prepare', conversationTarget())).preparation, () => publish(opts), adoptHelp);
     if (!p) return;
     steps(PUBLISH_STEPS, 1);
     const ack = el('input'); ack.type = 'checkbox'; ack.id = 'sync-publish-ack';
@@ -180,7 +182,9 @@
     footer([], [closeButton('取消'), act('確認歸屬', 'confirm', async () => {
       const { result } = await api('adoption-confirm', { token: p.token }); refresh();
       const text = result.message || '已記錄網站歸屬，尚未發布。';
-      done(ADOPT_STEPS, '已記下網站歸屬', text, 'ok', { status: 'done', message: text, tone: 'ok' });
+      // 從發布流程轉來接管的：記好歸屬後直接接著發布。
+      const next = opts.kind === 'publish' ? [act('繼續發布', 'continue', () => publish(opts), { busy: '檢查中…' })] : [];
+      done(ADOPT_STEPS, '已記下網站歸屬', text, 'ok', { status: 'done', message: text, tone: 'ok' }, next);
     }, { variant: 'primary', busy: '記錄中…' })]);
   }
 

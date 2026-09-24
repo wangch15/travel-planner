@@ -98,3 +98,12 @@ test('App migrate scripts upgrade an old trip config', t => {
   const trip = path.join(dir, 'trip'); fs.mkdirSync(trip); fs.writeFileSync(path.join(trip, 'trip.config.json'), '{}');
   assert.deepEqual(migrateWithAppScripts(trip, scripts).steps, [{ step: '0 → 1', notes: ['done'] }]);
 });
+test('a project with no upstream remote updates straight from the official template without adding a remote', async t => {
+  // App 下載的私人專案只有 origin；以前這裡直接拒絕「沒有指向官方模板的 upstream」。
+  const { project, upstream, app, v2 } = fixture(t);
+  execFileSync('git', ['remote', 'remove', 'upstream'], { cwd: project });
+  const s = new ProjectUpdateService({ trustedRoot: app, appCommit: v2, engineVersion: '1.1.0', templateUrl: upstream });
+  const plan = await s.prepare(project);
+  assert.ok(plan.token);
+  assert.equal(execFileSync('git', ['remote'], { cwd: project, encoding: 'utf8' }).trim(), '', '不替使用者新增 remote');
+});

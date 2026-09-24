@@ -15,7 +15,8 @@ const NAME = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 // Execute the installed, trusted Wrangler asynchronously so Electron's main loop stays responsive.
 async function runWrangler(args, { cwd, env = {} } = {}) {
   let binary;
-  try { binary = path.join(path.dirname(require.resolve('wrangler/package.json')), 'bin', 'wrangler.js'); }
+  // 啟動器只接受 wrangler-dist/cli.js（登入與工具檢查也用這個）；bin/wrangler.js 會被拒絕，發布就在查帳號前失敗。
+  try { binary = path.join(path.dirname(require.resolve('wrangler/package.json')), 'wrangler-dist', 'cli.js'); require('node:fs').accessSync(binary); }
   catch { throw fail('WRANGLER_REQUIRED', '請先完成桌面版工具安裝，找不到可信的 Wrangler。'); }
   const inherited = Object.fromEntries(Object.entries({ ...process.env, ...env }).filter(([key]) => !/^(NODE_OPTIONS|NODE_PATH|LD_|DYLD_)/.test(key)));
   return new Promise(resolve => {

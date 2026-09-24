@@ -59,6 +59,7 @@ app.whenReady().then(async()=>{
   assert.notEqual(await fs.readFile(path.join(project,'trips/sample/data.js'),'utf8'),before,'檔案要直接改好');
   // AI 判斷需要查核：不擋保存，只在回覆下方提供「開始查核」。
   assert.match(await js('document.querySelector(".message.assistant:last-child").textContent'),/開始查核/);
+  assert.equal(await js('Boolean(document.querySelector(".message.assistant:last-child .applied-actions [data-action=backup]"))'),true,'改好的訊息下方要能直接備份');
   // 查看修改對照：列出改了哪裡。
   await js('[...document.querySelectorAll(".applied-actions button")].find(b=>b.textContent==="查看修改對照").click()');
   await until('document.getElementById("changes-dialog").open && document.getElementById("change-list").textContent.includes("第 1 天")');

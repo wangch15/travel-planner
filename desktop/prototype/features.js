@@ -9,7 +9,7 @@
   const api=async(action,input={})=>{
     if(!window.travelDesktop?.feature)throw Error('請在桌面 App 使用這個功能。');
     const owns=exclusive.has(action)&&!aiBusy;if(owns){aiBusy=true;proposalBusy=true;updateComposer();}
-    try{const result=await window.travelDesktop.feature(action,input);if(!result.ok)throw Error(result.message||'操作未完成');return result;}
+    try{const result=await window.travelDesktop.feature(action,input);if(!result.ok)throw Object.assign(Error(result.message||'操作未完成'),{code:result.code});return result;}
     finally{if(owns){aiBusy=false;proposalBusy=false;renderProposal();updateComposer();}}
   };
   window.featureApi=api;

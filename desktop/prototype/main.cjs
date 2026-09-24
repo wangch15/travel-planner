@@ -4,6 +4,7 @@ const fs=require('node:fs/promises');
 const { randomUUID, createHash } = require('node:crypto');
 const { inspectProject } = require('../spikes/inspect-project.cjs');
 const { CSP, readAsset } = require('./assets.cjs');
+const { userFacingMessage } = require('./services/failure-text.cjs');
 const { createProjectStore } = require('./project-store.cjs');
 const { buildPreview, PREVIEW_CSP } = require('./preview.cjs');
 const { BrowserPreview } = require('./browser-preview.cjs');
@@ -285,7 +286,9 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       STALE_PROPOSAL:'這份提案已失效，請重新產生。', INVALID_CANDIDATE:'AI 提案未通過完整資料驗證，原專案未修改。',
       UNSUPPORTED_DAY_CHANGE:'提案修改了本輪不支援的欄位，原專案未修改。', MODEL_UNAVAILABLE:'目前沒有可用模型，請重新確認帳號連接。',
     };
-    return { ok:false, code:error.code || error.message, message:messages[error.code] || messages[error.message] || '這次操作未完成，原始行程未被本次操作修改。' };
+    // 沒收進對照表的錯誤：先用服務附的中文說明，最後才用預設訊息（附代碼，方便回報）。
+    const code=error.code||error.message;
+    return { ok:false, code, message:messages[error.code] || messages[error.message] || userFacingMessage(error) || `這次操作沒有完成，發生未預期的錯誤（${String(code||'未知').slice(0,60)}）。你的檔案沒有被這次操作改動，可以再試一次。` };
   };
   async function planningFor(target){
     try{const d=await newTrips.readDraft(target.root,target.slug);return d.status==='planning'?d:null;}catch(e){if(e.code==='ENOENT')return null;throw e;}

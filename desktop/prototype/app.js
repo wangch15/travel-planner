@@ -301,6 +301,8 @@ function addMessage(message) {
   if(message.role==='assistant'&&message.applied){const a=message.applied,actions=el('div',undefined,'message-actions applied-actions');
     actions.append(el('span',`已保存到本機${a.number?` · V${a.number}`:''}${a.labels.length?` · ${a.labels.length} 處修改`:''}`,'applied-note'));
     if(a.versionId&&a.previousId){const act=(text,click)=>{const b=el('button',text);b.type='button';b.onclick=click;return b;};actions.append(act('查看修改對照',()=>showAppliedChanges(a)),act(`回到修改前（V${a.previousNumber}）`,()=>restoreVersion(a.previousId)));}
+    // 改好的內容只在本機；在這裡就能備份，不用找頁首或設定。
+    const backupButton=el('button','備份到 GitHub…');backupButton.type='button';backupButton.dataset.action='backup';backupButton.onclick=()=>window.openSyncFlow?.({kind:'backup',scope:'trip'});actions.append(backupButton);
     item.append(actions);}
   if(message.role==='assistant'&&message.action){const card=window.actionCard?.(message.action);if(card)item.append(card);}
   if(message.generation){const g=message.generation;item.title=`回覆設定：${g.provider} · ${g.model||'服務預設模型'} · ${g.effort||(g.resolvedEffort?'預設思考強度（'+g.resolvedEffort+'）':'預設思考強度')}`;item.dataset.provider=g.provider;item.dataset.model=g.model;item.dataset.effort=g.effort;}

@@ -120,3 +120,10 @@ test('missing or mismatched output approval is rejected at both publication gate
   await assert.rejects(f.service.confirm(p.token, { ...f.input, previewOutputDigest: 'other' }), { code: 'PREVIEW_REQUIRED' });
   assert.equal(f.state.calls.some(args => args[0] === 'deploy'), false);
 });
+test('the real publisher launches the installed wrangler through the App launcher', async () => {
+  // 發布服務以前傳 bin/wrangler.js，啟動器只接受 cli.js，App 內每次發布都在查帳號前以退出碼 2 失敗。
+  const { runWrangler } = require('../services/publishing.cjs');
+  const result = await runWrangler(['--version'], { env: {} });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /\d+\.\d+\.\d+/);
+});
