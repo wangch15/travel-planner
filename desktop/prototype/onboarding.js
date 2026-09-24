@@ -247,11 +247,15 @@
   $('onboarding-resume').hidden = false;
   $('onboarding-resume').onclick = () => { closeSettings(); window.resumeOnboarding(); };
   (async () => {
-    await detect();
+    // 先用便宜的讀取判斷要不要引導；只有真的需要時才做完整偵測（會檢查多個工具與登入，較慢）。
+    saved = await feature('onboarding-state').then(r => r.onboarding).catch(() => saved);
     if (saved.completed) return;
+    const workspace = await window.travelDesktop.readWorkspace?.().catch(() => null);
     // 已經有專案的人（包括從舊版升級的人）直接視為完成，不強迫重走；需要時可從「關於」重新打開。
+    if (workspace?.project) { saved = { ...saved, completed: true }; await feature('onboarding-save', saved).catch(() => {}); return; }
+    await detect();
     if (facts.project) { saved = { ...saved, completed: true }; await feature('onboarding-save', saved).catch(() => {}); return; }
-    view = facts.done.github || facts.project ? firstOpen() : 'welcome';
+    view = facts.done.github ? firstOpen() : 'welcome';
     show();
   })().catch(() => {});
 })();
