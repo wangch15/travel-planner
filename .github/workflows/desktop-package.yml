@@ -4,9 +4,15 @@ name: Desktop Windows package
 # 未簽章、不發布 release；產物只放在這次執行的 Artifacts。
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: '要附加 ZIP 的既有 release（例如 desktop-v0.4.0）；留空只上傳到 Artifacts'
+        required: false
+        default: ''
 
+# 只有填了 release_tag 時才會寫入 release；其餘步驟只讀。
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   windows-portable:
@@ -30,3 +36,17 @@ jobs:
             .local/distribution/TravelPlanner-*-windows-*.zip.sha256
           if-no-files-found: error
           retention-days: 30
+      # 直接附加到既有 release，免得從 Artifacts 下載再上傳。只接受 desktop-vX.Y.Z，版號必須和 ZIP 相同。
+      - name: Attach ZIP to release
+        if: ${{ inputs.release_tag != '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          [[ "$TAG" =~ ^desktop-v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || { echo "release_tag 必須是 desktop-vX.Y.Z"; exit 1; }
+          version="${BASH_REMATCH[1]}"
+          zip=".local/distribution/TravelPlanner-${version}-windows-x64.zip"
+          [ -f "$zip" ] || { echo "找不到 $zip；App 版本和 release 不一致"; exit 1; }
+          gh release view "$TAG" >/dev/null
+          gh release upload "$TAG" "$zip" "$zip.sha256" --clobber
