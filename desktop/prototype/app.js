@@ -213,7 +213,7 @@ function tripMenu(trip,demo){const blocked=aiBusy||Boolean(pendingProposal)||Boo
   ...(!demo?[{label:'新增對話',icon:'plus',disabled:blocked,action:()=>window.newTripConversation?.(trip)}]:[]),
   ...(!demo?[{label:'發布網站…',icon:'globe',disabled:blocked,action:()=>openPublishFor(trip)}]:[]),
   {separator:true},{label:demo?'刪除示範旅程':'移除旅程…',icon:'trash',danger:true,disabled:blocked,action:()=>window.requestTripRemoval?.(trip,demo)}];}
-async function openPublishFor(trip){if(selected?.trip!==trip){await selectTrip(trip);if(selected?.trip!==trip)return;}openSettings('publish');}
+async function openPublishFor(trip){if(selected?.trip!==trip){await selectTrip(trip);if(selected?.trip!==trip)return;}window.openSyncFlow({kind:'publish'});}
 function navigation() {
   const query=$('trip-search').value.trim().toLocaleLowerCase();
   const conversationPanel=$('conversation-sidebar');conversationPanel.remove();
@@ -617,7 +617,7 @@ for(const id of ['close-changes','done-changes'])$(id).onclick=()=>$('changes-di
 $('select-all-changes').onclick=()=>changeSelection(pendingProposal.changes.map(c=>c.key));
 $('select-no-changes').onclick=()=>changeSelection([]);
 $('close-history').onclick=()=>$('history-dialog').close();
-$('publish-open').onclick=()=>openSettings('publish');
+$('publish-open').onclick=()=>window.openSyncFlow({kind:'publish'});
 $('versions-open').onclick=async()=>{
   if(!selected||selected.demo||aiBusy)return;
   aiBusy=true;proposalBusy=true;updateComposer();

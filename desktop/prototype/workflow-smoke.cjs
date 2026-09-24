@@ -76,14 +76,18 @@ app.whenReady().then(async()=>{
   await waitFor('document.getElementById("messages").textContent.includes("整體建議") && !document.getElementById("message").disabled');
   // 預設名稱的對話採用 AI 取的名字，標題列與側欄都更新。
   await waitFor('document.getElementById("conversation-title").textContent==="整體節奏調整" && document.getElementById("conversation-list").textContent.includes("整體節奏調整")');
-  // AI 提出備份：回覆下方出現卡片，按下才檢查、再按確認才推送。
+  // AI 提出備份：回覆下方出現卡片，按下開啟備份燈箱，核對後按確認才推送；結果記回卡片。
   await waitFor('document.querySelector(".message.assistant .action-card")?.textContent.includes("備份到你的私人 GitHub")');
   assert.deepEqual(backupCalls,[]);
   await win.webContents.executeJavaScript('[...document.querySelectorAll(".action-card button")].find(b=>b.textContent==="檢查要備份的內容").click()');
-  await waitFor('document.querySelector(".action-card").textContent.includes("私人專案：sample/private")');
+  await waitFor('document.getElementById("sync-dialog").open && document.getElementById("sync-dialog-body").textContent.includes("私人專案：sample/private")');
+  // 燈箱開著時，卡片的按鈕顯示執行中，不能再按一次。
+  assert.equal(await win.webContents.executeJavaScript('document.querySelector(".action-card button[aria-busy=true]")?.disabled'),true);
   assert.deepEqual(backupCalls,['prepare:'+(await win.webContents.executeJavaScript('selected.trip.slug'))]);
-  await win.webContents.executeJavaScript('[...document.querySelectorAll(".action-card button")].find(b=>b.textContent==="確認備份").click()');
-  await waitFor('document.querySelector(".action-card .action-card-note").textContent.includes("私人備份已完成")');
+  await win.webContents.executeJavaScript('document.querySelector("#sync-dialog [data-flow-action=confirm]").click()');
+  await waitFor('document.querySelector("#sync-dialog [data-flow-action=done]")');
+  await win.webContents.executeJavaScript('document.querySelector("#sync-dialog [data-flow-action=done]").click()');
+  await waitFor('!document.getElementById("sync-dialog").open && document.querySelector(".action-card .action-card-note").textContent.includes("私人備份已完成")');
   assert.equal(backupCalls.at(-1),'confirm:backup-token');
   assert.deepEqual(generated[0],{dayId:null,model:'other-model',threadId:null});
   assert.equal(await win.webContents.executeJavaScript('document.getElementById("codex-model").value'),'other-model');

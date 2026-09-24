@@ -76,9 +76,11 @@ app.whenReady().then(async()=>{
   await js("openSettings('backup')");
   await until('!document.getElementById("backup-discard").hidden',300);
   await js('document.getElementById("backup-discard").click()');
-  await until('document.getElementById("backup-discard").textContent==="確認全部不要" && document.getElementById("backup-review").textContent.includes("trips/sample/data.js")');
-  await js('document.getElementById("backup-discard").click()');
-  await until('document.getElementById("backup-result").textContent.includes("已回到上次備份")');
+  await until('document.getElementById("sync-dialog").open && document.querySelector("#sync-dialog [data-flow-action=confirm]") && document.getElementById("sync-dialog-body").textContent.includes("trips/sample/data.js")');
+  await js('document.querySelector("#sync-dialog [data-flow-action=confirm]").click()');
+  await until('document.getElementById("sync-dialog-body").textContent.includes("已回到上次備份")');
+  await js('document.querySelector("#sync-dialog [data-flow-action=done]").click()');
+  await until('!document.getElementById("sync-dialog").open && document.getElementById("backup-result").textContent.includes("已回到上次備份")');
   assert.equal(await fs.readFile(path.join(project,'trips/sample/data.js'),'utf8'),before,'全部不要要回到上次備份');
   await js('closeSettings()');
   // 附件留在參考資料，重新開啟對話也看得到那則訊息附了什麼。
