@@ -27,6 +27,7 @@ textarea,input { caret-color:var(--text); }
 .sidebar-content { overflow:hidden; display:flex; flex-direction:column; flex:1; min-height:0; }
 .workbench[data-sidebar="closed"] .brand { display:none; }
 .brand { min-width:0; overflow:hidden; display:flex; align-items:center; gap:9px; font-weight:600; font-size:13px; padding:0; white-space:nowrap; }
+.app-version { font-size:11px; font-weight:500; color:var(--muted); }
 .brand img { width:26px; height:26px; object-fit:contain; flex-shrink:0; }
 .nav-action { justify-content:flex-start; width:100%; border-color:transparent; background:transparent; padding:10px; font-size:13px; }
 .list-heading { display:flex; align-items:center; gap:9px; font-size:12px; color:var(--muted); margin:24px 10px 10px; min-width:0; }
@@ -38,7 +39,6 @@ textarea,input { caret-color:var(--text); }
 .trip-button small { display:block; font-size:11px; color:var(--muted); margin-top:3px; }
 .sidebar-empty { margin:6px 10px; font-size:12px; line-height:1.9; color:var(--muted); }
 .sidebar-bottom { margin-top:auto; padding-top:20px; }
-.prototype-label { display:block; margin:12px 10px 0; font-size:11px; color:var(--muted); }
 .chat-column { grid-area:chat; display:flex; flex-direction:column; min-width:0; min-height:0; }
 .app-header { height:56px; display:flex; align-items:center; gap:16px; padding:0 18px; border-bottom:1px solid var(--line); -webkit-app-region:drag; user-select:none; }
 .app-header button { -webkit-app-region:no-drag; }
@@ -208,7 +208,7 @@ img[data-logo] { object-fit:contain; }
 .account-entry small { display:block; font-size:10px; color:var(--muted); }
 .account-symbol { width:28px; height:28px; display:grid; place-items:center; background:var(--hover); border-radius:50%; }
 .account-symbol .icon { width:16px; height:16px; }
-.prototype-label { margin:7px 8px 0; font-size:10px; }
+
 .sidebar-rail { display:flex; flex-direction:column; align-items:center; gap:8px; flex:1; }
 #rail-settings { margin-top:auto; }
 /* Settings keep a stable navigation column and group related controls. */

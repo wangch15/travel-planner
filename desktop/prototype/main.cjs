@@ -101,6 +101,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'), session: isolatedSession,
       nodeIntegration: false, contextIsolation: true, sandbox: true, webviewTag: false,
+      additionalArguments: ['--tp-app-version='+require('./package.json').version],
     },
   });
   sendToolProgress=value=>{if(!win.isDestroyed())win.webContents.send('feature:tool-progress',value);};

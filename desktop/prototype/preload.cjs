@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('travelDesktop', Object.freeze({
   platform: process.platform,
+  appVersion: (process.argv.find(arg=>arg.startsWith('--tp-app-version='))||'').slice('--tp-app-version='.length)||null,
   feature: (action,input={}) => ipcRenderer.invoke('feature:'+action,input),
   onAuthProgress: callback => {const listener=(_event,value)=>callback(value);ipcRenderer.on('feature:auth-progress',listener);return ()=>ipcRenderer.removeListener('feature:auth-progress',listener);},
   onProviderAccount:callback=>{const listener=(_event,value)=>callback(value);ipcRenderer.on('feature:provider-account',listener);return()=>ipcRenderer.removeListener('feature:provider-account',listener);},

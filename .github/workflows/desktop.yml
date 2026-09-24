@@ -40,6 +40,8 @@ jobs:
       - run: npm --prefix desktop/prototype run smoke:settings
       - run: npm --prefix desktop/prototype run smoke:stop
       - run: npm --prefix desktop/prototype run smoke:session-settings
+      - run: npm --prefix desktop/prototype run smoke:paste
+      - run: npm --prefix desktop/prototype run smoke:research
 
 # No ChatGPT login, model request, Cloudflare deployment, or private trip data.
 # A committed workflow is not evidence that native Windows has already passed.

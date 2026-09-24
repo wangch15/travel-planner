@@ -699,13 +699,13 @@ async function initializeWorkspace() {
 }
 if(!window.travelDesktop)seedDemo();setSidebar(ui.sidebar); setPreview(ui.preview); navigation(); renderProject();
 initializeWorkspace();
+if(window.travelDesktop?.appVersion){$('app-version').textContent='v'+window.travelDesktop.appVersion;$('app-version').hidden=false;$('about-version').textContent=window.travelDesktop.appVersion+' · 本機測試版';}
 if(window.travelDesktop){window.travelDesktop.feature('provider-status').then(result=>{if(result.ok&&result.provider)activeProvider=result.provider;}).catch(()=>{}).finally(restoreAIConnection);}
 
 function renderCodexAccount(account) {
   queueMicrotask(renderSetupChecklist);
   if(account.provider&&account.provider!==activeProvider){activeProvider=account.provider;accountRequest++;}accountState = account;window.onFeatureAccount?.(account);
   const providerName=({codex:'Codex',claude:'Claude Code',gemini:'Gemini'})[activeProvider];$('provider-heading').textContent=providerName;$('chat-provider').value=activeProvider;window.refreshProviderOptions?.();$('codex-connect').textContent='檢查 '+providerName;$('codex-login').textContent=activeProvider==='codex'?'連接 ChatGPT':'登入 '+providerName;
-  document.querySelector('.prototype-label').textContent = account.state === 'checking'?'正在核對已保存的登入…':account.state === 'connected' ? '提案經確認後才保存' : '可在設定連接 AI 助手';
   const labels = { checking:'正在恢復連線', paused:'暫停提供', unavailable:'尚未安裝', error:'連線待確認', disconnected:'尚未連接', 'needs-login':'需要登入', connected:'已連接', 'waiting-login':'等待授權', 'login-failed':'登入未完成', switching:'正在更換帳號', 'switch-failed':'需要重新確認' };
   $('codex-badge').textContent = account.cachedAuth?'登入已保存':labels[account.state] || '需要確認';
   $('sidebar-account-status').textContent = account.state==='connected' ? providerName+(account.cachedAuth?' · 登入已保存':' · 已連接') : labels[account.state] || '需要確認';
