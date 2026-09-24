@@ -101,7 +101,8 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'), session: isolatedSession,
       nodeIntegration: false, contextIsolation: true, sandbox: true, webviewTag: false,
-      additionalArguments: ['--tp-app-version='+require('./package.json').version],
+      // 開發中（未打包）顯示 -dev，避免與已發布的同號 DMG 混淆。
+      additionalArguments: ['--tp-app-version='+require('./package.json').version+(app.isPackaged?'':'-dev')],
     },
   });
   sendToolProgress=value=>{if(!win.isDestroyed())win.webContents.send('feature:tool-progress',value);};
