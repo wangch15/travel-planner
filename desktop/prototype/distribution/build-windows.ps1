@@ -9,6 +9,11 @@ try {
   # Exact official electron/node-rcedit package; scripts disabled and no global/repo dependency change.
   & npm.cmd install --prefix $ToolDirectory --registry https://registry.npmjs.org --ignore-scripts --no-audit --no-fund --save-exact rcedit@5.0.2
   if ($LASTEXITCODE -ne 0) { throw 'Pinned Windows resource editor installation failed.' }
+  # Electron downloads its runtime lazily; a fresh checkout has no dist/ until it is fetched.
+  if (-not (Test-Path (Join-Path $RepoRoot 'node_modules/electron/dist/version'))) {
+    & node (Join-Path $RepoRoot 'node_modules/electron/install.js')
+    if ($LASTEXITCODE -ne 0) { throw 'Electron runtime download failed.' }
+  }
   $env:TRAVEL_PLANNER_RCEDIT_DIR = $ToolDirectory
   $ResultText = & node (Join-Path $PSScriptRoot 'package.cjs')
   if ($LASTEXITCODE -ne 0) { throw 'Desktop packaging failed.' }
