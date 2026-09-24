@@ -90,6 +90,13 @@ Travel Planner 是一套給自助旅行者使用的行程規劃工具。你只�
 
 Travel Planner 桌面版把整個流程放進一個視窗：左側是你的旅程，中間和 AI 討論，右側即時看到網站長什麼樣子。
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/desktop-dark.png">
+    <img src="docs/screenshots/desktop-light.png" alt="Travel Planner 桌面版：左側旅程列表，中間和 AI 討論雨天備案，右側即時預覽行程網站的地形總覽" width="800">
+  </picture>
+</p>
+
 ### 下載與安裝
 
 到 **[Releases](https://github.com/wangch15/travel-planner/releases/latest)** 下載標題為「Travel Planner 桌面版」的最新版本：
