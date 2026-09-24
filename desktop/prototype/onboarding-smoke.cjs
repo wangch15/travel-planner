@@ -42,6 +42,9 @@ app.whenReady().then(async()=>{
   gitReady=true;await until('onboarding.state().view==="project"',300);
   // 3 私人專案：預設名稱與位置，建立後自動第一次備份
   await until('document.getElementById("ob-project-name")?.value==="travel-planner-trips"');await shot('3-project.png');
+  // 「我已經有專案了」要真的打開設定頁（不被引導蓋住），關掉設定後回到引導
+  await press('我已經有專案了');await until('document.getElementById("onboarding").hidden && !document.getElementById("settings").hidden && !document.getElementById("setting-projects").hidden');
+  await js('closeSettings()');await until('!document.getElementById("onboarding").hidden && onboarding.state().view==="project"');
   await press('建立並完成第一次備份');await until('onboarding.state().view==="ai"',300);
   assert.deepEqual(calls.filter(c=>/^(prepare|backup)/.test(c)),['prepare:travel-planner-trips','backup-prepare:project','backup-confirm:backup-token']);
   assert.equal(await js('project?.root'),projectRoot);

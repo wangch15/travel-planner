@@ -66,7 +66,7 @@
     ].map(([t, d], i) => h('li', {}, h('span', { class: 'ob-num' }, String(i + 1)), h('div', {}, h('strong', {}, t), h('span', {}, d))))),
       h('p', { class: 'ob-note' }, 'Node.js、GitHub 工具、Cloudflare 工具與行程網頁引擎都已經內建在 App 裡，不用另外安裝。')),
     h('div', { class: 'ob-actions ob-center' }, button('開始準備', () => go(firstOpen())),
-      link('我已經有專案了', () => { openSettings('projects'); }),
+      link('我已經有專案了', () => { openSettingsFromOnboarding('projects'); }),
       link('先看看示範旅程', () => { dismissedForSession = true; hide(); openDemo(); }, 'ob-quiet'))];
   }
 
@@ -128,7 +128,7 @@
       h('div', { class: 'ob-row' }, h('span', {}, 'GitHub 專案'), h('div', { class: 'ob-inline' }, h('span', { class: 'ob-muted' }, s ? s.owner + ' /' : '…'), nameInput)),
       h('div', { class: 'ob-row' }, h('span', {}, '可見度'), h('strong', { class: 'ob-okText' }, '私人（只有你看得到）')),
       h('div', { class: 'ob-row' }, h('span', {}, '這台電腦'), h('span', { class: 'ob-path', title: s ? s.parentDirectory : '' }, s ? '…/' + s.parentDirectory.split(/[\\/]/).filter(Boolean).slice(-1)[0] + '/' + (d.name || s.name) : '…'), link('改位置', async () => { try { const r = await feature('onboarding-project-location'); if (r.suggestion) { d.suggestion = r.suggestion; d.name = r.suggestion.name; render(); } } catch (e) { fail('project', e); } })),
-      h('div', { class: 'ob-actions' }, button('建立並完成第一次備份', createProject, { disabled: busy || !s }), link('我已經有專案了', () => openSettings('projects')))));
+      h('div', { class: 'ob-actions' }, button('建立並完成第一次備份', createProject, { disabled: busy || !s }), link('我已經有專案了', () => openSettingsFromOnboarding('projects')))));
     if (d.steps) body.push(card(...d.steps.map(([text, tone]) => status(text, tone))));
     return body;
   }
@@ -210,6 +210,10 @@
   }
 
   // ---------- 流程 ----------
+  // 引導蓋在畫面最上層；要去設定頁（例如連接既有專案）時先收起來，關掉設定後再回來並重新偵測。
+  let pausedForSettings = false;
+  function openSettingsFromOnboarding(section) { pausedForSettings = true; hide(); openSettings(section); }
+  window.onSettingsClosed = () => { if (!pausedForSettings) return; pausedForSettings = false; if (saved.completed || dismissedForSession) return; detect().then(() => { view = firstOpen(); show(); }).catch(() => show()); };
   function go(step) { view = step; message = null; render(); }
   function poll(check, every, limit = 20 * 60 * 1000, onTimeout) {
     clearTimeout(pollTimer); const started = Date.now();

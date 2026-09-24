@@ -3,7 +3,7 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { createHash, randomUUID } = require('node:crypto');
-const { TRUSTED_FILES, regularBytes, sameTrusted } = require('./backup.cjs');
+const { TRUSTED_FILES, regularBytes, sameTrusted, trustedFilter } = require('./backup.cjs');
 const { destinationRepo } = require('../../../scripts/lib/pre-push.js');
 const exec = promisify(execFile);
 const TEMPLATE = 'wangch15/travel-planner';
@@ -45,10 +45,10 @@ class ProjectSetupService {
     const raw = String(await this.git(['config', '--null', '--list'], { cwd }) || '');
     for (const row of raw.split('\0').filter(Boolean)) {
       const index = row.indexOf('\n'), key = row.slice(0, index).toLowerCase(), value = row.slice(index + 1);
-      if (/^(includeif\.|filter\.|gpg\.|diff\..*\.(command|textconv)$|url\..*\.(insteadof|pushinsteadof)$|remote\..*\.(receivepack|uploadpack|vcs|proxy)$)/.test(key)
+      if (!trustedFilter(key, value) && /^(includeif\.|filter\.|gpg\.|diff\..*\.(command|textconv)$|url\..*\.(insteadof|pushinsteadof)$|remote\..*\.(receivepack|uploadpack|vcs|proxy)$)/.test(key)
         || ['core.fsmonitor', 'core.sshcommand', 'core.gitproxy', 'core.askpass', 'diff.external', 'core.alternaterefscommand', 'core.hookspath', 'core.worktree', 'init.templatedir'].includes(key)
         || key === 'core.bare' && !['false', 'no', '0'].includes(value)
-        || /^credential(?:\..+)?\.helper$/.test(key) && !/^(|osxkeychain|manager|manager-core|wincred|cache(?: --timeout=\d+)?|!gh auth git-credential|!\/(?:opt\/homebrew|usr\/local)\/bin\/gh auth git-credential)$/.test(value)) throw fail('UNSAFE_GIT_CONFIG', 'Git 設定含未知外部指令，請先核對後再下載。');
+        || /^credential(?:\..+)?\.helper$/.test(key) && !/^(|osxkeychain|manager|manager-core|wincred|cache(?: --timeout=\d+)?|!gh auth git-credential|!\/(?:opt\/homebrew|usr\/local)\/bin\/gh auth git-credential)$/.test(value)) throw fail('UNSAFE_GIT_CONFIG', `你的 Git 設定有「${key}」，它可能在下載時執行其他程式；為了安全，App 不會在這種設定下建立或下載專案。請確認這個設定後再試。`);
     }
   }
   async privateRepo(repo, cwd) {

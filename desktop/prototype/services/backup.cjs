@@ -11,6 +11,9 @@ const fail = (code, message) => Object.assign(new Error(message || code), { code
 const TRUSTED_FILES = ['.githooks/pre-push', 'scripts/pre-push.js', 'scripts/lib/pre-push.js', 'scripts/lib/push-history.js', 'scripts/lib/contribution-history.js'];
 // Git for Windows 預設 autocrlf，檢出的檔案可能是 CRLF；比對可信版本時忽略換行差異。
 const sameTrusted = (a, b) => a.toString('latin1').replace(/\r\n/g, '\n') === b.toString('latin1').replace(/\r\n/g, '\n');
+// Git LFS 官方安裝會在全域設定寫入這幾個 filter；只放行這些標準值，其他 filter 仍視為會執行未知程式。
+const LFS_FILTERS = Object.freeze({ 'filter.lfs.clean': ['git-lfs clean -- %f'], 'filter.lfs.smudge': ['git-lfs smudge -- %f', 'git-lfs smudge --skip -- %f'], 'filter.lfs.process': ['git-lfs filter-process', 'git-lfs filter-process --skip'], 'filter.lfs.required': ['true'] });
+const trustedFilter = (key, value) => Object.hasOwn(LFS_FILTERS, key) && LFS_FILTERS[key].includes(String(value).trim());
 const safeEnv = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(GIT_|NODE_OPTIONS$|NODE_PATH$|LD_|DYLD_)/.test(key)));
 async function defaultRun(bin, args, { pathPrefix, ...options } = {}) {
   // pathPrefix：只給 App 自己發起的推送用，讓備份 hook 找得到 App 內建的 node。
@@ -50,7 +53,7 @@ class BackupService {
     for (const entry of config.split('\0').filter(Boolean)) {
       const at = entry.indexOf('\n'), key = entry.slice(0, at).toLowerCase(), value = entry.slice(at + 1);
       values.set(key, value);
-      if (/^(filter\.|gpg\.|diff\..*\.(command|textconv)$|url\..*\.(insteadof|pushinsteadof)$|remote\..*\.(receivepack|uploadpack|vcs|proxy)$)/.test(key)
+      if (!trustedFilter(key, value) && /^(filter\.|gpg\.|diff\..*\.(command|textconv)$|url\..*\.(insteadof|pushinsteadof)$|remote\..*\.(receivepack|uploadpack|vcs|proxy)$)/.test(key)
         || ['core.fsmonitor', 'core.sshcommand', 'core.gitproxy', 'core.askpass', 'diff.external', 'core.alternateRefsCommand'.toLowerCase()].includes(key)
         || (['commit.gpgsign', 'push.gpgsign'].includes(key) && !['false', 'no', '0'].includes(value))
         || (/^credential(?:\..+)?\.helper$/.test(key) && !/^(|osxkeychain|manager|manager-core|wincred|cache(?: --timeout=\d+)?|!gh auth git-credential|!\/(?:opt\/homebrew|usr\/local)\/bin\/gh auth git-credential)$/.test(value))) {
@@ -193,4 +196,4 @@ class BackupService {
     } finally { this.busy = false; }
   }
 }
-module.exports = { BackupService, defaultRun, regularBytes, TRUSTED_FILES, sameTrusted };
+module.exports = { BackupService, defaultRun, regularBytes, TRUSTED_FILES, sameTrusted, trustedFilter };
