@@ -5,7 +5,7 @@
   let models=[],references=[],selectedRefs=new Set(),referenceScope='',lastAccount='',featureState={},materializedCandidate=false,viewedPreviewURL=null;
   let conversationItems=[],currentConversation=null,showArchived=false,conversationRequest=0,renameConversationId=null;
   let backupToken=null,publishToken=null,adoptionToken=null,elapsedTimer=null,startedAt=0;
-  const exclusive=new Set(['tool-prepare','tool-install','provider-select','trip-delete-prepare','trip-delete-confirm','trip-restore','project-setup-prepare','project-setup-confirm','git-identity-prepare','git-identity-confirm','trip-create','plan-confirm','references-add','references-add-bytes','references-url','references-remove','research-confirm','materialize-confirm','materialize-discard','job-wait','job-pause','job-recover','handoff','backup-prepare','backup-confirm','publish-prepare','publish-confirm','adoption-prepare','adoption-confirm','archive-export','archive-import','auth-start','auth-cancel','cloudflare-account','conversation-new','conversation-switch','conversation-rename','conversation-archive']);
+  const exclusive=new Set(['project-update-prepare','project-update-confirm','tool-prepare','tool-install','provider-select','trip-delete-prepare','trip-delete-confirm','trip-restore','project-setup-prepare','project-setup-confirm','git-identity-prepare','git-identity-confirm','trip-create','plan-confirm','references-add','references-add-bytes','references-url','references-remove','research-confirm','materialize-confirm','materialize-discard','job-wait','job-pause','job-recover','handoff','backup-prepare','backup-confirm','publish-prepare','publish-confirm','adoption-prepare','adoption-confirm','archive-export','archive-import','auth-start','auth-cancel','cloudflare-account','conversation-new','conversation-switch','conversation-rename','conversation-archive']);
   const api=async(action,input={})=>{
     if(!window.travelDesktop?.feature)throw Error('請在桌面 App 使用這個功能。');
     const owns=exclusive.has(action)&&!aiBusy;if(owns){aiBusy=true;proposalBusy=true;updateComposer();}
@@ -27,7 +27,19 @@
       if(archiving)notify('已封存「'+archivedTitle+'」'+(wasCurrent?'，並開始一段新的討論':'')+'。可從對話清單的「⋯ → 顯示已封存對話」找回。');}
     catch(e){notify(e.message);}finally{aiBusy=false;proposalBusy=false;updateComposer();}
   }
-  async function loadConversations(){if(!selected||selected.demo||!window.travelDesktop)return;const request=++conversationRequest;const result=await api('conversations-list',target());if(request!==conversationRequest)return;conversationItems=result.items;currentConversation=result.currentId;navigation();}
+  async function loadConversations(){if(!selected||selected.demo||!window.travelDesktop)return;const request=++conversationRequest;const result=await api('conversations-list',target());if(request!==conversationRequest)return;conversationItems=result.items;currentConversation=result.currentId;navigation();window.refreshBackupStatus();}
+  // 頂部「尚未備份」：只看本機（未提交的行程改動、未推送的提交），不連網。
+  let backupStatusRequest=0;
+  window.refreshBackupStatus=async()=>{
+    const button=$('backup-status');if(!project||!selected||selected.demo||!window.travelDesktop){button.hidden=true;return;}
+    const request=++backupStatusRequest;let status=null;try{status=(await window.travelDesktop.feature('backup-status',{slug:selected.trip.slug})).status;}catch{}
+    if(request!==backupStatusRequest)return;
+    const pending=status&&(status.neverBackedUp||status.pendingFiles>0||status.unpushedCommits>0);
+    button.hidden=!pending||$('versions-open').hidden;if(!pending)return;
+    button.textContent=status.neverBackedUp?'尚未備份到 GitHub':'尚未備份'+(status.pendingFiles?` · ${status.pendingFiles} 個檔案`:'');
+  };
+  $('backup-status').onclick=()=>openSettings('backup');
+  window.addEventListener('focus',()=>window.refreshBackupStatus());
   function conversationMenu(item){const disabled=aiBusy||Boolean(pendingProposal)||materializedCandidate;return [
     {label:'命名對話',icon:'chat',disabled,action:()=>{renameConversationId=item.id;$('conversation-name').value=item.title;$('conversation-name-dialog').showModal();}},
     {label:'複製對話',icon:'chat',disabled:aiBusy,action:async()=>{await api('conversation-copy',{...target(),id:item.id});notify('對話文字已複製；可能含私人資訊，請留意貼上的位置。');}},
@@ -186,7 +198,7 @@
   $('research-trip').onclick=()=>specialized('research',pendingProposal?'請查核目前候選行程中調整的停留安排與備案，確認營業時間、交通順序與緩衝可行性。引用官方來源與原文短摘，任何未知都列入待確認。':'請依目前逐日安排／已確認草案，查核景點、交通、餐食與行程可行性；引用官方來源與原文短摘，任何未知都列入待確認。');
   $('confirm-plan').onclick=()=>action('confirm-plan',async()=>{const result=await api('plan-confirm',{...target(),digest:featureState.plan?.digest});useConversation(result);renderPlan();});
   $('materialize-plan').onclick=()=>specialized('materialize','請依已確認逐日草案與來源查核結果，建立符合所有 schema 的完整旅程資料檔。保留指定 deploy.name；不填造假的座標、日期或來源。若仍缺必要事實，明確指出，不能宣稱已保存。');
-  $('confirm-materialization').onclick=()=>action('confirm-materialization',async()=>{const result=await api('materialize-confirm',target());await reloadProject(result);notify('正式行程資料已保存本機，尚未發布或異地備份。');});
+  $('confirm-materialization').onclick=()=>action('confirm-materialization',async()=>{const result=await api('materialize-confirm',target());await reloadProject(result);window.refreshBackupStatus();notify('正式行程資料已保存本機，尚未發布或異地備份。');});
   $('discard-materialization').onclick=()=>action('discard-materialization',async()=>{await api('materialize-discard',target());materializedCandidate=false;realPreview=null;renderPreview();updateComposer();});
   function renderResearch(){
     const report=featureState.research;$('research-report').replaceChildren();if(!report)return;
@@ -261,9 +273,10 @@
   $('handoff-open').onclick=()=>{const messages=selected?.trip.conversation||[];const text=`旅程：${selected?.trip.title||''}\n目前行程內容以 App 最新檔案為準。任何提案、備份與發布都必須重新確認。\n\n最近討論：\n${messages.slice(-12).map(m=>`${m.role==='user'?'使用者':'助手'}：${m.text.slice(0,1000)}`).join('\n\n')}`;$('handoff-summary').value=text.slice(0,16000);$('handoff-dialog').showModal();};$('close-handoff').onclick=()=>$('handoff-dialog').close();
   $('confirm-handoff').onclick=()=>action('confirm-handoff',async()=>{const result=await api('handoff',{...target(),summary:$('handoff-summary').value});useConversation(result);$('handoff-dialog').close();updateComposer();});
   async function prepareRemote(kind){
-    if(!selected||selected.demo)throw Error('請先選擇一趟正式旅程。');const id=kind==='backup'?'backup':'publish';tell(id+'-result','正在核對…');const result=await api(kind+'-prepare',target()),p=result.preparation;
+    const projectLevel=kind==='backup'&&(!selected||selected.demo)&&Boolean(project);
+    if(!projectLevel&&(!selected||selected.demo))throw Error('請先選擇一趟正式旅程。');const id=kind==='backup'?'backup':'publish';tell(id+'-result','正在核對…');const result=projectLevel?await api('backup-project-prepare'):await api(kind+'-prepare',target()),p=result.preparation;
     const box=$(id+'-review');box.hidden=false;box.replaceChildren();
-    if(kind==='backup'){backupToken=p.token;box.append(el('p',`私人專案：${p.repo} · 分支：${p.branch}`),el('p',`本次 ${p.files.length} 個檔案；另有 ${p.unpublishedCommits} 個既有提交會一併推送。`));const list=el('ul');p.files.forEach(f=>list.append(el('li',`${f.status==='deleted'?'刪除':'保存'} · ${f.path}`)));box.append(list);for(const warning of p.warnings||[])box.append(el('p',warning));if(p.unrelatedCommittedFiles?.length){box.append(el('h3','既有未推送提交另包含'));const others=el('ul');p.unrelatedCommittedFiles.forEach(f=>others.append(el('li',f)));box.append(others);}$('backup-confirm').hidden=false;}
+    if(kind==='backup'){backupToken=p.token;box.append(el('p',`私人專案：${p.repo} · 分支：${p.branch}`),el('p',`本次 ${p.files.length} 個檔案；另有 ${p.unpublishedCommits} 個既有提交會一併推送。`));const list=el('ul');p.files.forEach(f=>list.append(el('li',`${f.status==='deleted'?'刪除':'保存'} · ${f.path}`)));box.append(list);for(const warning of p.warnings||[])box.append(el('p',warning));if(p.firstPush)box.append(el('p','這是第一次推送到這個私人專案，會包含模板本身的所有檔案。'));if(p.unrelatedCommittedFiles?.length){box.append(el('h3','既有未推送提交另包含'));const others=el('ul');p.unrelatedCommittedFiles.slice(0,20).forEach(f=>others.append(el('li',f)));if(p.unrelatedCommittedFiles.length>20)others.append(el('li',`…另外 ${p.unrelatedCommittedFiles.length-20} 個檔案`));box.append(others);}$('backup-confirm').hidden=false;}
     else {publishToken=p.token;box.append(el('p',`網站：${p.name}`),el('p',`Cloudflare：${p.accountName||p.accountId}`),el('p',p.warning));$('publish-ack').checked=false;$('publish-ack-row').hidden=false;$('publish-confirm').hidden=false;$('adoption-confirm').hidden=true;}
     tell(id+'-result','請核對以上資訊，再確認。');
   }
@@ -292,7 +305,7 @@
   $('identity-prepare').onclick=()=>action('identity-prepare',async()=>{const {preparation:p}=await api('git-identity-prepare');identityToken=p.token;$('identity-review').replaceChildren(el('p',`專案：${p.repo}`),el('p',`${p.author.name} · ${p.author.email}`),el('p',p.warning));$('identity-review').hidden=false;$('identity-confirm').hidden=false;});
   $('identity-confirm').onclick=()=>action('identity-confirm',async()=>{if(!identityToken)return;const token=identityToken;identityToken=null;$('identity-confirm').hidden=true;const {result}=await api('git-identity-confirm',{token});tell('identity-result',result.message);});
   $('backup-prepare').onclick=()=>action('backup-prepare',()=>prepareRemote('backup'));
-  $('backup-confirm').onclick=()=>action('backup-confirm',async()=>{const token=backupToken;backupToken=null;$('backup-confirm').hidden=true;const {result}=await api('backup-confirm',{token});tell('backup-result',result.message);});
+  $('backup-confirm').onclick=()=>action('backup-confirm',async()=>{const token=backupToken;backupToken=null;$('backup-confirm').hidden=true;const {result}=await api('backup-confirm',{token});tell('backup-result',result.message);window.refreshBackupStatus();});
   $('publish-prepare').onclick=()=>action('publish-prepare',()=>prepareRemote('publish'));
   $('publish-confirm').onclick=()=>action('publish-confirm',async()=>{if(!$('publish-ack').checked)throw Error('請先勾選公開網站提醒。');const token=publishToken;publishToken=null;$('publish-confirm').hidden=true;const {result}=await api('publish-confirm',{token});tell('publish-result',result.message);if(result.url)$('publish-result').append(document.createTextNode(' '),button('開啟網站',()=>api('open-link',{url:result.url})));});
   $('adoption-prepare').onclick=()=>action('adoption-prepare',async()=>{const {preparation:p}=await api('adoption-prepare',target());adoptionToken=p.token;const box=$('publish-review');box.hidden=false;box.replaceChildren(el('p',`網站：${p.name}`),el('p',`帳號：${p.accountName||p.accountId}`),el('p',`目前版本：${p.versionId}`),el('p',p.warning));$('adoption-confirm').hidden=false;$('publish-confirm').hidden=true;});
@@ -349,5 +362,38 @@
   $('check-updates').onclick=()=>updateAction('updates');$('download-update').onclick=()=>updateAction('updates-download');$('install-update').onclick=()=>updateAction('updates-install');
   window.travelDesktop?.onUpdateState?.(update=>{renderUpdate(update);if(update.state==='error')notify('更新未完成，原有程式與行程保留。');});
 
-  window.onFeatureSetting=section=>{if(section==='backup')authStatus('github').catch(()=>{});if(section==='publish')authStatus('cloudflare').catch(()=>{});if(section==='tools'){environment().catch(e=>notify(e.message));api('updates-status').then(({update})=>renderUpdate(update)).catch(()=>{});}if(['backup','publish'].includes(section)&&(!selected||selected.demo))tell(section+'-result','請先回到工作台選擇正式旅程。');};
+  // 專案引擎更新：狀態不連網；按下「更新專案」才向 GitHub 取得模板並預演合併。
+  let projectUpdatePlan=null,projectUpdateRequest=0;
+  let checkedProjectRoot=null;
+  window.renderProjectUpdate=async()=>{
+    if(window.travelDesktop&&(project?.root||null)!==checkedProjectRoot){checkedProjectRoot=project?.root||null;window.travelDesktop.feature('project-open-check').then(r=>{if(r.ok&&r.warning)notify(r.warning);}).catch(()=>{});}
+    const box=$('project-update');if(!project||!window.travelDesktop){box.hidden=true;return;}
+    const request=++projectUpdateRequest;let update;try{update=(await api('project-update-status')).update;}catch{if(request===projectUpdateRequest)box.hidden=true;return;}
+    if(request!==projectUpdateRequest)return;
+    const notes=[];if(update.state==='update-available'){if(update.projectVersion&&update.appVersion&&update.projectVersion!==update.appVersion)notes.push(`專案引擎 ${update.projectVersion}，App 內建 ${update.appVersion}。`);if(!update.trusted)notes.push('備份保護程式需要更新，更新前無法備份到 GitHub。');if(update.migrateTrips.length)notes.push(`有 ${update.migrateTrips.length} 趟行程的資料格式需要升級。`);}
+    if(update.state==='app-older')notes.push('這個專案比 App 內建的版本還新，請先到「工具與更新」更新 Travel Planner App。');
+    box.hidden=update.state==='current';$('project-update-text').textContent=notes.join('');$('project-update-open').hidden=update.state!=='update-available';box.dataset.state=update.state;
+  };
+  function projectUpdateReview(plan){
+    const root=document.createElement('div');
+    root.append(el('p',plan.upToDate?'模板引擎已是最新，只需要升級行程資料格式。':`專案引擎 ${plan.fromVersion||'未知'} → ${plan.toVersion||'未知'}，共 ${plan.changedFiles} 個引擎檔案。`));
+    for(const entry of plan.highlights||[]){root.append(el('strong',`${entry.version}（${entry.date}）${entry.needsMigrate?' · 需要升級資料格式':''}`));const list=document.createElement('ul');for(const line of entry.highlights)list.append(el('li',line));root.append(list);}
+    if(plan.migrateTrips?.length)root.append(el('p','更新後會升級這些行程的資料格式：'+plan.migrateTrips.join('、')+'。原檔會另存 .bak。'));
+    return root;
+  }
+  $('project-update-open').onclick=async()=>{
+    if(aiBusy||pendingProposal||materializedCandidate){notify('請先停止 AI 工作，或確認／放棄目前的提案，再更新專案。');return;}
+    $('project-update-open').disabled=true;$('project-update-open').textContent='正在從 GitHub 檢查…';
+    try{const {update}=await api('project-update-prepare');if(!update.token){notify(update.message);window.renderProjectUpdate();return;}
+      projectUpdatePlan=update;$('project-update-review').replaceChildren(projectUpdateReview(update));$('project-update-error').hidden=true;$('confirm-project-update').disabled=false;$('project-update-dialog').showModal();}
+    catch(e){notify(e.message);}finally{$('project-update-open').disabled=false;$('project-update-open').textContent='更新專案…';}
+  };
+  $('cancel-project-update').onclick=()=>{projectUpdatePlan=null;$('project-update-dialog').close();};
+  $('confirm-project-update').onclick=async()=>{
+    if(!projectUpdatePlan)return;$('confirm-project-update').disabled=true;$('project-update-error').hidden=true;
+    try{const response=await api('project-update-confirm',{token:projectUpdatePlan.token});projectUpdatePlan=null;$('project-update-dialog').close();await reloadProject(response);window.refreshBackupStatus();
+      const r=response.result,parts=[r.merged?'專案已更新到 App 內建的引擎版本。':'專案引擎已是最新。'];if(r.migrated.length)parts.push(`已升級 ${r.migrated.length} 趟行程的資料格式。`);parts.push(r.status.trusted?'下次私人備份會一起推送這次更新。':'備份保護程式仍和 App 不同，請更新 App 後再備份。');notify(parts.join(''));}
+    catch(e){$('project-update-error').textContent=e.message;$('project-update-error').hidden=false;$('confirm-project-update').disabled=false;}
+  };
+  window.onFeatureSetting=section=>{if(section==='backup')authStatus('github').catch(()=>{});if(section==='publish')authStatus('cloudflare').catch(()=>{});if(section==='tools'){environment().catch(e=>notify(e.message));api('updates-status').then(({update})=>renderUpdate(update)).catch(()=>{});}if(section==='backup'&&(!selected||selected.demo)&&project)tell('backup-result','目前沒有選擇旅程：會推送這個專案既有、尚未備份的提交（例如第一次推送或專案更新）。');else if(['backup','publish'].includes(section)&&(!selected||selected.demo))tell(section+'-result','請先回到工作台選擇正式旅程。');};
 })();

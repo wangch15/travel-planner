@@ -7,6 +7,15 @@
 開發中的 commit 不升版，未打包執行時側欄顯示 `vX.Y.Z-dev`。版號只維護在 `desktop/prototype/package.json`（與 root lockfile 對應欄位），側欄品牌後方與「關於」頁都從這裡讀。
 發布放在 GitHub release `desktop-vX.Y.Z`，App 內「檢查新版本」只認這個格式。網頁引擎版號另計（root `package.json` + `CHANGELOG.md`）。
 
+## 備份與專案維護（0.4.0）
+
+- **不必另外安裝 Node.js 也能備份**：備份保護 hook（`.githooks/pre-push`）需要 `node`。App 在自己的資料夾放一個名為 `node` 的小腳本，以 App 內建的執行環境（`ELECTRON_RUN_AS_NODE`）執行 hook，只在 App 自己發起的推送中放進 PATH。已用真實 hook 驗證：PATH 裡沒有 Node 時，hook 仍完成 PRIVATE 查核並放行。
+- **在 App 裡更新專案**（相當於 CLI 的 `tp-update`）：「設定 → 專案管理」會顯示專案引擎版本與 App 內建版本是否一致、備份保護程式是否相同、哪些行程的資料格式需要升級。按「更新專案…」後，App 從官方模板取得更新，**對齊到 App 打包時的那一個 commit**（`build-info.json`），先用 `git merge-tree` 預演：有衝突、會動到使用者行程資料夾、或引擎檔案有未提交修改，都會先擋下，不改任何東西。確認後在本機建立合併提交，需要時用 App 內建的遷移腳本升級資料格式（原檔另存 `.bak`）。專案比 App 新時，請使用者先更新 App。已用真實 GitHub 實測：把 1.1.0 的專案更新到 1.1.2，行程沒有變動。
+- **專案層級備份**：沒有選擇旅程時，「私人備份」會推送專案既有、尚未備份的提交（例如剛建立的專案第一次推送、或專案更新的合併）。
+- **「尚未備份」提示**：頂部在這趟旅程有未提交的改動、或有尚未推送的提交時，顯示「尚未備份」；從未推送過則顯示「尚未備份到 GitHub」。只看本機，不連網；保存提案、建立行程、備份、專案更新之後，以及視窗重新取得焦點時更新。
+- **新建專案的 main 改為追蹤私人 origin**（原本追蹤公開模板），外部 Git 工具按 Push 不會推錯地方。
+- **同一專案被兩個 App 開著時提醒**：在專案 `.local/desktop-open.json`（已 gitignore）記下目前開啟的 App；另一個仍在執行、資料夾不同的 App（例如開發版與安裝版）開同一專案時提醒使用者先關掉其中一個。只提醒，不阻擋。
+
 ## 對話自動命名與封存提示（開發中）
 
 - Codex app-server 與 Claude `-p` 都不會替 App 的對話自動命名（實查 App 的 Codex profile，threads.name 全是空的；Codex 只在自己的介面命名）。所以每種回覆 schema 多一個 `conversationTitle`，由 AI 用 4–16 字替整段對話取名。名稱仍是「新的討論／旅程討論」且使用者沒改過時才採用；之後不再改名。使用者用「命名對話」改過的名稱記為 `conversationTitleCustom`，封存與切換都會保留，AI 不會覆蓋。缺少或格式不對的名稱會被忽略，不影響回覆本身。

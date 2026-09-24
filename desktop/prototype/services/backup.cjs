@@ -10,8 +10,11 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 const fail = (code, message) => Object.assign(new Error(message || code), { code });
 const TRUSTED_FILES = ['.githooks/pre-push', 'scripts/pre-push.js', 'scripts/lib/pre-push.js', 'scripts/lib/push-history.js', 'scripts/lib/contribution-history.js'];
 const safeEnv = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(GIT_|NODE_OPTIONS$|NODE_PATH$|LD_|DYLD_)/.test(key)));
-async function defaultRun(bin, args, options) {
-  return execute(bin, args, { ...options, env: { ...safeEnv(), GH_HOST: 'github.com', GH_PROMPT_DISABLED: '1', GIT_TERMINAL_PROMPT: '0', GIT_LITERAL_PATHSPECS: '1' }, timeout: 120000, maxBuffer: options.maxBuffer || 8 * 1024 * 1024 });
+async function defaultRun(bin, args, { pathPrefix, ...options } = {}) {
+  // pathPrefix：只給 App 自己發起的推送用，讓備份 hook 找得到 App 內建的 node。
+  const base = safeEnv(), pathKey = Object.keys(base).find(key => key.toUpperCase() === 'PATH') || 'PATH';
+  if (pathPrefix) base[pathKey] = pathPrefix + path.delimiter + (base[pathKey] || '');
+  return execute(bin, args, { ...options, env: { ...base, GH_HOST: 'github.com', GH_PROMPT_DISABLED: '1', GIT_TERMINAL_PROMPT: '0', GIT_LITERAL_PATHSPECS: '1' }, timeout: 120000, maxBuffer: options.maxBuffer || 8 * 1024 * 1024 });
 }
 async function regularBytes(file, maximum = 32 * 1024 * 1024) {
   const stat = await fs.lstat(file);
@@ -27,11 +30,11 @@ async function regularBytes(file, maximum = 32 * 1024 * 1024) {
   } finally { await handle.close(); }
 }
 class BackupService {
-  constructor({ run = defaultRun, trustedRoot = path.resolve(__dirname, '../../..') } = {}) {
-    this.run = run; this.trustedRoot = trustedRoot; this.pending = new Map(); this.busy = false;
+  constructor({ run = defaultRun, trustedRoot = path.resolve(__dirname, '../../..'), hookPath = null } = {}) {
+    this.run = run; this.trustedRoot = trustedRoot; this.hookPath = hookPath; this.pending = new Map(); this.busy = false;
   }
-  async git(root, args) {
-    const result = await this.run('git', ['--no-replace-objects', '--no-pager', '--no-optional-locks', '-C', root, ...args], { cwd: root });
+  async git(root, args, options = {}) {
+    const result = await this.run('git', ['--no-replace-objects', '--no-pager', '--no-optional-locks', '-C', root, ...args], { cwd: root, ...options });
     if (result?.status && result.status !== 0) throw fail('GIT_FAILED');
     return String(result.stdout || '');
   }
@@ -89,7 +92,8 @@ class BackupService {
   }
   async inspect(target) {
     const { root, slug } = target;
-    if (!/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug)) throw fail('INVALID_TARGET');
+    // slug 為 null：整個專案層級的備份，只推送既有提交（例如剛建立、還沒有旅程的專案，或引擎更新的合併）。
+    if (slug !== null && !/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug)) throw fail('INVALID_TARGET');
     const configDigest = await this.audit(root), destination = await this.destination(root);
     let authorReady = false;
     try { authorReady = Boolean((await this.git(root, ['config', 'user.name'])).trim() && (await this.git(root, ['config', 'user.email'])).trim()); } catch {}
@@ -97,8 +101,8 @@ class BackupService {
     const head = (await this.git(root, ['rev-parse', 'HEAD'])).trim();
     const staged = await this.git(root, ['diff', '--no-ext-diff', '--no-textconv', '--cached', '--name-only', '-z']);
     if (staged) throw fail('STAGED_CHANGES', '已有暫存中的改動；請先完成或取消原本的提交，再使用 App 備份。');
-    const prefix = `trips/${slug}/`;
-    const names = (await this.git(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', prefix])).split('\0').filter(Boolean);
+    const prefix = slug === null ? null : `trips/${slug}/`;
+    const names = prefix ? (await this.git(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', prefix])).split('\0').filter(Boolean) : [];
     const files = []; let total = 0;
     for (const name of [...new Set(names)].sort()) {
       if (!name.startsWith(prefix) || name.split('/').some(p => p === '..') || /[\x00-\x1f\x7f]/.test(name)) throw fail('UNSAFE_PATH');
@@ -109,8 +113,8 @@ class BackupService {
       if (total > 256 * 1024 * 1024 || files.length >= 5000) throw fail('BACKUP_TOO_LARGE');
       files.push({ path: name, status: bytes ? 'present' : 'deleted', bytes: bytes?.length || 0, digest: bytes ? hash(bytes) : null });
     }
-    const changedNames = new Set((await this.git(root, ['diff', '--no-ext-diff', '--no-textconv', '--name-only', '--no-renames', '-z', 'HEAD', '--', prefix])).split('\0').filter(Boolean));
-    for (const name of (await this.git(root, ['ls-files', '--others', '--exclude-standard', '-z', '--', prefix])).split('\0').filter(Boolean)) changedNames.add(name);
+    const changedNames = new Set(prefix ? (await this.git(root, ['diff', '--no-ext-diff', '--no-textconv', '--name-only', '--no-renames', '-z', 'HEAD', '--', prefix])).split('\0').filter(Boolean) : []);
+    if (prefix) for (const name of (await this.git(root, ['ls-files', '--others', '--exclude-standard', '-z', '--', prefix])).split('\0').filter(Boolean)) changedNames.add(name);
     const changed = files.filter(file => changedNames.has(file.path));
     const remote = (await this.git(root, ['ls-remote', destination.url, `refs/heads/${destination.branch}`])).trim();
     const remoteHead = remote ? remote.split(/\s+/)[0] : null;
@@ -126,8 +130,21 @@ class BackupService {
       }
     }
     return { ...destination, root, slug, head, remoteHead, configDigest, files: changed, allFilesDigest: hash(JSON.stringify(files)), unpublishedCommits,
-      unrelatedCommittedFiles: unpublishedFiles.filter(name => !name.startsWith(prefix)),
+      unrelatedCommittedFiles: unpublishedFiles.filter(name => !prefix || !name.startsWith(prefix)), firstPush: !remoteHead,
       warnings: unpublishedCommits ? ['推送會包含目前分支尚未備份的既有提交，請一併核對。'] : [] };
+  }
+  // 不連網的備份狀態：這趟旅程有沒有尚未提交的改動、目前分支有沒有尚未推送的提交。
+  async localStatus(root, slug) {
+    if (slug !== null && !/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug)) throw fail('INVALID_TARGET');
+    const pendingFiles = slug ? (await this.git(root, ['status', '--porcelain', '-z', '--untracked-files=all', '--', `trips/${slug}/`])).split('\0').filter(Boolean).length : 0;
+    const branch = (await this.git(root, ['branch', '--show-current'])).trim();
+    if (!branch) return { pendingFiles, unpushedCommits: null, neverBackedUp: false };
+    // 還沒有 origin 追蹤分支＝從未推送；預設 runner 在 git 非零退出時會丟錯，所以一併當成沒有。
+    let tracking = null;
+    try { tracking = await this.run('git', ['--no-pager', '-C', root, 'rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`], { cwd: root }); } catch {}
+    if (!tracking || tracking.status && tracking.status !== 0 || !String(tracking.stdout || '').trim()) return { pendingFiles, unpushedCommits: null, neverBackedUp: true };
+    const unpushedCommits = Number((await this.git(root, ['rev-list', '--count', `refs/remotes/origin/${branch}..HEAD`])).trim()) || 0;
+    return { pendingFiles, unpushedCommits, neverBackedUp: false };
   }
   async prepare(target) {
     if (this.busy) throw fail('BACKUP_BUSY');
@@ -165,7 +182,7 @@ class BackupService {
       if ((await this.git(current.root, ['remote', 'get-url', '--push', '--all', 'origin'])).trim() !== current.url
         || (await this.git(current.root, ['branch', '--show-current'])).trim() !== current.branch
         || (await this.git(current.root, ['rev-parse', 'HEAD'])).trim() !== head) throw fail('DESTINATION_CHANGED');
-      await this.git(current.root, ['push', 'origin', `HEAD:refs/heads/${current.branch}`]);
+      await this.git(current.root, ['push', 'origin', `HEAD:refs/heads/${current.branch}`], this.hookPath ? { pathPrefix: this.hookPath } : {});
       const remote = (await this.git(current.root, ['ls-remote', current.url, `refs/heads/${current.branch}`])).trim().split(/\s+/)[0];
       if (remote !== head) throw fail('REMOTE_NOT_VERIFIED');
       return { committed, backedUp: true, head, message: '私人備份已完成，遠端版本已核對。' };

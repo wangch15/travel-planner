@@ -205,6 +205,9 @@ class ProjectSetupService {
       localCreated = true; const owned = await this.materialize(pending, `https://github.com/${TEMPLATE}.git`);
       await this.git(['remote', 'rename', 'origin', 'upstream'], { cwd: pending.destination });
       await this.git(['remote', 'add', 'origin', pending.url], { cwd: pending.destination });
+      // main 原本追蹤公開模板；改成追蹤自己的私人專案，外部 Git 工具按 Push 才不會推錯地方。
+      const branch = String(await this.git(['branch', '--show-current'], { cwd: pending.destination })).trim();
+      if (branch) { await this.git(['config', '--local', `branch.${branch}.remote`, 'origin'], { cwd: pending.destination }); await this.git(['config', '--local', `branch.${branch}.merge`, `refs/heads/${branch}`], { cwd: pending.destination }); }
       await this.privateRepo(pending.repo, pending.destination); await verify(owned);
       const origins = String(await this.git(['remote', 'get-url', '--push', '--all', 'origin'], { cwd: pending.destination })).trim(); if (origins !== pending.url) throw fail('DESTINATION_CHANGED');
       await this.git(['config', '--local', 'user.name', pending.author.name], { cwd: pending.destination });

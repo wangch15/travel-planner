@@ -33,7 +33,7 @@ try { const stored = localStorage.getItem('travel-planner.theme'); if (['system'
 const issues = {
   'workspace-busy': '請先停止目前的 AI 工作，再切換專案。',
   'workspace-pending-proposal': '請先確認或放棄目前的提案，再切換專案。',
-  'schema-unsupported': '資料格式版本尚未支援，需要另行確認相容性。',
+  'schema-unsupported': '資料格式和 App 的版本不同；請按上方的「更新專案」。',
   'title-invalid': '旅程名稱缺漏或格式不符。', 'dates-invalid': '日期缺漏或格式不符。',
   'deployment-invalid': '部署設定缺漏或格式不符。', 'data-files-missing': '部分行程資料檔尚未齊全。',
   'config-invalid': '設定檔不是可讀取的 JSON 物件。', 'config-unreadable': '設定檔缺漏或無法讀取。',
@@ -269,6 +269,7 @@ function renderProject() {
   $('sync-trip-name').textContent=selected&&!selected.demo?selected.trip.title:'請先在工作台選擇旅程';
   if(!project)return;
   $('summary-title').textContent=project.projectName;$('summary-path').textContent=project.root;$('settings-trip-count').textContent=project.trips.length+' 趟';
+  window.renderProjectUpdate?.();
   facts($('summary-facts'),[['專案版本',project.engineVersion||'未知'],['私人備份','備份前會重新核對帳號與專案私有狀態']]);
   $('summary-message').textContent='連接時只讀取基本資訊；完整資料會在開啟旅程預覽時驗證。';$('summary-trips').replaceChildren();
   for(const trip of project.trips){const key=project.projectId+':'+trip.slug,row=el('details',undefined,'project-trip trip-row');row.open=settingsOpenTrips.has(key);row.ontoggle=()=>{if(row.open)settingsOpenTrips.add(key);else settingsOpenTrips.delete(key);};
@@ -495,6 +496,7 @@ function updateComposer() {
   // 發布入口只是帶到設定；核對、預覽確認與發布仍在「公開網站」分頁完成。
   $('publish-open').hidden=$('versions-open').hidden;
   $('publish-open').disabled=!ready||aiBusy;
+  if($('versions-open').hidden)$('backup-status').hidden=true;
   $('ai-day-controls').hidden = !real;
   $('connect-from-chat').hidden = accountState.state === 'connected' || activeProvider === 'gemini';
   const options = realPreview?.summary?.dayOptions || [];
@@ -677,6 +679,7 @@ $('save-proposal').onclick = async () => {
     else {
       appendRealMessage(selected.trip,{role:'assistant',text:`已保存到原專案的本機檔案，並保留修改前的還原副本。尚未異地備份，也沒有部署。${result.statusUpdated ? '' : '\n進度紀錄未能同步更新，請稍後核對。'}`});
       if(result.versionRecorded===false)notify('內容已保存，但版本紀錄尚待核對；請重新載入後確認，避免重複保存。');
+      window.refreshBackupStatus?.();
       if(result.version)appendRealMessage(selected.trip,{role:'assistant',text:`已建立本機日程版本 V${result.version.number}。可從上方版本紀錄查看或回復。`});
       if(result.conversationWarning)notify('行程已保存，但對話紀錄未能更新，請保留此畫面。');
       pendingProposal=null; realPreview=null; renderPreview();
