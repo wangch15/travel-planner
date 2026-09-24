@@ -445,7 +445,7 @@ function buildTabs() {
     b.style.setProperty('--tc', color);
     b.appendChild(el('span', 'd'));
     b.appendChild(el('span', null, label));
-    b.onclick = () => show(id);
+    b.onclick = () => { show(id); toTop(); };
     tabsBox.appendChild(b);
   };
   mk(0, '全程總覽', 'var(--accent)');
@@ -458,8 +458,12 @@ tabsBox.addEventListener('keydown', (e) => {
   const n = DAYS.length + 1;
   const next = step === -99 ? 0 : step === 99 ? n - 1 : Math.min(n - 1, Math.max(0, cur + step));
   show(next);
+  toTop();
   $('#tab-' + next).focus();
 });
+
+// 換分頁後回到頁首：手機上內容很長，不然會停在上一頁捲到的位置。
+function toTop() { if (window.scrollY > 0) scrollTo({ top:0, behavior:'auto' }); }
 
 function show(id) {
   cur = id;
@@ -477,7 +481,7 @@ function show(id) {
   renderMap(day);
   if (!day) restoreChecks();
   panel.querySelectorAll('[data-detail]').forEach((n) => { n.onclick = () => openDetail(n.dataset.detail, n); });
-  panel.querySelectorAll('[data-day]').forEach((n) => { n.onclick = () => { show(+n.dataset.day); scrollTo({ top:0, behavior: reduced() ? 'auto' : 'smooth' }); }; });
+  panel.querySelectorAll('[data-day]').forEach((n) => { n.onclick = () => { show(+n.dataset.day); toTop(); }; });
   panel.querySelectorAll('.stop').forEach((n) => {
     n.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; focusPlace(n.dataset.place, {}); });
   });
