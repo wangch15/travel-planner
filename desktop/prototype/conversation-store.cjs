@@ -17,10 +17,12 @@ function validGeneration(value){return value===undefined||(value&&typeof value==
 // 對話名稱仍是預設、使用者也沒改過時，才採用 AI 回覆附帶的 conversationTitle。
 const DEFAULT_TITLES=Object.freeze(['旅程討論','新的討論']);
 function applySuggestedTitle(state,answer){if(answer?.conversationTitle&&state.conversationTitleCustom!==true&&DEFAULT_TITLES.includes(state.conversationTitle||'旅程討論'))state.conversationTitle=answer.conversationTitle;return state;}
+// 使用者訊息附帶的參考資料只存 id、名稱與種類，讓對話紀錄能顯示；內容仍在參考資料區。
+function validMessageAttachments(m){return m.attachments===undefined||(m.role==='user'&&Array.isArray(m.attachments)&&m.attachments.length<=12&&m.attachments.every(a=>a&&string(a.id,200)&&string(a.name,200)&&['image','file'].includes(a.kind)));}
 function valid(s) {
   return s?.version===1 && (s.started===undefined||typeof s.started==='boolean') && (s.provider===undefined||['codex','claude','gemini'].includes(s.provider)) && validConversations(s)&&validPlan(s.plan)&&validResearch(s.research)&&validJob(s.job) && (s.effort===undefined||string(s.effort,40)) && (s.handoff===undefined||s.handoff===null||string(s.handoff,16000)) && string(s.draft,2000) && string(s.model,200) && (s.dayId===null || Number.isSafeInteger(s.dayId))
     && typeof s.pendingProposal==='boolean' && string(s.lastOutcome,1000)
-    && Array.isArray(s.messages) && s.messages.length<=2000 && s.messages.every(m=>m && ['user','assistant'].includes(m.role) && string(m.text,64000)&&validGeneration(m.generation)&&(m.action===undefined||(m.role==='assistant'&&['backup','publish','project-update','research'].includes(m.action))))
+    && Array.isArray(s.messages) && s.messages.length<=2000 && s.messages.every(m=>m && ['user','assistant'].includes(m.role) && string(m.text,64000)&&validGeneration(m.generation)&&(m.action===undefined||(m.role==='assistant'&&['backup','publish','project-update','research'].includes(m.action)))&&validMessageAttachments(m))
     && (s.thread===null || (string(s.thread.id,200) && string(s.thread.accountKey,200) && (s.thread.lastTurnId===null || string(s.thread.lastTurnId,200))))
     && (s.run===null || (string(s.run.id,100) && ['pending','complete','failed','unknown','stopped'].includes(s.run.status)
       && (s.run.stopRequested===undefined||typeof s.run.stopRequested==='boolean')

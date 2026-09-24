@@ -60,7 +60,7 @@ test('whole-trip discussion sends all raw days with only referenced place descri
   assert.deepEqual(sent.places,{first:{name:'First',cat:'sight',note:'Known note'},second:{name:'Second',cat:'stay'},alternate:{name:'Alternate',cat:'sight'},another:{name:'Another',cat:'food'}});
   assert.equal(JSON.stringify(sent).includes('PRIVATE_ADDRESS'),false);
   assert.equal(JSON.stringify(sent).includes('EXCLUDED_TOKEN'),false);
-  assert.deepEqual(schema,{type:'object',additionalProperties:false,properties:{summary:{type:'string'},conversationTitle:{type:'string'},appAction:{type:'string',enum:['none','backup','publish','project-update','research']}},required:['summary','conversationTitle','appAction']});
+  assert.deepEqual(schema,{type:'object',additionalProperties:false,properties:{summary:{type:'string'},conversationTitle:{type:'string'},appAction:{type:'string',enum:['none','backup','publish','project-update','research']},nextScope:{type:'string'},nextReply:{type:'string'}},required:['summary','conversationTitle','appAction','nextScope','nextReply']});
   assert.match(instructions,/整趟/);
   assert.match(instructions,/不可.*(?:修改|保存)/);
   assert.deepEqual(result,{summary:'建議每天留一段休息時間。',discussion:true,threadId:'thread',turnId:'turn',model:'server-model'});
@@ -260,4 +260,14 @@ test('appAction is an optional App action proposal; unknown actions are rejected
   // 研究模式的其他欄位仍照原本檢查
   const research=decodeAnswer(JSON.stringify({summary:'查完',sources:[],unresolved:[],feasibility:'可行',privateNotes:'',appAction:'publish'}),{mode:'research'});
   assert.equal(research.research,true);assert.equal(research.appAction,'publish');
+});
+
+test('nextScope／nextReply become a suggestion; malformed hints are ignored instead of failing the reply',()=>{
+  const {decodeAnswer}=require('../editor.cjs');
+  const d=decodeAnswer(JSON.stringify({summary:'好',nextScope:'all',nextReply:'請套用修改'}),{mode:'discussion'});
+  assert.deepEqual(d.suggestion,{scope:'all',reply:'請套用修改'});assert.equal(d.discussion,true);
+  assert.deepEqual(decodeAnswer(JSON.stringify({summary:'好',nextScope:'3',nextReply:''}),{mode:'discussion'}).suggestion,{scope:'3'});
+  assert.equal(decodeAnswer(JSON.stringify({summary:'好',nextScope:'keep',nextReply:''}),{mode:'discussion'}).suggestion,undefined);
+  assert.equal(decodeAnswer(JSON.stringify({summary:'好',nextScope:'rm -rf',nextReply:'x'.repeat(80)}),{mode:'discussion'}).suggestion,undefined);
+  assert.equal(decodeAnswer(JSON.stringify({summary:'好'}),{mode:'discussion'}).suggestion,undefined);
 });

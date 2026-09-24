@@ -142,16 +142,20 @@
   };
   window.onFeatureTrip=()=>{conversationRequest++;conversationItems=[];currentConversation=null;$('conversation-list').replaceChildren();references=[];selectedRefs.clear();referenceScope='';featureState={};updateReferenceCount();renderJob();};
   window.selectedReferenceIds=()=>[...selectedRefs];
+  // 送出時把附件從輸入框移到那則訊息；送出失敗再放回來。
+  window.takeComposerAttachments=()=>{const items=references.filter(i=>selectedRefs.has(i.id)).map(i=>({id:i.id,name:i.name,kind:i.kind==='image'?'image':'file'}));selectedRefs.clear();updateReferenceCount();return items;};
+  window.restoreComposerAttachments=items=>{for(const i of items)if(references.some(r=>r.id===i.id))selectedRefs.add(i.id);updateReferenceCount();};
+  window.referenceThumbnail=id=>thumbnails.get(id)||null;
   window.hasMaterialization=()=>materializedCandidate;
   window.setFeatureModels=value=>{models=value;window.refreshEffort();};
   window.refreshEffort=()=>{
     const model=models.find(m=>m.id===$('chat-model').value);const previous=selected?.trip.effort??featureState.effort??'';
     const names={none:'不額外思考',minimal:'最少',low:'低',medium:'中',high:'高',xhigh:'更高',max:'最高'};
-    $('chat-effort').replaceChildren();const automatic=el('option',model?.defaultEffort?`模型預設（${names[model.defaultEffort]||model.defaultEffort}）`:'模型預設（由服務決定）');automatic.value='';$('chat-effort').append(automatic);
-    for(const item of model?.effort||[]){const value=typeof item==='string'?item:item.reasoningEffort;const option=el('option',({none:'不額外思考',minimal:'最少',low:'低',medium:'中',high:'高',xhigh:'更高',max:'最高'})[value]||value);option.value=value;$('chat-effort').append(option);}
-    const allowed=[...$('chat-effort').options].some(o=>o.value===previous);$('chat-effort').value=allowed?previous:'';
+    const specs=[{value:'',label:model?.defaultEffort?`模型預設（${names[model.defaultEffort]||model.defaultEffort}）`:'模型預設（由服務決定）'}];
+    for(const item of model?.effort||[]){const value=typeof item==='string'?item:item.reasoningEffort;specs.push({value,label:names[value]||value});}
+    const allowed=specs.some(o=>o.value===previous);syncSelect($('chat-effort'),specs,allowed?previous:'');
     if(model&&selected&&!selected.demo&&!allowed)selected.trip.effort='';
-    $('chat-effort').hidden=!selected||selected.demo||accountState.state!=='connected'||!model?.effort?.length;
+    setIfChanged($('chat-effort'),'hidden',!selected||selected.demo||accountState.state!=='connected'||!model?.effort?.length);
   };
   $('chat-effort').onchange=()=>{if(selected){selected.trip.effort=$('chat-effort').value;queuePreferences();}};
   window.onFeatureAccount=account=>{window.updateProviderRow?.({...account,provider:activeProvider});const identity=JSON.stringify([activeProvider,account.label,account.plan]);if(account.state!=='connected'||identity!==lastAccount){references=[];selectedRefs.clear();referenceScope='';$('chat-effort').hidden=true;}lastAccount=identity;updateReferenceCount();};
@@ -220,7 +224,7 @@
   function renderComposerAttachments(){
     const tray=$('composer-attachments'),items=references.filter(item=>selectedRefs.has(item.id));tray.replaceChildren();tray.hidden=!items.length;
     for(const item of items){const chip=el('li',undefined,'composer-attachment');if(thumbnails.has(item.id)){const img=el('img');img.src=thumbnails.get(item.id);img.alt='';chip.append(img);}
-      chip.append(el('span',item.name));const remove=button('×',()=>{selectedRefs.delete(item.id);renderReferences();$('message').focus();});remove.setAttribute('aria-label',`不附加 ${item.name}`);remove.title='這次不附加（仍保留在參考資料）';chip.append(remove);tray.append(chip);}
+      chip.append(el('span',item.name));const remove=button('×',()=>{selectedRefs.delete(item.id);renderReferences();$('message').focus();});remove.className='attachment-remove';remove.setAttribute('aria-label',`這次不附加 ${item.name}（仍保留在參考資料）`);chip.append(remove);tray.append(chip);}
   }
   async function loadReferences(){const scope=JSON.stringify([project?.projectId,selected?.trip.slug,accountState.label]);if(scope!==referenceScope){referenceScope=scope;selectedRefs.clear();}const result=await api('references-list',target());references=result.items;renderReferences();}
   function renderReferences(){$('references-list').replaceChildren();for(const item of references){const row=el('div',undefined,'reference-row'),label=el('label'),check=document.createElement('input');check.type='checkbox';check.checked=selectedRefs.has(item.id);check.onchange=()=>{if(check.checked)selectedRefs.add(item.id);else selectedRefs.delete(item.id);updateReferenceCount();};label.append(check,document.createTextNode(` ${item.name} · ${Math.ceil(item.size/1024)} KB`));row.append(label,button('移除',async()=>{await api('references-remove',{...target(),id:item.id});selectedRefs.delete(item.id);await loadReferences();}));$('references-list').append(row);}if(!references.length)$('references-list').append(el('p','尚未加入參考資料。'));updateReferenceCount();}

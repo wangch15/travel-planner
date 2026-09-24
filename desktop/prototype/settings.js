@@ -20,11 +20,12 @@
   }
   function syncProviderOptions(){
     for(const select of [$('chat-provider'),$('settings-provider'),$('provider-switch-choice')]){
-      select.querySelector('option[value="gemini"]').hidden=true;
-      for(const id of Object.keys(catalog))select.querySelector(`option[value="${id}"]`).hidden=records.get(id)?.state!=='connected';
+      // 值沒變就不寫：選單展開時改到選項，原生選單會閃爍。
+      setIfChanged(select.querySelector('option[value="gemini"]'),'hidden',true);
+      for(const id of Object.keys(catalog))setIfChanged(select.querySelector(`option[value="${id}"]`),'hidden',records.get(id)?.state!=='connected');
     }
-    $('chat-provider').value=records.get(activeProvider)?.state==='connected'?activeProvider:'';
-    $('settings-provider').value=records.get(defaults.provider)?.state==='connected'?defaults.provider:'';
+    setIfChanged($('chat-provider'),'value',records.get(activeProvider)?.state==='connected'?activeProvider:'');
+    setIfChanged($('settings-provider'),'value',records.get(defaults.provider)?.state==='connected'?defaults.provider:'');
   }
   window.refreshProviderOptions=syncProviderOptions;
   window.updateProviderRow=value=>{if(!catalog[value.provider])return;const previous=records.get(value.provider);records.set(value.provider,value);renderProvider(value.provider);syncProviderOptions();if(previous?.state==='waiting-login'&&value.state==='connected'&&defaults.provider===value.provider)loadDefaultModels();};

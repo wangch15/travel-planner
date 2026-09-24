@@ -39,6 +39,14 @@ const issues = {
   'config-invalid': '設定檔不是可讀取的 JSON 物件。', 'config-unreadable': '設定檔缺漏或無法讀取。',
   'file-too-large': '設定檔超過目前可檢查的大小。', 'linked-path': '這個路徑包含連結，原型不會跟隨讀取。',
 };
+// 選單內容沒變就不重建：原生選單展開時若被換掉選項，會關掉重畫，看起來一直閃、也選不到。
+function syncSelect(select, options, value) {
+  const same = select.options.length === options.length && options.every((o, i) => { const c = select.options[i]; return c.value === o.value && c.textContent === o.label && c.disabled === Boolean(o.disabled) && (c.dataset.default || '') === (o.isDefault || '') && (c.dataset.unavailable || '') === (o.unavailable || ''); });
+  if (!same) select.replaceChildren(...options.map(o => { const n = el('option', o.label); n.value = o.value; if (o.disabled) n.disabled = true; if (o.isDefault) n.dataset.default = o.isDefault; if (o.unavailable) n.dataset.unavailable = o.unavailable; return n; }));
+  if (value !== undefined && select.value !== value) select.value = value;
+}
+const optionSpec = o => ({ value: o.value, label: o.textContent, disabled: o.disabled, isDefault: o.dataset.default || '', unavailable: o.dataset.unavailable || '' });
+function setIfChanged(node, key, value) { if (node[key] !== value) node[key] = value; }
 function el(tag, text, className) {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = text;
@@ -101,7 +109,8 @@ function setPreview(open) {
 // Reserve the center explicitly: hidden siblings must never change its grid placement.
 function layoutPanels() {
   const total = $('workbench').clientWidth || innerWidth;
-  const chatMin = Math.min(320, Math.max(0, total - 52));
+  // 對話欄至少要放得下輸入列（AI 服務、模型、思考強度、送出）不折行。
+  const chatMin = Math.min(420, Math.max(0, total - 52));
   const previewMin = ui.preview ? Math.min(260, Math.max(0, total - chatMin - 52)) : 0;
   const sidebarMax = Math.max(52, Math.min(420, total - chatMin - previewMin));
   const sidebar = ui.sidebar ? Math.min(paneWidths.sidebar, sidebarMax) : 52;
@@ -284,6 +293,7 @@ function renderProject() {
 function addMessage(message) {
   const item = el('div', undefined, `message ${message.role}`);
   item.setAttribute('aria-label', message.role === 'user' ? '你的訊息' : '助手回覆');
+  if(message.role==='user'&&message.attachments?.length){const list=el('ul',undefined,'message-attachments');for(const a of message.attachments){const chip=el('li',undefined,'message-attachment');const thumb=a.kind==='image'?window.referenceThumbnail?.(a.id):null;if(thumb){const img=el('img');img.src=thumb;img.alt='';chip.append(img);}chip.append(el('span',a.name));chip.title=a.name;list.append(chip);}item.append(list);}
   const content=el('div',undefined,'message-content');if(message.role==='assistant'&&window.renderMarkdown)window.renderMarkdown(content,message.text);else content.textContent=message.text;
   item.append(content);
   // AI 提出的 App 動作（備份、發布…）以確認卡片呈現，由使用者按下才執行。
@@ -323,6 +333,7 @@ function queuePreferences() {
 }
 async function flushConversationDraft() { clearTimeout(draftTimer);return queuePreferences(); }
 async function selectTrip(trip, demo = false) {
+  composerSuggestion='';
   if (aiBusy || pendingProposal || window.hasMaterialization?.()) { notify('請先停止工作，或確認／放棄目前的提案，再切換旅程。'); return; }
   if(selected && !selected.demo && !await flushConversationDraft())return;
   if(aiBusy||pendingProposal||window.hasMaterialization?.())return;
@@ -505,26 +516,25 @@ function updateComposer() {
   const options = realPreview?.summary?.dayOptions || [];
   if (real) {
     const previous = $('edit-day').value;
-    $('edit-day').replaceChildren();
-    const all = el('option', '不指定 · 整體討論'); all.value=''; $('edit-day').append(all);
-    if(!realPreview?.planning){const whole=el('option','整趟行程 · 提出跨日修改');whole.value='-1';$('edit-day').append(whole);}
-    for (const day of options) { const option = el('option', `第 ${day.id} 天 · ${day.title}`); option.value=String(day.id); $('edit-day').append(option); }
-    if(previous==='-1')$('edit-day').value='-1';
-    else if (options.some(day => String(day.id) === previous)) $('edit-day').value=previous;
-    else if(selected?.trip.dayId===-1&&!realPreview?.planning)$('edit-day').value='-1';
-    else if(options.some(day=>day.id===selected?.trip.dayId)) $('edit-day').value=String(selected.trip.dayId);
-    $('edit-day').disabled = !ready || aiBusy || Boolean(pendingProposal);
+    const specs=[{value:'',label:'不指定 · 整體討論'}];
+    if(!realPreview?.planning)specs.push({value:'-1',label:'整趟行程 · 提出跨日修改'});
+    for (const day of options) specs.push({value:String(day.id),label:`第 ${day.id} 天 · ${day.title}`});
+    const has=v=>specs.some(o=>o.value===v);
+    // 「不指定」不算已選：還原時以保存的 dayId 為準。
+    const target=previous!==''&&has(previous)?previous:selected?.trip.dayId===-1&&has('-1')?'-1':selected?.trip.dayId!=null&&has(String(selected.trip.dayId))?String(selected.trip.dayId):'';
+    syncSelect($('edit-day'),specs,target);
+    setIfChanged($('edit-day'),'disabled',!ready || aiBusy || Boolean(pendingProposal));
   }
   const hasModels = [...$('chat-model').options].some(o=>!o.disabled);
   const modelReady=hasModels&&Boolean($('chat-model').selectedOptions[0])&&!$('chat-model').selectedOptions[0].disabled;
-  $('chat-model').hidden = !real || accountState.state !== 'connected' || !$('chat-model').options.length;
+  setIfChanged($('chat-model'),'hidden',!real || accountState.state !== 'connected' || !$('chat-model').options.length);
   const providerLocked=Boolean(selected&&!selected.demo&&selected.trip.featureState?.started);
-  $('chat-provider').hidden=!real||providerLocked;
+  setIfChanged($('chat-provider'),'hidden',!real||providerLocked);
   $('chat-provider-locked').hidden=!real||!providerLocked;
   $('chat-provider-locked').textContent=({codex:'Codex',claude:'Claude Code',gemini:'Gemini（暫停）'})[activeProvider]||activeProvider;
   window.refreshProviderOptions?.();
   $('chat-provider').disabled=providerLocked||aiBusy||Boolean(pendingProposal)||Boolean(window.hasMaterialization?.());
-  $('chat-provider').title=providerLocked?'此對話的 AI 服務已固定；可從右上方選單使用其他 AI 開新對話':'選擇這段新對話的 AI 服務';
+  setIfChanged($('chat-provider'),'title',providerLocked?'此對話的 AI 服務已固定；可從右上方選單使用其他 AI 開新對話':'選擇這段新對話的 AI 服務');
   $('chat-model').disabled = aiBusy || Boolean(pendingProposal);
   $('codex-model').disabled = aiBusy || Boolean(pendingProposal);
   $('composer-model').hidden = !$('chat-model').hidden;
@@ -540,7 +550,8 @@ function updateComposer() {
   $('codex-switch-help').hidden = accountState.state !== 'connected' || (!aiBusy && !pendingProposal);
   if (real) {
     $('composer-model').textContent = activeProvider === 'gemini' ? 'Gemini 暫停提供' : accountState.state === 'connected' ? hasModels ? ({codex:'Codex',claude:'Claude Code'})[activeProvider] : '正在取得模型…' : '尚未連接 AI';
-    $('message').placeholder = activeProvider === 'gemini' ? 'Gemini 暫停提供，請用其他 AI 開新對話' : !ready ? '先開啟右側預覽，驗證這趟行程' : accountState.state !== 'connected' ? '連接 AI 帳號後，就能提出修改' : $('edit-day').value === '' ? '例如：希望整趟行程更輕鬆，可以怎麼調整？' : '例如：把這一天的標題改成「悠閒出發」';
+    const basePlaceholder = activeProvider === 'gemini' ? 'Gemini 暫停提供，請用其他 AI 開新對話' : !ready ? '先開啟右側預覽，驗證這趟行程' : accountState.state !== 'connected' ? '連接 AI 帳號後，就能提出修改' : $('edit-day').value === '' ? '例如：希望整趟行程更輕鬆，可以怎麼調整？' : $('edit-day').value === '-1' ? '例如：請套用剛才的建議' : '例如：把這一天的標題改成「悠閒出發」';
+    setIfChanged($('message'),'placeholder',composerSuggestion&&ready&&accountState.state==='connected'?composerSuggestion+'　（按 Tab 帶入）':basePlaceholder);
     $('composer-note').textContent = activeProvider === 'gemini' ? '舊 Gemini CLI 連線暫停；歷史紀錄保留。可從對話選單使用 Codex 或 Claude 開新對話。' : conversationError ? '對話紀錄無法讀寫，暫停送出以免遺失。' : conversationLoading ? '正在恢復對話…' : selected.trip.needsRestart ? (selected.trip.featureState?.stopRequested?'可以先編輯草稿。停止狀態尚未確認，請先確認停止狀態。':selected.trip.featureState?.legacyStopped?'可以先編輯草稿。上次工作狀態尚未確認，請先確認上次狀態。':'可以先編輯草稿。上次回覆尚未確認，請先找回上次回覆或重新開始（保留紀錄）。') : selected.trip.stopped ? '上一輪已停止，可以在原對話繼續討論。' : !modelReady&&accountState.state==='connected'?'這段對話的模型目前不可用，請選擇其他模型。' : pendingProposal ? '請先確認或放棄提案，再進行下一次修改。' : $('edit-day').value === '' ? '沿用本旅程對話，提供最新整趟安排；這輪只討論，不會直接修改行程。' : '本輪提供這一天與相關地點，沿用本旅程對話；提案經你確認才保存。';
   }
 }
@@ -642,14 +653,16 @@ $('chat-form').onsubmit = async event => {
   if(conversationLoading||conversationError||trip.needsRestart)return;
   aiBusy=true;updateComposer();
   if(!await flushConversationDraft()){aiBusy=false;updateComposer();return;}
-  const target={projectId:project.projectId,slug:trip.slug,dayId:$('edit-day').value === '' ? null : Number($('edit-day').value),text:message,model:$('chat-model').value||undefined,effort:$('chat-effort').value||undefined,attachmentIds:window.selectedReferenceIds?.()||[]};
-  appendRealMessage(trip,{role:'user',text:message}); $('message').value=''; trip.draft=''; aiBusy=true; updateComposer();
+  const target={projectId:project.projectId,slug:trip.slug,dayId:$('edit-day').value === '' ? null : Number($('edit-day').value),text:message,model:$('chat-model').value||undefined,effort:$('chat-effort').value||undefined,attachmentIds:[]};
+  const attachments=window.takeComposerAttachments?.()||[];target.attachmentIds=attachments.map(a=>a.id);clearSuggestion();
+  appendRealMessage(trip,{role:'user',text:message,...(attachments.length?{attachments}:{})}); $('message').value=''; trip.draft=''; aiBusy=true; updateComposer();
   const progress = addMessage({role:'assistant',text:target.dayId === null ? '正在整理整體行程建議…' : '正在準備這次修改…'}); markAIProgress(progress);
   try {
     const result=await window.travelDesktop.generateProposal(target); progress.remove();
     if(result.conversation)applyConversation(result.conversation,trip);
     window.acceptFeatureResult?.(result);
-    if(!result.ok&&!result.accepted){trip.draft=message;$('message').value=message;}
+    if(!result.ok&&!result.accepted){trip.draft=message;$('message').value=message;window.restoreComposerAttachments?.(attachments);}
+    if(result.ok&&selected?.trip===trip)applySuggestion(result.suggestion);
     if (!result.ok && !result.conversation) appendRealMessage(trip,{role:'assistant',text:result.message});
     if(result.ok) {
       if(!result.conversation)appendRealMessage(trip,{role:'assistant',text:result.proposal.summary});
@@ -692,7 +705,20 @@ $('save-proposal').onclick = async () => {
 };
 $('message').oninput = () => { if(selected){selected.trip.draft=$('message').value;clearTimeout(draftTimer);draftTimer=setTimeout(queuePreferences,350);} };
 window.addEventListener('blur',()=>queuePreferences());
-$('message').onkeydown = event => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) { event.preventDefault(); $('chat-form').requestSubmit(); } };
+// AI 建議的下一步：自動切換「這次調整」，建議的話放在輸入框提示，按 Tab 帶入。
+var composerSuggestion='';
+function clearSuggestion(){if(!composerSuggestion)return;composerSuggestion='';updateComposer();}
+function scopeLabel(value){return [...$('edit-day').options].find(o=>o.value===value)?.textContent||'';}
+function applySuggestion(suggestion){
+  clearSuggestion();if(!suggestion||!selected||selected.demo)return;
+  const value=suggestion.scope==='discussion'?'':suggestion.scope==='all'?'-1':suggestion.scope;
+  if(value!==undefined&&value!==$('edit-day').value&&[...$('edit-day').options].some(o=>o.value===value)){
+    $('edit-day').value=value;selected.trip.dayId=value===''?null:Number(value);queuePreferences();notify('已切換「這次調整」為：'+scopeLabel(value));
+  }
+  if(suggestion.reply&&!$('message').value){composerSuggestion=suggestion.reply;updateComposer();}
+}
+$('message').addEventListener('input',()=>{if(composerSuggestion&&$('message').value)clearSuggestion();});
+$('message').onkeydown = event => { if(event.key==='Tab'&&!event.shiftKey&&composerSuggestion&&!$('message').value){event.preventDefault();$('message').value=composerSuggestion;$('message').dispatchEvent(new Event('input'));clearSuggestion();return;} if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) { event.preventDefault(); $('chat-form').requestSubmit(); } };
 async function initializeWorkspace() {
   if (window.travelDesktop?.readWorkspace) {
     try {
@@ -766,7 +792,7 @@ function selectSavedModel(modelId){
   const source=$('codex-model');source.querySelectorAll('[data-unavailable]').forEach(o=>o.remove());
   if(modelId&&![...source.options].some(o=>o.value===modelId)){const option=el('option','暫時不可用：'+modelId);option.value=modelId;option.disabled=true;option.dataset.unavailable='true';source.append(option);}
   source.value=modelId||[...source.options].find(o=>o.dataset.default==='true')?.value||[...source.options].find(o=>!o.disabled)?.value||'';
-  $('chat-model').replaceChildren(...[...source.options].map(o=>o.cloneNode(true)));$('chat-model').value=source.value;
+  syncSelect($('chat-model'),[...source.options].map(optionSpec),source.value);
 }
 async function loadModels() {
   if (!window.travelDesktop?.codexModels) return;
