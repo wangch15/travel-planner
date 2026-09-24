@@ -9,6 +9,13 @@
 - 版號不往回調低。版號只維護在 `desktop/prototype/package.json`（與 root lockfile 對應欄位），側欄與「關於」都讀這裡；從原始碼執行時顯示 `-dev`。
 - 發布放在 GitHub release `desktop-vX.Y.Z`，App 內「檢查新版本」只認這個格式。網頁引擎版號另計（root `package.json` + `CHANGELOG.md`）。
 
+## 0.1.1（2026-09-24）
+
+- 選模型、選「這次調整」時選單一直閃、選不到：視窗失焦／回焦會重建選單，現在內容沒變就不動。
+- 附圖送出後，附件跟著移進那則訊息（含縮圖），不再留在輸入框。
+- AI 回覆會建議下一輪的範圍與下一句話：App 自動切換「這次調整」，建議文字顯示在輸入框，按 Tab 帶入。
+- 對話欄最小寬度 420px；聊天裡的確認卡片改成全寬、按鈕縮小。
+
 ## 備份與發布重新設計（開發版）
 
 - 頁首「目前旅程」是下拉選單：切換等於在左側列表點那趟旅程（整個 App 一起換；AI 回覆中或有提案時會擋下並說明）。私人備份分頁另有「整個專案（所有旅程）」：一次提交並推送所有旅程（不含模板附的 `_example`）的改動，仍先列出清單再確認。
@@ -255,4 +262,4 @@ npm --prefix desktop/prototype run smoke:navigation
 
 2026-09-22：root501、engine92、desktop164，共757項單元測試通過；原生 UI、startup、preview、workflow、versions、batch、batch-safety、updater 與隔離封裝啟動均通過。Windows CI 配方已包含對應步驟，但未宣稱已在原生 Windows 執行。
 
-本機 Apple Silicon 產物位於 `.local/distribution/Travel Planner.app` 和 `TravelPlanner-0.1.0-mac-arm64-unsigned.dmg`。這是0.1.0未簽章測試版，沒有公證或公開發布。工具檢查與實際 GitHub／Cloudflare 授權仍由 App 引導；測試沒有推送或發布真實行程。
+本機 Apple Silicon 產物位於 `.local/distribution/Travel Planner.app` 和 `TravelPlanner-0.1.1-mac-arm64-unsigned.dmg`。這是0.1.1未簽章測試版，沒有公證或公開發布。工具檢查與實際 GitHub／Cloudflare 授權仍由 App 引導；測試沒有推送或發布真實行程。
