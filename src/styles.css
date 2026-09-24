@@ -291,9 +291,17 @@ details>summary .n{font:400 11px/1.5 var(--mono);color:var(--ink-3);margin-left:
   .ov .overview-table td{display:block;padding:0;border:0;min-width:0;overflow-wrap:anywhere}
   .ov .overview-table .entry-date{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px}
   .entry-date br{display:none}
-  .ov .overview-table .lk{display:flex;align-items:center;min-height:44px;font-size:16px;line-height:1.5}
+  .ov .overview-table .lk{display:flex;align-items:center;min-height:44px;padding:0;font-size:16px;line-height:1.4}
   .ov .overview-table .dchip{font-size:12px;white-space:normal}
   .overview-table .mobile-field-label{display:inline;color:var(--ink-3);font-size:12px}
+  /* 卡片：主軸是「日期 → 標題 → 住宿」；加點是「標題 ⟷ 日期」同一列 */
+  .ov .days-table tbody tr{gap:0;padding:12px 0 14px}
+  .ov .days-table td:last-child{font-size:13px;color:var(--ink-2)}
+  .ov .addons-table tbody tr{grid-template-columns:minmax(0,1fr) auto;column-gap:12px;row-gap:4px;padding:10px 0 14px}
+  .ov .addons-table td:nth-child(2){align-self:center;justify-self:end;white-space:nowrap}
+  .ov .addons-table td:nth-child(n+3){grid-column:1/-1}
+  .ov .addons-table td:nth-child(3){font-size:13.5px;line-height:1.65;color:var(--ink-2)}
+  .ov .addons-table td:nth-child(4){margin-top:2px}
 }
 table{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
 th{text-align:left;font:500 10.5px/1.6 var(--sans);letter-spacing:.07em;color:var(--ink-3);
