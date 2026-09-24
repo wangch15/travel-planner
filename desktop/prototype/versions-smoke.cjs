@@ -43,6 +43,8 @@ app.whenReady().then(async()=>{
  await restore(version3.id);await save();assert.equal(await fs.readFile(source,'utf8'),version3.source);
  records=(await history.read(target)).revisions;assert.equal(records.length,6);assert.deepEqual(records.map(r=>r.kind),['initial','save','save','restore','restore','restore']);
  await js('document.getElementById("versions-open").click()');await until('document.querySelectorAll("#history-list .history-row").length === 6');await capture('versions-history-dark.png');await js('document.getElementById("close-history").click()');
+ // 發布入口只帶到設定的「公開網站」分頁，不直接發布。
+ await until('!document.getElementById("publish-open").hidden && !document.getElementById("publish-open").disabled');await capture('versions-header-publish.png');await js('document.getElementById("publish-open").click()');await until('!document.getElementById("settings").hidden && !document.getElementById("setting-publish").hidden && document.getElementById("setting-backup").hidden');assert.equal(await js('document.getElementById("publish-confirm").hidden'),true);await js('closeSettings()');await until('document.getElementById("settings").hidden && !document.getElementById("publish-open").hidden');
  // Delayed discard owns the operation lock until disk and UI agree.
  await restore(records[0].id);await js('document.getElementById("done-changes").click()');
  const proposalID=await js('pendingProposal.id');holdDiscard=true;const started=new Promise(resolve=>{discardStarted=resolve;});

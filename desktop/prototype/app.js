@@ -202,7 +202,9 @@ function moreButton(label,items){const b=el('button',undefined,'icon-button row-
 function tripMenu(trip,demo){const blocked=aiBusy||Boolean(pendingProposal)||Boolean(window.hasMaterialization?.());return [
   {label:'開啟旅程',icon:'folder',disabled:blocked,action:()=>selectTrip(trip,demo)},
   ...(!demo?[{label:'新增對話',icon:'plus',disabled:blocked,action:()=>window.newTripConversation?.(trip)}]:[]),
+  ...(!demo?[{label:'發布網站…',icon:'globe',disabled:blocked,action:()=>openPublishFor(trip)}]:[]),
   {separator:true},{label:demo?'刪除示範旅程':'移除旅程…',icon:'trash',danger:true,disabled:blocked,action:()=>window.requestTripRemoval?.(trip,demo)}];}
+async function openPublishFor(trip){if(selected?.trip!==trip){await selectTrip(trip);if(selected?.trip!==trip)return;}openSettings('publish');}
 function navigation() {
   const query=$('trip-search').value.trim().toLocaleLowerCase();
   const conversationPanel=$('conversation-sidebar');conversationPanel.remove();
@@ -490,6 +492,9 @@ function updateComposer() {
   $('versions-open').hidden=!real || Boolean(realPreview?.planning) || !$('settings').hidden;
   $('versions-open').disabled=!ready||aiBusy;
   $('versions-open').textContent=realPreview?.version?`V${realPreview.version.number} · 版本紀錄`:'版本紀錄';
+  // 發布入口只是帶到設定；核對、預覽確認與發布仍在「公開網站」分頁完成。
+  $('publish-open').hidden=$('versions-open').hidden;
+  $('publish-open').disabled=!ready||aiBusy;
   $('ai-day-controls').hidden = !real;
   $('connect-from-chat').hidden = accountState.state === 'connected' || activeProvider === 'gemini';
   const options = realPreview?.summary?.dayOptions || [];
@@ -577,6 +582,7 @@ for(const id of ['close-changes','done-changes'])$(id).onclick=()=>$('changes-di
 $('select-all-changes').onclick=()=>changeSelection(pendingProposal.changes.map(c=>c.key));
 $('select-no-changes').onclick=()=>changeSelection([]);
 $('close-history').onclick=()=>$('history-dialog').close();
+$('publish-open').onclick=()=>openSettings('publish');
 $('versions-open').onclick=async()=>{
   if(!selected||selected.demo||aiBusy)return;
   aiBusy=true;proposalBusy=true;updateComposer();
