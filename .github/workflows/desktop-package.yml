@@ -63,6 +63,9 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --workspaces --include-workspace-root
+      # Electron 第一次用到時才下載執行檔；乾淨的機器上要先補（同 build-windows.ps1）。
+      - name: Download Electron runtime
+        run: '[ -f node_modules/electron/dist/version ] || node node_modules/electron/install.js'
       - name: Build app
         run: node desktop/prototype/distribution/package.cjs
       - name: Launch packaged app with disposable state
