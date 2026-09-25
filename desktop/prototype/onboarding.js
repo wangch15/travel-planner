@@ -148,8 +148,8 @@
       try {
         const { preparation } = await feature('backup-project-prepare');
         const { result } = await feature('backup-confirm', { token: preparation.token });
-        mark(2, result.backedUp ? '第一次備份完成，遠端版本已核對' : '第一次備份沒有完成：' + result.message + '（之後可在「備份與發布」重試）', result.backedUp ? 'ok' : 'warn');
-      } catch (e) { mark(2, '第一次備份沒有完成：' + e.message + '（之後可在「備份與發布」重試）', 'warn'); }
+        mark(2, result.backedUp ? '第一次備份完成，遠端版本已核對' : '第一次備份沒有完成：' + result.message + '（之後可在「設定 → 備份與分享」重試）', result.backedUp ? 'ok' : 'warn');
+      } catch (e) { mark(2, '第一次備份沒有完成：' + e.message + '（之後可在「設定 → 備份與分享」重試）', 'warn'); }
       busy = false; await refresh();
     } catch (e) { d.steps = null; fail('project', e, '專案沒有建立完成，請再試一次。'); }
   }
@@ -255,11 +255,14 @@
     const screens = { welcome, github: githubStep, git: gitStep, project: projectStep, existing: existingStep, ai: aiStep, cloudflare: cloudflareStep, ready: readyStep };
     const content = screens[view]?.() || [];
     const top = STEPS.some(([id]) => id === view) ? stepper(view) : view === 'existing' ? stepper('project') : null;
-    root.replaceChildren(h('div', { class: 'ob-inner' }, top, h('div', { class: 'ob-body' }, ...content, problem())));
+    // 每一步都能先離開；之後缺的東西會在聊天上方提示，也能從設定頁底部「重新走一次設定」回來。
+    const later = view !== 'welcome' && view !== 'ready' ? h('div', { class: 'ob-later' }, link('稍後再設定', later_)) : null;
+    root.replaceChildren(h('div', { class: 'ob-inner' }, later, top, h('div', { class: 'ob-body' }, ...content, problem())));
     const logo = `assets/brand/travel-planner-mark-on-${document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'}-v3.svg`;
     root.querySelectorAll('[data-logo]').forEach(image => { image.src = logo; });
   }
   function show() { root.hidden = false; document.body.dataset.onboarding = 'on'; render(); }
+  function later_() { dismissedForSession = true; busy = false; authWatch = null; hide(); }
   function hide() { root.hidden = true; delete document.body.dataset.onboarding; clearTimeout(pollTimer); }
 
   // 瀏覽器授權（GitHub／Cloudflare）的進度由主程式推送。
@@ -284,7 +287,7 @@
     saved = await feature('onboarding-state').then(r => r.onboarding).catch(() => saved);
     if (saved.completed) { reveal(); return; }
     const workspace = await window.travelDesktop.readWorkspace?.().catch(() => null);
-    // 已經有專案的人（包括從舊版升級的人）直接視為完成，不強迫重走；需要時可從「關於」重新打開。
+    // 已經有專案的人（包括從舊版升級的人）直接視為完成，不強迫重走；需要時可從設定頁底部「重新走一次設定」打開。
     if (workspace?.project) { reveal(); saved = { ...saved, completed: true }; await feature('onboarding-save', saved).catch(() => {}); return; }
     // 需要引導：先顯示歡迎頁（不必等完整偵測），偵測完再決定從哪一步開始。
     view = 'loading'; show();

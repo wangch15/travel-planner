@@ -80,7 +80,7 @@ class BackupService {
       if (entry !== 'pre-push') throw fail('UNTRUSTED_HOOK', '專案的 .githooks 裡有 App 不認得的程式（除了備份保護以外的 Git hook），App 不會執行它，這次沒有備份。');
     }
     for (const relative of TRUSTED_FILES) {
-      if (!trustedFile(relative, await regularBytes(path.join(root, relative), 1024 * 1024), await regularBytes(path.join(this.trustedRoot, relative), 1024 * 1024))) throw fail('UNTRUSTED_HOOK', '專案裡的備份保護程式和 App 內建的版本不同。請先到「設定 → 專案管理」按「更新專案」，完成後再備份。');
+      if (!trustedFile(relative, await regularBytes(path.join(root, relative), 1024 * 1024), await regularBytes(path.join(this.trustedRoot, relative), 1024 * 1024))) throw fail('UNTRUSTED_HOOK', '專案裡的備份保護程式和 App 內建的版本不同。請先到「設定 → 我的旅程資料」按「更新專案」，完成後再備份。');
     }
     // A package type override would change how the trusted hook imports are executed.
     for (const folder of ['', 'scripts', 'scripts/lib']) {

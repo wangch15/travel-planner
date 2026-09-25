@@ -48,7 +48,7 @@ app.whenReady().then(async()=>{
   win=await createWindow(windowOptions);
   await waitFor('document.documentElement.dataset.ready === "true"');
   await waitFor('document.getElementById("preview").getAttribute("src")?.startsWith("travel-preview://")');
-  await win.webContents.executeJavaScript('document.getElementById("open-settings").click(); document.querySelector("[data-setting=ai]").click(); document.getElementById("codex-connect").click()');
+  await win.webContents.executeJavaScript('document.getElementById("open-settings").click(); document.querySelector("[data-setting=accounts]").click(); document.getElementById("codex-connect").click()');
   await waitFor('document.getElementById("codex-badge").textContent === "已連接"');
   await waitFor('!document.getElementById("codex-switch").hidden && !document.getElementById("codex-switch").disabled');
   await win.webContents.executeJavaScript('document.getElementById("codex-switch").click()');
@@ -100,7 +100,7 @@ app.whenReady().then(async()=>{
   await waitFor('document.documentElement.dataset.ready === "true" && document.getElementById("message").value === "重開後要繼續的草稿"');
   assert.ok(await win.webContents.executeJavaScript('document.getElementById("messages").textContent.includes("整體建議")'));
   await waitFor('document.getElementById("edit-day").value === "1"');
-  await win.webContents.executeJavaScript('document.getElementById("open-settings").click();document.querySelector("[data-setting=ai]").click()');
+  await win.webContents.executeJavaScript('document.getElementById("open-settings").click();document.querySelector("[data-setting=accounts]").click()');
   await waitFor('document.getElementById("codex-model").value === "other-model"');
   await win.webContents.executeJavaScript('document.getElementById("back-to-trip").click()');
 
@@ -132,7 +132,7 @@ app.whenReady().then(async()=>{
   await waitFor('document.getElementById("messages").textContent.includes("已開始新的 AI 對話")');
   assert.equal(await win.webContents.executeJavaScript('document.getElementById("message").value'),'暫停後仍可先寫下想法');
   const restarted=await chats.read({root:project,slug:'sample'});assert.equal(restarted.thread,null);assert.equal(restarted.job,null);assert.equal(restarted.handoff,null);assert.equal(restarted.pendingProposal,false);assert.ok(restarted.messages.length>4);
-  await win.webContents.executeJavaScript('document.getElementById("open-settings").click();document.querySelector("[data-setting=ai]").click()');
+  await win.webContents.executeJavaScript('document.getElementById("open-settings").click();document.querySelector("[data-setting=accounts]").click()');
   await waitFor('document.getElementById("codex-model").options.length === 2');
   await win.webContents.executeJavaScript('document.getElementById("back-to-trip").click()');
   await waitFor('!document.getElementById("message").disabled');

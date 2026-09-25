@@ -217,7 +217,7 @@ class ProjectSetupService {
       localCreated = true; await this.materialize(pending, pending.url);
       await this.privateRepo(pending.repo, pending.destination);
       const backupReady = await this.installTrustedHooks(pending.destination), identityReady = await this.identityReady(pending.destination);
-      return { ready: true, root: pending.destination, repo: pending.repo, backupReady, identityReady, warning: !backupReady ? '專案已下載。它的備份保護程式和 App 的版本不同，第一次備份前請到「設定 → 專案管理」按「更新專案」。' : !identityReady ? '專案已下載。第一次備份時 App 會請你確認備份署名（用你的 GitHub 帳號）。' : null };
+      return { ready: true, root: pending.destination, repo: pending.repo, backupReady, identityReady, warning: !backupReady ? '專案已下載。它的備份保護程式和 App 的版本不同，第一次備份前請到「設定 → 我的旅程資料」按「更新專案」。' : !identityReady ? '專案已下載。第一次備份時 App 會請你確認備份署名（用你的 GitHub 帳號）。' : null };
     } catch (error) { return { ready: false, ...(localCreated ? { root: pending.destination } : {}), repo: pending.repo, code: error.code || 'PROJECT_DOWNLOAD_FAILED', message: '下載未完成；已產生的本機資料保留，沒有覆蓋既有資料夾，也沒有推送。請核對位置、權限與網路。' }; }
     finally { this.busy = false; }
   }

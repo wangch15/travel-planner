@@ -40,7 +40,7 @@ app.whenReady().then(async () => {
   });
   await waitFor('document.documentElement.dataset.ready === "true"');
   await waitFor('document.getElementById("preview").getAttribute("src")?.startsWith("travel-preview://")');
-  await run('document.getElementById("open-settings").click(); document.querySelector("[data-setting=ai]").click(); document.getElementById("codex-connect").click()');
+  await run('document.getElementById("open-settings").click(); document.querySelector("[data-setting=accounts]").click(); document.getElementById("codex-connect").click()');
   await waitFor('document.getElementById("codex-badge").textContent === "已連接"');
   await run('document.getElementById("back-to-trip").click()');
   await waitFor('!document.getElementById("message").disabled');

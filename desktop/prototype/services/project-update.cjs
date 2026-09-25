@@ -73,7 +73,7 @@ class ProjectUpdateService {
       const file = (await this.git(root, ['rev-parse', '--git-path', marker])).trim();
       if (await fs.lstat(path.resolve(root, file)).then(() => true, () => false)) throw fail('GIT_OPERATION_ACTIVE', '這個專案有一個還沒完成的 Git 合併（通常是其他工具留下的）。App 不會替你決定怎麼處理，這次沒有更新。請把這個畫面給幫你設定電腦的人看。');
     }
-    if ((await this.git(root, ['diff', '--cached', '--name-only'])).trim()) throw fail('STAGED_CHANGES', '專案裡有被其他工具「暫存」、準備提交的改動，這次沒有更新。先到「備份與發布」備份一次（備份時可以按「取消暫存」），再回來更新。');
+    if ((await this.git(root, ['diff', '--cached', '--name-only'])).trim()) throw fail('STAGED_CHANGES', '專案裡有被其他工具「暫存」、準備提交的改動，這次沒有更新。先到「設定 → 備份與分享」備份一次（備份時可以按「取消暫存」），再回來更新。');
     const dirty = await this.dirtyEngineFiles(root);
     if (dirty.length) throw fail('ENGINE_FILES_CHANGED', '行程資料夾以外有被改過、還沒備份的檔案，更新可能會蓋掉它們，所以這次沒有更新：' + dirty.slice(0, 5).join('、') + '。如果不是你刻意改的，請把這個畫面給幫你設定電腦的人看。');
     const head = (await this.git(root, ['rev-parse', 'HEAD'])).trim();

@@ -9,7 +9,7 @@ const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
 const narrowWindow = window.matchMedia('(max-width: 700px)');
 document.body.dataset.platform = window.travelDesktop?.platform || 'browser';
 const paneWidths = { sidebar:240, preview:360 };
-const ui = { sidebar: !narrowWindow.matches, preview: false, theme: 'system', setting: 'projects', syncTab:'backup' };
+const ui = { sidebar: !narrowWindow.matches, preview: false, theme: 'system', setting: 'projects' };
 let toastTimer;
 let settingsReturnFocus;
 const settingsScroll = {};
@@ -172,21 +172,23 @@ function openSettings(section = ui.setting) {
   settingTab(section,false);
   $('back-to-trip').focus();
 }
+// 舊的分頁名稱仍可用：ai → 帳號連線；backup／publish → 備份與分享（捲到那一塊）。
 function settingTab(section, rememberPosition=true) {
-  if(['backup','publish'].includes(section)){ui.syncTab=section;section='sync';}
+  const focusPanel=['backup','publish'].includes(section)?section:null;
+  if(focusPanel)section='sync';
+  if(section==='ai')section='accounts';
   const content=document.querySelector('.settings-content');
   if(rememberPosition)settingsScroll[ui.setting]=content.scrollTop;
   ui.setting = section;
-  for (const name of ['projects','appearance','ai','sources','about','sync','tools']) $(`setting-${name}`).hidden = section !== name;
+  for (const name of ['accounts','projects','appearance','sources','about','sync','tools']) $(`setting-${name}`).hidden = section !== name;
   document.querySelectorAll('[data-setting]').forEach(button => {
     if (button.dataset.setting === section) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
   renderProject();
   content.scrollTop=settingsScroll[section]||0;
-  $('setting-backup').hidden=ui.syncTab!=='backup';$('setting-publish').hidden=ui.syncTab!=='publish';
-  document.querySelectorAll('[data-sync-tab]').forEach(b=>{const current=b.dataset.syncTab===ui.syncTab;b.setAttribute('aria-selected',String(current));b.tabIndex=current?0:-1;});
-  window.onFeatureSetting?.(section==='sync'?ui.syncTab:section);
+  if(focusPanel==='publish')$('setting-publish').scrollIntoView({block:'start'});
+  window.onFeatureSetting?.(section);
 }
 function closeSettings() {
   settingsScroll[ui.setting]=document.querySelector('.settings-content').scrollTop;
@@ -245,7 +247,7 @@ $('trip-group-toggle').onclick=()=>{};
 $('rail-search').onclick=()=>{setSidebar(true);$('trip-search').focus();};
 $('rail-new').onclick=()=>newTripModal();
 $('rail-settings').onclick=()=>openSettings();
-$('sidebar-ai').onclick=()=>openSettings('ai');
+$('sidebar-ai').onclick=()=>openSettings('accounts');
 if(window.travelDesktop?.platform !== 'darwin')$('search-shortcut').textContent='Ctrl K';
 for(const id of ['open-settings','rail-settings'])$(id).title=window.travelDesktop?.platform==='darwin'?'設定（⌘ ,）':'設定（Ctrl ,）';
 document.addEventListener('keydown',event=>{
@@ -265,7 +267,7 @@ function renderSetupChecklist() {
   // 桌面版改用完整的首次引導（onboarding.js）；這份清單只在瀏覽器預覽模式保留。
   list.hidden = true; list.replaceChildren(); if (window.travelDesktop) return;
   const steps = [
-    { done: hasProject, title: '連接或建立你的私人專案', hint: '行程資料會存在你自己的私人 GitHub 專案，換電腦也不會不見。', label: '前往專案管理', go: () => openSettings('projects') },
+    { done: hasProject, title: '連接或建立你的私人專案', hint: '行程資料會存在你自己的私人 GitHub 專案，換電腦也不會不見。', label: '前往我的旅程資料', go: () => openSettings('projects') },
     { done: aiReady, title: '安裝並連接 AI（Codex 或 Claude）', hint: state === 'unavailable' ? '這台電腦還沒有 AI 工具，App 可以幫你下載安裝。' : '用你的 ChatGPT 或 Claude 帳號登入一次。', label: state === 'unavailable' ? '安裝 AI 工具' : '連接 AI', go: () => { openSettings(state === 'unavailable' ? 'tools' : 'ai'); if (state === 'unavailable') window.openToolSetup?.(activeProvider === 'claude' ? 'claude' : 'codex'); } },
     { optional: true, title: '要分享給同行朋友時，再連接 Cloudflare', hint: '發布網站前才需要，現在可以先跳過。', label: '了解發布', go: () => { openSettings('sync'); settingTab('publish'); } },
   ];
@@ -279,19 +281,21 @@ function renderSetupChecklist() {
 function renderProject() {
   renderSetupChecklist();
   $('project-empty').hidden=Boolean(project);$('project-summary').hidden=!project;
+  $('acquire-title').textContent=project?'換一個旅程資料夾':'取得旅程資料夾';
   $('sync-trip-name').textContent=selected&&!selected.demo?selected.trip.title:'請先在工作台選擇旅程';
   if(!project)return;
   $('summary-title').textContent=project.projectName;$('summary-path').textContent=project.root;$('settings-trip-count').textContent=project.trips.length+' 趟';
+  $('summary-line').textContent=project.trips.length?`${project.trips.length} 趟旅程 · 修改會存在這個資料夾，備份時上傳到你的私人 GitHub`:'資料夾裡還沒有旅程，可以回到旅程列表新增。';
   window.renderProjectUpdate?.();
-  facts($('summary-facts'),[['專案版本',project.engineVersion||'未知'],['私人備份','備份前會重新核對帳號與專案私有狀態']]);
-  $('summary-message').textContent='連接時只讀取基本資訊；完整資料會在開啟旅程預覽時驗證。';$('summary-trips').replaceChildren();
+  facts($('summary-facts'),[['網頁引擎版本',project.engineVersion||'未知'],['私人備份','每次備份前都會重新確認 GitHub 上的備份是私人的']]);
+  $('summary-message').textContent='連接時只讀取基本資訊；打開旅程時才會完整檢查行程資料。';$('summary-trips').replaceChildren();
   for(const trip of project.trips){const key=project.projectId+':'+trip.slug,row=el('details',undefined,'project-trip trip-row');row.open=settingsOpenTrips.has(key);row.ontoggle=()=>{if(row.open)settingsOpenTrips.add(key);else settingsOpenTrips.delete(key);};
     const heading=el('summary'),copy=el('span',undefined,'trip-setting-label');copy.append(el('strong',trip.title),el('small',dateLabel(trip)));heading.append(icon('folder'),copy,icon('chevron'));row.append(heading);
-    const body=el('div',undefined,'trip-setting-body'),list=el('dl',undefined,'facts');facts(list,[['資料格式',trip.schemaVersion===null?'待確認':String(trip.schemaVersion)],['網站設定',trip.deployment?`${trip.deployment.target==='pages'?'Pages':'Workers'} · ${trip.deployment.name}`:'尚未設定'],['本機發布紀錄',({present:'已有紀錄；發布前會核對遠端歸屬',missing:'尚無紀錄',unknown:'需要重新核對'})[trip.localDeploymentRecord]||'待確認']]);body.append(list);
+    const body=el('div',undefined,'trip-setting-body'),list=el('dl',undefined,'facts');facts(list,[['網站名稱',trip.deployment?trip.deployment.name:'還沒設定'],['發布紀錄',({present:'有，發布前會再確認是你的網站',missing:'還沒發布過',unknown:'需要重新確認'})[trip.localDeploymentRecord]||'待確認'],['資料版本',trip.schemaVersion===null?'待確認':String(trip.schemaVersion)]]);body.append(list);
     if(trip.issues.length)body.append(el('p',trip.issues.map(code=>issues[code]||'設定需要確認。').join(' '),'note'));
     const actions=el('div',undefined,'settings-actions'),open=el('button','開啟旅程');open.onclick=()=>{selectTrip(trip);closeSettings();};actions.append(open);body.append(actions);row.append(body);$('summary-trips').append(row);
   }
-  if(!project.trips.length)$('summary-trips').append(el('p','還沒有旅程，可從工作台新增。','note'));
+  if(!project.trips.length)$('summary-trips').append(el('p','還沒有旅程，可以回到旅程列表新增。','note'));
 }
 function addMessage(message) {
   const item = el('div', undefined, `message ${message.role}`);
@@ -308,7 +312,7 @@ function addMessage(message) {
     const backupButton=el('button','備份到 GitHub…');backupButton.type='button';backupButton.dataset.action='backup';backupButton.onclick=()=>window.openSyncFlow?.({kind:'backup',scope:'trip'});actions.append(backupButton);
     item.append(actions);}
   if(message.role==='assistant'&&message.action){const card=window.actionCard?.(message.action);if(card)item.append(card);}
-  if(message.generation){const g=message.generation;item.title=`回覆設定：${g.provider} · ${g.model||'服務預設模型'} · ${g.effort||(g.resolvedEffort?'預設想多久（'+g.resolvedEffort+'）':'預設想多久')}`;item.dataset.provider=g.provider;item.dataset.model=g.model;item.dataset.effort=g.effort;}
+  if(message.generation){const g=message.generation;item.title=`回覆設定：${g.provider} · ${g.model||'服務預設模型'} · ${g.effort||(g.resolvedEffort?'預設思考級別（'+g.resolvedEffort+'）':'預設思考級別')}`;item.dataset.provider=g.provider;item.dataset.model=g.model;item.dataset.effort=g.effort;}
   $('messages').append(item);
   return item;
 }
@@ -481,7 +485,7 @@ $('choose-project').onclick = async () => {
     }
     navigation(); renderProject(); notify('已連接這個旅程資料夾，可以從左側選一趟旅程開始。');
   } catch { notify('檢查未完成，請重新選擇資料夾。'); }
-  finally { aiBusy=false;proposalBusy=false;updateComposer();button.disabled = false; button.textContent = '選擇本機資料夾'; }
+  finally { aiBusy=false;proposalBusy=false;updateComposer();button.disabled = false; button.textContent = '選擇資料夾…'; }
 };
 function newTripModal() { if (aiBusy || pendingProposal || window.hasMaterialization?.()) { notify('請先處理目前的修改提案。'); return; } $('new-form').reset();$('new-kind').value=project&&window.travelDesktop?'real':'demo';$('new-demo-note').hidden=Boolean(project&&window.travelDesktop)||!window.travelDesktop;$('new-kind').querySelector('option[value=real]').disabled=!(project&&window.travelDesktop); $('new-error').hidden = true; $('new-dialog').showModal(); $('new-title').focus(); }
 $('new-demo').onclick = newTripModal;
@@ -523,7 +527,15 @@ function updateComposer() {
   if($('versions-open').hidden)$('backup-status').hidden=true;else if(headerWasHidden)window.refreshBackupStatus?.();
   headerWasHidden=$('versions-open').hidden;
   $('ai-day-controls').hidden = !real;
-  $('connect-from-chat').hidden = accountState.state === 'connected' || activeProvider === 'gemini';
+  // 引導結束後又缺東西（例如 AI 登入過期）：聊天上方提示，按鈕回到同一個引導，停在要處理的那一步。
+  const aiMissing = real && activeProvider !== 'gemini' && ['needs-login','login-failed','unavailable','error','switch-failed'].includes(accountState.state);
+  const banner = aiMissing && !setupBannerDismissed;
+  $('setup-banner').hidden = !banner;
+  if (banner) {
+    $('setup-banner-title').textContent = accountState.state === 'unavailable' ? '還差一步：安裝 AI 助手' : accountState.state === 'needs-login' ? '還差一步：連接 AI 助手' : '還差一步：AI 助手的登入需要確認';
+    $('setup-banner-text').textContent = 'AI 暫時沒辦法幫你改行程。對話和草稿都還在，可以先打字。';
+  }
+  $('connect-from-chat').hidden = accountState.state === 'connected' || activeProvider === 'gemini' || banner;
   const options = realPreview?.summary?.dayOptions || [];
   if (real) {
     const previous = $('edit-day').value;
@@ -664,7 +676,10 @@ $('restart-conversation').onclick=async()=>{
   try{if(!await flushConversationDraft())return;const result=await window.travelDesktop.restartConversation(conversationTarget(trip));if(result.ok)applyConversation(result.conversation,trip);else notify(result.message);}
   finally{aiBusy=false;proposalBusy=false;updateComposer();}
 };
-$('connect-from-chat').onclick = () => openSettings('ai');
+$('connect-from-chat').onclick = () => openSettings('accounts');
+var setupBannerDismissed = false;
+$('setup-banner-go').onclick = () => { if (window.resumeOnboarding) window.resumeOnboarding(); else openSettings('accounts'); };
+$('setup-banner-close').onclick = () => { setupBannerDismissed = true; updateComposer(); };
 $('chat-form').onsubmit = async event => {
   event.preventDefault(); if (!selected || aiBusy || pendingProposal) return;
   const message = $('message').value.trim(); if (!message) return;
@@ -790,7 +805,7 @@ async function initializeWorkspace() {
       navigation(); renderProject();
       const trip = project?.trips.find(item => item.slug === saved.selectedSlug);
       if (trip) { selectTrip(trip); setPreview(true); }
-      if (saved.warning) notify(saved.warning === 'project-recovery-required' ? '上次關閉時有一次保存沒有完成，App 需要重新確認專案。請到「設定 → 專案管理」重新選取原本的專案資料夾；你的檔案都還在。' : saved.warning === 'project-unavailable' ? '上次的專案目前無法讀取，請到設定重新選擇資料夾。' : '連接紀錄無法讀取，原紀錄已保留，請讓 coding agent 協助處理。');
+      if (saved.warning) notify(saved.warning === 'project-recovery-required' ? '上次關閉時有一次保存沒有完成，App 需要重新確認專案。請到「設定 → 我的旅程資料」重新選取原本的旅程資料夾；你的檔案都還在。' : saved.warning === 'project-unavailable' ? '上次的專案目前無法讀取，請到設定重新選擇資料夾。' : '連接紀錄無法讀取，原紀錄已保留，請讓 coding agent 協助處理。');
     } catch { notify('無法恢復上次的專案連接，請到設定重新選擇。'); }
   }
   renderTheme();
@@ -815,7 +830,7 @@ function renderCodexAccount(account) {
   $('codex-switch').hidden = account.state !== 'connected'||account.capabilities?.switchAccount===false;
   $('codex-copy-link').hidden = activeProvider!=='codex'||account.state !== 'waiting-login';
   $('codex-login-help').hidden = activeProvider!=='codex'||account.state !== 'waiting-login';
-  $('provider-capabilities').textContent=activeProvider==='gemini'?'Gemini 連線暫停，請使用 Codex 或 Claude。':activeProvider==='codex'?'支援文字、圖片與原生對話續接。':'支援 Claude Pro／Max。支援文字、截圖、公開網址與來源研究；要調整「回覆前想多久」請改用 Codex。';
+  $('provider-capabilities').textContent=activeProvider==='gemini'?'Gemini 連線暫停，請使用 Codex 或 Claude。':activeProvider==='codex'?'支援文字、圖片與原生對話續接。':'支援 Claude Pro／Max。支援文字、截圖、公開網址與來源研究；要調整思考級別請改用 Codex。';
   if (account.state !== 'connected') { modelRequest++; $('codex-model').replaceChildren(); $('chat-model').replaceChildren(); $('codex-model-row').hidden=true; }
   updateComposer();
   if (account.state === 'connected') loadModels();
