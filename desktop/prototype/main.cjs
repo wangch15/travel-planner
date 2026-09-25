@@ -494,7 +494,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   const extraChannels=[];
   const feature=(name,handler,{exclusive=false}={})=>{
     const channel='feature:'+name;extraChannels.push(channel);
-    handle(channel,async(event,input={})=>{assertSender(event);if(exclusive&&(generating||versionBusy||proposals.saving))return workflowFailure({code:'AI_BUSY'});if(exclusive)versionBusy=true;
+    handle(channel,async(event,input={})=>{assertSender(event);if(exclusive&&(generating||proposals.saving||!await versionIdle()||generating||proposals.saving))return workflowFailure({code:'AI_BUSY'});if(exclusive)versionBusy=true;
       try{return {ok:true,...await handler(input)};}catch(error){const failure=workflowFailure(error);return {...failure,message:featureMessage(error)};}finally{if(exclusive)versionBusy=false;}});
   };
   function featureMessage(error){
