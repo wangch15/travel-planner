@@ -50,7 +50,7 @@ function explain(reason, where, areas, total) {
     case 'unsafe': return `${named(where)}是捷徑或連結，為了安全 App 不會跟著讀。請把真正的檔案放回旅程資料夾。`;
     case 'too-large': return `${where ? named(where) : '行程資料或照片'}超過 App 能讀取的大小。`;
     case 'changed': return '檢查時檔案剛好在變動，按「重新檢查」再試一次就好。';
-    default: return '建立預覽時沒有完成，可能是資料很大或電腦正忙。可以再試一次；還是不行的話，把狀況複製給幫忙的人。';
+    default: return '建立預覽時沒有完成，可能是資料很大或電腦正忙。可以再試一次；還是不行的話，按「回報給開發者」。';
   }
 }
 

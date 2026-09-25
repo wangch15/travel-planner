@@ -887,7 +887,6 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       return {ok:false,code:diagnosis.code,message:diagnosis.explanation,diagnosis};
     }finally{versionBusy=false;}
   });
-  // 「複製給幫忙的人」：只複製 App 產生的去識別化摘要，不收畫面傳來的文字。
   // 回報給開發者：內容只用 main 剛產生的去識別化回報，不收畫面傳來的文字。畫面先顯示完整內容與公開目的地，人按確認才送。
   const currentReport=input=>{const target=selectedTarget(input);if(previewReport?.key!==`${target.projectId}\0${target.slug}`)throw Object.assign(Error('REPORT_STALE'),{userMessage:'請先按「重新檢查」，再回報。'});return previewReport.issue;};
   let issueReporter=null;
