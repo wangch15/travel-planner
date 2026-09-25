@@ -9,6 +9,15 @@
 - 版號不往回調低。版號只維護在 `desktop/prototype/package.json`（與 root lockfile 對應欄位），側欄與「關於」都讀這裡；從原始碼執行時顯示 `-dev`。
 - 發布放在 GitHub release `desktop-vX.Y.Z`，App 內「檢查新版本」只認這個格式。網頁引擎版號另計（root `package.json` + `CHANGELOG.md`）。
 
+## 0.1.8（2026-09-25）
+
+Windows 上連不到 Codex、Claude，GitHub 登入按了沒反應：現在都能接上，版本太舊時也會說清楚。
+
+- **AI 工具版本太舊時講清楚**：電腦上的 Claude Code 或 Codex 比 App 需要的舊，以前只顯示「連線未完成」；現在顯示「版本太舊」，按「安裝…」就會更新到最新版。
+- **找得到用 nvm 等方式裝的 Codex、Claude**：以前只找 `%APPDATA%\npm`，Node 版本管理工具裝在別處的會被當成「尚未安裝」。
+- **GitHub 登入可以用了**：安裝 GitHub CLI 時查版本資訊的請求格式錯誤，GitHub 拒絕、一直裝不起來（Mac 沒裝 `gh` 的人也受影響）；下載時限也從 2 分鐘放寬到 15 分鐘，網路慢時不再中途失敗。設定頁的「在瀏覽器登入 GitHub」會先自動裝好 GitHub CLI，跟首次設定一樣；缺工具時會說明要先安裝。
+- **Windows 自動下載 Node.js 時的解壓縮**：改用 Windows 內建的 tar，不會被 Git 附帶的 tar 攔走而失敗。
+
 ## 0.1.7（2026-09-25）
 
 行程資料壞掉時不再卡住：說清楚哪裡壞、給下一步，也能直接回報給開發者。
