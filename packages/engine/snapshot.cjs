@@ -93,26 +93,31 @@ async function readTripSnapshot(tripDirectory, { slug, includePhotoBytes = false
       return bytes;
     }
 
+    // 出錯時記下是哪個檔案（相對路徑），讓 App 能告訴人問題在哪裡；訊息本身不含路徑或內容。
+    const inFile = (relative, e) => { if (e && e.code && !e.file) e.file = relative; return e; };
     async function text(relative, required = false) {
-      const bytes = await readFile(relative, { required });
+      let bytes;
+      try { bytes = await readFile(relative, { required }); } catch (e) { throw inFile(relative, e); }
       if (bytes === null) return null;
       try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
-      catch { throw dataError(); }
+      catch { throw inFile(relative, dataError()); }
     }
     async function json(relative, fallback, required = false) {
       const source = await text(relative, required);
       if (source === null) return fallback;
       try { return copyLiteral(JSON.parse(source)); }
-      catch (e) { if (e.code) throw e; throw dataError(); }
+      catch (e) { throw inFile(relative, e.code ? e : dataError()); }
     }
     async function js(relative, fallback) {
       const source = await text(relative);
-      return source === null ? fallback : parseLiteralModule(source);
+      if (source === null) return fallback;
+      try { return parseLiteralModule(source); } catch (e) { throw inFile(relative, e); }
     }
 
     const config = await json('trip.config.json', null, true);
     const dataSource = await text('data.js');
-    const data = dataSource === null ? {} : parseLiteralModule(dataSource);
+    let data = {};
+    if (dataSource !== null) { try { data = parseLiteralModule(dataSource); } catch (e) { throw inFile('data.js', e); } }
     const {DAYS:_days,...nonDayData}=data;
     contextDigest.update(JSON.stringify(nonDayData));
     const DETAILS = await js('details.js', {});
@@ -122,17 +127,19 @@ async function readTripSnapshot(tripDirectory, { slug, includePhotoBytes = false
     const basemap = await json('basemap.json', null);
     const theme = (await text('theme.css')) || '';
     const extra = await js('extra.js', { sections: [] });
-    if (![config, data, DETAILS, DINING, MAP_LISTS, PHOTOS, extra].every(isObject)) throw dataError('INVALID_TRIP');
-    if (!Array.isArray(extra.sections || [])) throw dataError('INVALID_TRIP');
+    const loaded = [['trip.config.json', config], ['data.js', data], ['details.js', DETAILS], ['dining.js', DINING], ['map-lists.js', MAP_LISTS], ['photos.json', PHOTOS], ['extra.js', extra]];
+    const notObject = loaded.find(([, value]) => !isObject(value));
+    if (notObject) throw inFile(notObject[0], dataError('INVALID_TRIP'));
+    if (!Array.isArray(extra.sections || [])) throw inFile('extra.js', dataError('INVALID_TRIP'));
 
     const photos = {};
     const photoFiles = [];
     for (const [key, list] of Object.entries(PHOTOS)) {
-      if (!SAFE_NAME.test(key)) throw dataError('UNSAFE_PATH');
-      if (!Array.isArray(list)) throw dataError('INVALID_TRIP');
+      if (!SAFE_NAME.test(key)) throw inFile('photos.json', dataError('UNSAFE_PATH'));
+      if (!Array.isArray(list)) throw inFile('photos.json', dataError('INVALID_TRIP'));
       const kept = [];
       for (const [i, ph] of list.entries()) {
-        if (!isObject(ph)) throw dataError('INVALID_TRIP');
+        if (!isObject(ph)) throw inFile('photos.json', dataError('INVALID_TRIP'));
         for (const link of [ph.url, ph.page]) {
           if (link == null) continue;
           try { const url = new URL(link); if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error(); }
@@ -147,6 +154,7 @@ async function readTripSnapshot(tripDirectory, { slug, includePhotoBytes = false
       if (kept.length) photos[key] = kept;
     }
     let trip;
+    let problems;
     try {
       trip = {
         slug, config, PLACES: { ...data.PLACES }, DAYS: (data.DAYS || []).map((d) => ({ ...d })),
@@ -156,14 +164,17 @@ async function readTripSnapshot(tripDirectory, { slug, includePhotoBytes = false
       for (const [key, place] of Object.entries(DINING.places || {})) trip.PLACES[key] = { approximate: true, ...place };
       for (const day of trip.DAYS) { day.meals = (DINING.days || {})[day.id] || []; day.mapList = MAP_LISTS[day.id] || null; }
       trip.CHECKLIST.push(...(DINING.checklist || []));
-      if (validate(trip).length) throw dataError('INVALID_TRIP');
+      problems = validate(trip);
     } catch { throw dataError('INVALID_TRIP'); }
+    // 逐項問題另外附在 problems，不放進 message：它含行程內容，只給擁有者在本機看。
+    if (problems.length) throw Object.assign(dataError('INVALID_TRIP'), { problems });
     await parentsUnchanged();
     return { trip, theme, extra, photos, photoFiles, dataSource, contextDigest:contextDigest.digest('hex'), digest: digest.digest('hex') };
   } catch (e) {
     if (['INCOMPATIBLE_DATA', 'INPUT_LIMIT', 'UNSAFE_PATH', 'INVALID_TRIP', 'READ_FAILED', 'SOURCE_CHANGED'].includes(e.code)) throw e;
-    if (e.code === 'ELOOP') throw dataError('UNSAFE_PATH');
-    throw dataError('READ_FAILED');
+    const where = e.file ? { file: e.file } : {};
+    if (e.code === 'ELOOP') throw Object.assign(dataError('UNSAFE_PATH'), where);
+    throw Object.assign(dataError('READ_FAILED'), where);
   }
 }
 

@@ -194,6 +194,29 @@ class BackupService {
     for (const name of [...restore, ...remove]) { try { digests[name] = hash(await regularBytes(path.join(root, name))); } catch (error) { if (error.code !== 'ENOENT') throw error; digests[name] = null; } }
     return { root, slug, head: (await this.git(root, ['rev-parse', 'HEAD'])).trim(), restore, remove, digests };
   }
+  // 把上次備份（HEAD）這趟旅程的檔案寫到 dest/trips/<slug>/，讓 App 先檢查那一版能不能用，再提議「回到上次備份」。
+  // 不動工作目錄與 Git 索引；私人筆記與快取不匯出。沒備份過、或含連結等不是一般檔案的項目時回傳 null。
+  async exportLastBackup(root, slug, dest) {
+    if (!/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug || '')) throw fail('INVALID_TARGET');
+    const prefix = `trips/${slug}/`;
+    let listing;
+    try { listing = await this.git(root, ['ls-tree', '-r', '-z', '--full-tree', 'HEAD', '--', prefix]); } catch { return null; }
+    const entries = listing.split('\0').filter(Boolean).map(line => {
+      const tab = line.indexOf('\t'), [mode, type, oid] = line.slice(0, tab).split(' ');
+      return { mode, type, oid, name: line.slice(tab + 1) };
+    }).filter(e => !e.name.startsWith(`${prefix}docs/`) && !e.name.split('/').includes('.cache'));
+    if (!entries.length) return null;
+    const safe = name => name.startsWith(prefix) && !name.split('/').some(p => p === '..' || p === '') && !/[\x00-\x1f\x7f]/.test(name);
+    if (!entries.every(e => e.type === 'blob' && ['100644', '100755'].includes(e.mode) && /^[0-9a-f]{40,64}$/.test(e.oid) && safe(e.name))) return null;
+    for (const e of entries) {
+      const result = await this.run('git', ['--no-replace-objects', '--no-pager', '-C', root, 'cat-file', 'blob', e.oid], { cwd: root, encoding: 'buffer', maxBuffer: 40 * 1024 * 1024 });
+      if (result?.status && result.status !== 0) throw fail('GIT_FAILED');
+      const file = path.join(dest, ...e.name.split('/'));
+      await fs.mkdir(path.dirname(file), { recursive: true });
+      await fs.writeFile(file, Buffer.isBuffer(result.stdout) ? result.stdout : Buffer.from(result.stdout));
+    }
+    return entries.length;
+  }
   async discardPrepare({ root, slug }) {
     if (this.busy) throw fail('BACKUP_BUSY');
     const snapshot = await this.discardInspect(root, slug), token = randomUUID();

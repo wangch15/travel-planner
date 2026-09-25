@@ -108,6 +108,16 @@ textarea::placeholder,input::placeholder { color:var(--subtle); opacity:1; }
 .preview-empty .icon { width:32px; height:32px; }
 .preview-empty h3 { font-size:14px; color:var(--text); font-weight:500; margin:20px 0 8px; }
 .preview-empty p { font-size:12px; line-height:1.8; }
+.preview-empty p#preview-note { max-width:42ch; color:var(--text); }
+/* 預覽建不起來：原因、逐項問題（收起）、上次備份說明、依原因給的按鈕 */
+.preview-repair { width:min(100%,46ch); display:flex; flex-direction:column; gap:12px; margin-top:4px; }
+.preview-repair details { text-align:left; border:1px solid var(--line); border-radius:8px; background:var(--panel); }
+.preview-repair summary { cursor:pointer; padding:8px 12px; font-size:12px; color:var(--text); }
+.preview-repair summary:focus-visible { outline:2px solid var(--focus); outline-offset:2px; border-radius:8px; }
+.preview-repair ul { margin:0; padding:0 12px 10px 30px; max-height:200px; overflow:auto; font-size:11px; line-height:1.7; color:var(--muted); overflow-wrap:anywhere; }
+.preview-repair #preview-backup-note { margin:0; padding:10px 12px; border-radius:8px; background:var(--surface); text-align:left; }
+.preview-repair-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:12px; }
+.preview-repair-actions button { font-size:13px; padding:7px 12px; }
 #preview { flex:1; width:calc(100% - 32px); margin:20px 16px 0; min-height:150px; border:1px solid var(--line); background:var(--bg); border-radius:6px; }
 .preview-footer { color:var(--muted); font-size:10px; text-align:center; padding:14px; }
 .toast { position:fixed; top:76px; left:50%; transform:translateX(-50%); z-index:100; padding:10px 16px; max-width:min(620px,90vw); border:1px solid var(--line); border-radius:8px; background:var(--surface); font-size:12px; }

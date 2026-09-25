@@ -64,6 +64,23 @@ test('malformed schema errors reveal neither private data nor paths', async (t) 
   await assert.rejects(readTripSnapshot(dir), (e) => e.code === 'INVALID_TRIP' && !e.message.includes('PRIVATE-MARKER') && !e.message.includes(dir));
 });
 
+test('validation failures list each problem without putting trip content in the message', async (t) => {
+  const { dir } = await fixture(t);
+  const data = await fs.readFile(path.join(dir, 'data.js'), 'utf8');
+  await fs.writeFile(path.join(dir, 'data.js'), data.replace(/color: '#[0-9A-Fa-f]{6}'/, "color: 'PRIVATE-MARKER'"));
+  await assert.rejects(readTripSnapshot(dir), (e) => e.code === 'INVALID_TRIP' && Array.isArray(e.problems)
+    && e.problems.some(p => /color 不是 hex/.test(p)) && !e.message.includes('PRIVATE-MARKER'));
+});
+
+test('unreadable data names the file it came from', async (t) => {
+  const { dir } = await fixture(t);
+  await fs.writeFile(path.join(dir, 'dining.js'), 'module.exports = { days: {');
+  await assert.rejects(readTripSnapshot(dir), (e) => e.code === 'INCOMPATIBLE_DATA' && e.file === 'dining.js');
+  await fs.cp(example, dir, { recursive: true });
+  await fs.writeFile(path.join(dir, 'trip.config.json'), '[]');
+  await assert.rejects(readTripSnapshot(dir), (e) => e.code === 'INVALID_TRIP' && e.file === 'trip.config.json');
+});
+
 for (const kind of ['symlink', 'hardlink', 'photo-directory']) test('rejects ' + kind, async (t) => {
   const { dir, root } = await fixture(t);
   if (kind === 'photo-directory') {

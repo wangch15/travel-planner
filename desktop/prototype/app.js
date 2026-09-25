@@ -426,7 +426,9 @@ function renderPreview() {
       return;
     }
     $('revision').textContent = realPreview?.status === 'loading' ? '正在驗證並建立預覽…' : realPreview?.status === 'error' ? '預覽未能建立' : selected ? '正在準備預覽…' : '尚未選擇旅程';
-    $('preview-note').textContent = realPreview?.status === 'error' ? `無法產生預覽：${realPreview.message}` : selected ? '正在讀取並檢查行程資料，完成後就會顯示在這裡。' : '選擇一趟旅程後，就能查看完整安排。';
+    $('preview-empty-title').textContent = realPreview?.status === 'error' ? '預覽還不能顯示' : '在這裡查看你的行程';
+    $('preview-note').textContent = realPreview?.status === 'error' ? (realPreview.diagnosis ? realPreview.message : `無法產生預覽：${realPreview.message}`) : selected ? '正在讀取並檢查行程資料，完成後就會顯示在這裡。' : '選擇一趟旅程後，就能查看完整安排。';
+    renderPreviewRepair(realPreview?.status === 'error' ? realPreview.diagnosis : null);
     $('retry-preview').hidden = realPreview?.status !== 'error';
     $('preview').removeAttribute('src'); $('preview').removeAttribute('srcdoc');
     // 不論面板開不開都先在背景驗證；送出訊息要等驗證完成，不能因為面板關著就一直不能送。
@@ -445,6 +447,31 @@ function renderPreview() {
   // Coalesce changes and wait until the preview panel has a layout before loading.
   previewFrame = requestAnimationFrame(() => { $('preview').srcdoc = html; });
 }
+// 預覽建不起來時依原因給下一步：更新旅程資料夾／更新 App／回到上次備份（先列清單再確認）／複製給幫忙的人。
+// 逐項問題只在本機顯示；複製的是 App 產生的去識別化摘要（preview-report-copy）。
+const previewRepairActions = {
+  'project-update': ['更新旅程資料夾…', () => window.openProjectUpdate?.()],
+  'app-update': ['前往 App 更新', () => openSettings('about')],
+  'last-backup': ['回到上次備份…', async () => { const outcome = await window.openSyncFlow({ kind: 'backup', mode: 'discard' }); if (outcome?.status === 'blocked' && outcome.message) notify(outcome.message); }],
+  'copy-report': ['複製給幫忙的人', async () => { const r = await window.travelDesktop.feature('preview-report-copy', conversationTarget()); notify(r.ok ? '已複製問題摘要（不含行程內容），可以貼給幫你的人。' : r.message); }],
+};
+function renderPreviewRepair(diagnosis) {
+  $('preview-repair').hidden = !diagnosis;
+  // 「重新檢查」一直留在同一列最後面；依原因給的按鈕排在它前面。
+  if (!diagnosis) { $('preview-repair-actions').replaceChildren($('retry-preview')); return; }
+  const problems = diagnosis.problems || [];
+  $('preview-problems').hidden = !problems.length;
+  $('preview-problem-list').replaceChildren(...problems.map(p => el('li', p)));
+  $('preview-backup-note').hidden = !diagnosis.backupNote; $('preview-backup-note').textContent = diagnosis.backupNote || '';
+  const buttons = (diagnosis.actions || []).filter(a => previewRepairActions[a]).map((action, i) => {
+    const [label, run] = previewRepairActions[action];
+    const button = el('button', label, i === 0 && action !== 'copy-report' ? 'primary' : '');
+    button.type = 'button'; button.dataset.repair = action;
+    button.onclick = () => { if (aiBusy || pendingProposal) { notify('請先等 AI 回覆完成，或確認／放棄目前的提案。'); return; } return withBusy(button, '處理中…', async () => { try { await run(); } catch { notify('這個動作沒有完成，請再試一次。'); } }); };
+    return button;
+  });
+  $('preview-repair-actions').replaceChildren(...buttons, $('retry-preview'));
+}
 async function loadRealPreview() {
   if (!selected || selected.demo || !project || !window.travelDesktop?.buildPreview) return;
   const target = { projectId: project.projectId, slug: selected.trip.slug };
@@ -457,7 +484,7 @@ async function loadRealPreview() {
     if (request !== previewRequest || target.projectId !== project?.projectId || target.slug !== selected?.trip.slug || selected?.demo) return;
     if(result.ok&&result.proposal?.changed){pendingProposal={...result.proposal,...target,previewLoaded:false};renderProposal();}
     if(result.warning)notify(result.warning);
-    realPreview = result.ok ? { ...result, status: 'ready' } : { status: 'error', message: result.message || '請重新選擇旅程後再試一次。' };
+    realPreview = result.ok ? { ...result, status: 'ready' } : { status: 'error', message: result.message || '請重新選擇旅程後再試一次。', diagnosis: result.diagnosis || null };
   } catch { if (request === previewRequest) realPreview = { status: 'error', message: '預覽程序未能完成，請重試。' }; }
   if (request === previewRequest) { renderPreview(); updateComposer(); }
 }
@@ -573,9 +600,9 @@ function updateComposer() {
   $('codex-switch-help').hidden = accountState.state !== 'connected' || (!aiBusy && !pendingProposal);
   if (real) {
     $('composer-model').textContent = activeProvider === 'gemini' ? 'Gemini 暫停提供' : accountState.state === 'connected' ? hasModels ? ({codex:'Codex',claude:'Claude Code'})[activeProvider] : '正在取得模型…' : '尚未連接 AI';
-    const basePlaceholder = activeProvider === 'gemini' ? 'Gemini 暫停提供，請用其他 AI 開新對話' : !ready ? (realPreview?.status==='error'?'行程資料需要先修正，說明在右側預覽':'正在檢查這趟行程，完成後就能送出…') : accountState.state !== 'connected' ? '連接 AI 帳號後，就能提出修改' : $('edit-day').value === '' ? '例如：希望整趟行程更輕鬆，可以怎麼調整？' : $('edit-day').value === '-1' ? '例如：請套用剛才的建議' : '例如：把這一天的標題改成「悠閒出發」';
+    const basePlaceholder = activeProvider === 'gemini' ? 'Gemini 暫停提供，請用其他 AI 開新對話' : !ready ? (realPreview?.status==='error'?'行程資料需要先處理，打開右側預覽看怎麼做':'正在檢查這趟行程，完成後就能送出…') : accountState.state !== 'connected' ? '連接 AI 帳號後，就能提出修改' : $('edit-day').value === '' ? '例如：希望整趟行程更輕鬆，可以怎麼調整？' : $('edit-day').value === '-1' ? '例如：請套用剛才的建議' : '例如：把這一天的標題改成「悠閒出發」';
     setIfChanged($('message'),'placeholder',composerSuggestion&&ready&&accountState.state==='connected'?composerSuggestion+'　（按 Tab 帶入）':basePlaceholder);
-    $('composer-note').textContent = activeProvider === 'gemini' ? '舊 Gemini CLI 連線暫停；歷史紀錄保留。可從對話選單使用 Codex 或 Claude 開新對話。' : conversationError ? '對話紀錄無法讀寫，暫停送出以免遺失。' : conversationLoading ? '正在恢復對話…' : selected.trip.needsRestart ? (selected.trip.featureState?.stopRequested?'可以先編輯草稿。停止狀態尚未確認，請先確認停止狀態。':selected.trip.featureState?.legacyStopped?'可以先編輯草稿。上次工作狀態尚未確認，請先確認上次狀態。':'可以先編輯草稿。上次回覆尚未確認，請先找回上次回覆或重新開始（保留紀錄）。') : !ready&&!realPreview?.planning ? (realPreview?.status==='error'?'行程資料沒有通過檢查，先修正才能請 AI 修改。原因寫在右側預覽，可以打開看。':'正在檢查這趟行程的資料，通常幾秒鐘；完成前先不能送出，可以先打字。') : selected.trip.stopped ? '上一輪已停止，可以在原對話繼續討論。' : !modelReady&&accountState.state==='connected'?'這段對話的模型目前不可用，請選擇其他模型。' : pendingProposal ? '請先確認或放棄提案，再進行下一次修改。' : $('edit-day').value === '' ? 'AI 自己判斷：只是問問就回答；要它修改就直接改好存到本機，右邊預覽馬上更新，改錯可以一鍵回到修改前。' : '只改這一天；改好直接存到本機，可以一鍵回到修改前。';
+    $('composer-note').textContent = activeProvider === 'gemini' ? '舊 Gemini CLI 連線暫停；歷史紀錄保留。可從對話選單使用 Codex 或 Claude 開新對話。' : conversationError ? '對話紀錄無法讀寫，暫停送出以免遺失。' : conversationLoading ? '正在恢復對話…' : selected.trip.needsRestart ? (selected.trip.featureState?.stopRequested?'可以先編輯草稿。停止狀態尚未確認，請先確認停止狀態。':selected.trip.featureState?.legacyStopped?'可以先編輯草稿。上次工作狀態尚未確認，請先確認上次狀態。':'可以先編輯草稿。上次回覆尚未確認，請先找回上次回覆或重新開始（保留紀錄）。') : !ready&&!realPreview?.planning ? (realPreview?.status==='error'?'行程資料有問題，AI 暫時讀不到這趟行程。打開右側預覽，裡面有原因和處理按鈕（例如回到上次備份）。':'正在檢查這趟行程的資料，通常幾秒鐘；完成前先不能送出，可以先打字。') : selected.trip.stopped ? '上一輪已停止，可以在原對話繼續討論。' : !modelReady&&accountState.state==='connected'?'這段對話的模型目前不可用，請選擇其他模型。' : pendingProposal ? '請先確認或放棄提案，再進行下一次修改。' : $('edit-day').value === '' ? 'AI 自己判斷：只是問問就回答；要它修改就直接改好存到本機，右邊預覽馬上更新，改錯可以一鍵回到修改前。' : '只改這一天；改好直接存到本機，可以一鍵回到修改前。';
   }
 }
 function renderProposal() {

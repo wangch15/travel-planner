@@ -478,17 +478,23 @@
     if(plan.migrateTrips?.length)root.append(el('p','更新後會升級這些行程的資料格式：'+plan.migrateTrips.join('、')+'。原檔會另存 .bak。'));
     return root;
   }
+  const updateBlocked=()=>{if(aiBusy||pendingProposal||materializedCandidate){notify('請先停止 AI 工作，或確認／放棄目前的提案，再更新旅程資料夾。');return true;}return false;};
+  async function openProjectUpdate(){
+    const {update}=await api('project-update-prepare');if(!update.token){notify(update.message);window.renderProjectUpdate();return;}
+    projectUpdatePlan=update;$('project-update-review').replaceChildren(projectUpdateReview(update));$('project-update-error').hidden=true;$('confirm-project-update').disabled=false;$('project-update-dialog').showModal();
+  }
+  // 預覽因資料格式太舊而建不起來時，從預覽直接打開同一個更新確認視窗。
+  window.openProjectUpdate=async()=>{if(updateBlocked())return;try{await openProjectUpdate();}catch(e){notify(e.message);}};
   $('project-update-open').onclick=async()=>{
-    if(aiBusy||pendingProposal||materializedCandidate){notify('請先停止 AI 工作，或確認／放棄目前的提案，再更新旅程資料夾。');return;}
+    if(updateBlocked())return;
     $('project-update-open').disabled=true;$('project-update-open').textContent='正在從 GitHub 檢查…';
-    try{const {update}=await api('project-update-prepare');if(!update.token){notify(update.message);window.renderProjectUpdate();return;}
-      projectUpdatePlan=update;$('project-update-review').replaceChildren(projectUpdateReview(update));$('project-update-error').hidden=true;$('confirm-project-update').disabled=false;$('project-update-dialog').showModal();}
+    try{await openProjectUpdate();}
     catch(e){notify(e.message);}finally{$('project-update-open').disabled=false;$('project-update-open').textContent='更新旅程資料夾…';}
   };
   $('cancel-project-update').onclick=()=>{projectUpdatePlan=null;$('project-update-dialog').close();};
   $('confirm-project-update').onclick=async()=>{
     if(!projectUpdatePlan)return;$('confirm-project-update').disabled=true;$('project-update-error').hidden=true;
-    try{const response=await api('project-update-confirm',{token:projectUpdatePlan.token});projectUpdatePlan=null;$('project-update-dialog').close();await reloadProject(response);window.refreshBackupStatus();
+    try{const response=await api('project-update-confirm',{token:projectUpdatePlan.token});projectUpdatePlan=null;$('project-update-dialog').close();await reloadProject(response);realPreview=null;renderPreview();window.refreshBackupStatus();
       const r=response.result,parts=[r.merged?'旅程資料夾已更新到 App 內建的版本。':'資料夾裡的網頁程式已是最新。'];if(r.migrated.length)parts.push(`已升級 ${r.migrated.length} 趟行程的資料格式。`);parts.push(r.status.trusted?'下次私人備份會一起上傳這次更新。':'備份保護程式仍和 App 不同，請更新 App 後再備份。');notify(parts.join(''));}
     catch(e){$('project-update-error').textContent=e.message;$('project-update-error').hidden=false;$('confirm-project-update').disabled=false;}
   };

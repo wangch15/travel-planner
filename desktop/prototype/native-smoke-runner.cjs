@@ -11,7 +11,7 @@ const { spawn } = require('node:child_process');
 const allowed = new Set(['updater-smoke.cjs', 'navigation-smoke.cjs', 'settings-smoke.cjs',
   'session-settings-smoke.cjs', 'menu-smoke.cjs', 'onboarding-smoke.cjs', 'smoke.cjs', 'real-preview-smoke.cjs',
   'workflow-smoke.cjs', 'paste-smoke.cjs', 'research-smoke.cjs', 'versions-smoke.cjs', 'batch-smoke.cjs',
-  'batch-safety-smoke.cjs', 'stop-continuation-smoke.cjs', 'composer-smoke.cjs', 'chat-recovery-smoke.cjs']);
+  'batch-safety-smoke.cjs', 'stop-continuation-smoke.cjs', 'composer-smoke.cjs', 'chat-recovery-smoke.cjs', 'preview-repair-smoke.cjs']);
 // 較長的流程給比較多時間；其餘 90 秒。
 const LIMIT_SECONDS = { 'workflow-smoke.cjs': 240, 'batch-smoke.cjs': 180, 'batch-safety-smoke.cjs': 180, 'versions-smoke.cjs': 180, 'research-smoke.cjs': 180 };
 const limit = (LIMIT_SECONDS[process.argv[2]] || 90) * 1000;

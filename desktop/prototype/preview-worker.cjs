@@ -17,4 +17,7 @@ const { createRenderer } = require('@travel-planner/engine/render');
       dayOptions: snapshot.trip.DAYS.map(day => ({ id: day.id, title: day.title, date: day.date })) },
   });
 })().catch(error => parentPort.postMessage({ ok: false, code: error.code || 'preview-invalid',
-  message: String(error.message || '資料無法安全載入').slice(0, 1200) }));
+  message: String(error.message || '資料無法安全載入').slice(0, 1200),
+  // 哪個檔案、哪些欄位沒過檢查：只給擁有者在本機看，數量與長度都設上限。
+  file: typeof error.file === 'string' ? error.file.slice(0, 200) : null,
+  problems: Array.isArray(error.problems) ? error.problems.slice(0, 50).map(p => String(p).slice(0, 300)) : [] }));

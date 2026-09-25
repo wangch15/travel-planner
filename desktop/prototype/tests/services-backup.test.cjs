@@ -149,3 +149,24 @@ test('the pre-push guard from the previous engine is still trusted, anything els
   assert.equal(trustedFile('scripts/lib/pre-push.js', Buffer.concat([previous, Buffer.from('\n// changed\n')]), current), false);
   assert.equal(trustedFile('scripts/pre-push.js', previous, current), false, '舊版只認得對應的那一個檔案');
 });
+test('exports only the last backed-up trip files for checking, without touching the working tree or private notes', async t => {
+  const f = await fixture(t);
+  await fs.writeFile(path.join(f.root, 'trips/sample/data.js'), 'broken {');
+  const dest = await fs.mkdtemp(path.join(os.tmpdir(), 'tp-last-backup-'));
+  t.after(() => fs.rm(dest, { recursive: true, force: true }));
+  assert.equal(await f.service.exportLastBackup(f.root, 'sample', dest), 1);
+  assert.equal(await fs.readFile(path.join(dest, 'trips/sample/data.js'), 'utf8'), 'const DAYS = [];\n');
+  await assert.rejects(fs.stat(path.join(dest, 'trips/sample/docs')), { code: 'ENOENT' });
+  assert.equal(await fs.readFile(path.join(f.root, 'trips/sample/data.js'), 'utf8'), 'broken {');
+  assert.equal(await f.service.exportLastBackup(f.root, 'missing', dest), null, '沒備份過的旅程沒有可以回去的版本');
+  await assert.rejects(f.service.exportLastBackup(f.root, '../x', dest), { code: 'INVALID_TARGET' });
+});
+test('a last backup containing links is not offered as a usable version', async t => {
+  if (process.platform === 'win32') return;
+  const f = await fixture(t);
+  await fs.symlink('/etc/hosts', path.join(f.root, 'trips/sample/details.js'));
+  await f.git(['add', '.']); await f.git(['commit', '-m', 'link']);
+  const dest = await fs.mkdtemp(path.join(os.tmpdir(), 'tp-last-backup-'));
+  t.after(() => fs.rm(dest, { recursive: true, force: true }));
+  assert.equal(await f.service.exportLastBackup(f.root, 'sample', dest), null);
+});

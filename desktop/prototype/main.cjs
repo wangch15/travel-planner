@@ -7,6 +7,7 @@ const { CSP, readAsset } = require('./assets.cjs');
 const { userFacingMessage, unexpectedFailureMessage } = require('./services/failure-text.cjs');
 const { createProjectStore } = require('./project-store.cjs');
 const { buildPreview, PREVIEW_CSP } = require('./preview.cjs');
+const { diagnosePreviewFailure } = require('./preview-diagnosis.cjs');
 const { BrowserPreview } = require('./browser-preview.cjs');
 const { CodexAccount } = require('./codex/account.cjs');
 const { CodexEditor } = require('./codex/editor.cjs');
@@ -300,6 +301,25 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   };
   async function planningFor(target){
     try{const d=await newTrips.readDraft(target.root,target.slug);return d.status==='planning'?d:null;}catch(e){if(e.code==='ENOENT')return null;throw e;}
+  }
+  // 預覽建不起來（行程資料本身的問題）時，查旅程資料夾要不要更新、上次備份那一版能不能用，交給 preview-diagnosis 翻成人話。
+  const PREVIEW_DATA_CODES=new Set(['INVALID_TRIP','INCOMPATIBLE_DATA','READ_FAILED','UNSAFE_PATH','INPUT_LIMIT','SOURCE_CHANGED']);
+  const previewDataFailure=error=>PREVIEW_DATA_CODES.has(error?.code)||/^(preview-|invalid-preview)/.test(String(error?.message||''));
+  let previewReport=null;
+  async function lastBackupUsable(target){
+    const status=await backup.localStatus(target.root,target.slug).catch(()=>null);
+    if(!status)return null;
+    if(!(status.pendingFiles>0))return {usable:false,pendingFiles:0};
+    const dir=await fs.realpath(await fs.mkdtemp(path.join(require('node:os').tmpdir(),'travel-last-backup-')));
+    try{return {usable:Boolean(await backup.exportLastBackup(target.root,target.slug,dir))&&Boolean(await buildPreview(dir,target.slug).catch(()=>null)),pendingFiles:status.pendingFiles};}
+    catch{return {usable:false,pendingFiles:status.pendingFiles};}
+    finally{await fs.rm(dir,{recursive:true,force:true}).catch(()=>{});}
+  }
+  async function diagnosePreview(target,error){
+    const status=await projectUpdate.status(target.root).catch(()=>null);
+    const update=status&&{state:status.state,migrating:status.migrateTrips.includes(target.slug)};
+    const lastBackup=update?.state==='app-older'||update?.migrating||error.code==='SOURCE_CHANGED'?null:await lastBackupUsable(target);
+    return diagnosePreviewFailure({code:error.code||String(error.message||''),file:error.file||null,problems:error.problems||[],update,backup:lastBackup,appVersion:app.getVersion(),platform:`${process.platform} ${process.arch}`});
   }
   async function aiBaseline(target,conversation){
     const planning=await planningFor(target);
@@ -853,8 +873,17 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       }
       artifact=proposal?.changed?proposals.pending.artifact:baseline;
       return proposalResult(baseline,proposal,revision,warning);
-    }catch(error){return workflowFailure(error);}finally{versionBusy=false;}
+    }catch(error){
+      if(attempt!==previewAttempt)return {ok:false,code:'preview-stale'};
+      if(!previewDataFailure(error))return workflowFailure(error);
+      const diagnosis=await diagnosePreview(target,error);
+      if(attempt!==previewAttempt)return {ok:false,code:'preview-stale'};
+      previewReport={key:`${target.projectId}\0${target.slug}`,text:diagnosis.report};
+      return {ok:false,code:diagnosis.code,message:diagnosis.explanation,diagnosis};
+    }finally{versionBusy=false;}
   });
+  // 「複製給幫忙的人」：只複製 App 產生的去識別化摘要，不收畫面傳來的文字。
+  feature('preview-report-copy',async input=>{const target=selectedTarget(input);if(previewReport?.key!==`${target.projectId}\0${target.slug}`)throw Error('請先按「重新檢查」，再複製。');clipboard.writeText(previewReport.text);return {copied:true};});
   handle('versions:list',async(event,input)=>{
     assertSender(event);const target=selectedTarget(input);
     if(versionBusy||generating||proposals.saving)return workflowFailure({code:'AI_BUSY'});

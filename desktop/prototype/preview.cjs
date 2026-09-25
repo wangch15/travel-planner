@@ -20,7 +20,7 @@ function buildPreview(projectRoot, slug) {
     worker.once('error', () => done(Error('preview-worker-failed')));
     worker.once('exit', code => { if (!settled) done(Error(`preview-worker-exit-${code}`)); });
     worker.once('message', result => {
-      if (!result.ok) { const error = Error(result.message); error.code = result.code; done(error); return; }
+      if (!result.ok) { done(Object.assign(Error(result.message), { code: result.code, file: result.file || null, problems: result.problems || [] })); return; }
       const token = randomBytes(24).toString('hex');
       const assets = new Map([['/index.html', { body: result.html, type: 'text/html; charset=utf-8' }]]);
       for (const photo of result.photos) {
