@@ -144,7 +144,7 @@
       if (!confirm.result.ready) throw Error(confirm.result.message || '專案沒有建立完成。');
       mark(0, '已建立 GitHub 私人專案：' + confirm.result.repo, 'ok');
       await window.reloadProjectFromResult?.(confirm);
-      d.steps.push(['下載模板並設定備份保護', 'ok'], ['第一次備份：推送到你的私人 GitHub…', 'active']); render();
+      d.steps.push(['下載模板並設定備份保護', 'ok'], ['第一次備份：上傳到你的私人 GitHub…', 'active']); render();
       try {
         const { preparation } = await feature('backup-project-prepare');
         const { result } = await feature('backup-confirm', { token: preparation.token });
@@ -158,7 +158,7 @@
   function existingStep() {
     const d = detail.existing || (detail.existing = {});
     const repoInput = h('input', { id: 'ob-existing-repo', value: d.repo || '', placeholder: '例如 your-name/travel-planner', 'aria-label': 'GitHub 私人專案', oninput: e => { d.repo = e.target.value.trim(); } });
-    return [heading('使用你已經有的專案', '行程會繼續存在原本的私人專案裡，App 只做唯讀檢查，不會改動它。'),
+    return [heading('使用你已經有的專案', '行程會繼續存在原本的私人專案裡。連接時只檢查資料夾，不會改動任何檔案；之後你請 AI 修改時才會寫入。'),
       card(h('strong', {}, '這台電腦上已經有專案資料夾'), h('span', { class: 'ob-muted' }, '例如之前用 AI 助手在終端機做的 travel-planner 專案。'),
         h('div', { class: 'ob-actions' }, button('選擇資料夾…', chooseLocalProject, { disabled: busy }))),
       card(h('strong', {}, '專案在 GitHub 上，這台電腦還沒有'), h('span', { class: 'ob-muted' }, '會下載到「文件／Travel Planner」，並確認它是私人專案。'),

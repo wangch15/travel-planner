@@ -21,7 +21,8 @@ class JobController{
  }
  async patch(target,id,change){let value;await this.store.update(target,s=>{if(s.job?.id!==id)throw fail('STALE_JOB');Object.assign(s.job,change);if(!validJob(s.job))throw fail('INVALID_JOB');value=s.job;});return value;}
  async checkpoint(target,id,threadId,turnId=null){return this.patch(target,id,{threadId,turnId});}
- async fail(target,id,code,limits){return this.patch(target,id,{status:['QUOTA_UNAVAILABLE','QUOTA_EXHAUSTED'].includes(code)?'waiting_quota':code==='AI_CANCELED'?'paused':['AI_RESULT_UNKNOWN','UNKNOWN_RESULT'].includes(code)?'unknown':'failed',nextCheck:nextQuotaCheck(limits,this.now()),reason:code});}
+ // settled：這輪確定已結束（程序已退出或伺服器回報結束），不是「結果不明」，可以直接重送。
+ async fail(target,id,code,limits,{settled=false}={}){const quota=['QUOTA_UNAVAILABLE','QUOTA_EXHAUSTED'].includes(code);return this.patch(target,id,{status:quota?'waiting_quota':code==='AI_CANCELED'?'paused':settled?'failed':['AI_RESULT_UNKNOWN','UNKNOWN_RESULT'].includes(code)?'unknown':'failed',nextCheck:nextQuotaCheck(limits,this.now()),reason:code,...(settled&&!quota&&code!=='AI_CANCELED'?{settled:true}:{})});}
  async finish(target,id){return this.patch(target,id,{status:'completed',autoResume:false,reason:null});}
  async wait(target,enabled){const {job}=await this.store.read(target);if(!job||job.status!=='waiting_quota')throw fail('NO_WAITING_JOB');return this.patch(target,job.id,{autoResume:Boolean(enabled),claimId:null,nextCheck:enabled?Math.max(this.now()+1000,job.nextCheck):0});}
  async pause(target){const {job}=await this.store.read(target);if(!job)return null;return this.patch(target,job.id,{autoResume:false,claimId:null,status:job.status==='completed'?'completed':'paused',reason:'user-paused'});}

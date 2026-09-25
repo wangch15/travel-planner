@@ -288,3 +288,29 @@ test('needsResearch comes from the AI and only a boolean is accepted', () => {
   assert.equal(decode({}).needsResearch, undefined, '舊回覆沒有這個欄位時不附查核卡片');
   assert.throws(() => decode({ needsResearch: 'yes' }), { code: 'AI_OUTPUT_INVALID' });
 });
+// 伺服器已回報這輪結束（失敗或輸出不合格式）：確定沒有完成，App 可以讓人直接重送，不必鎖住對話。
+test('a turn the server reports as failed is settled and records its terminal turn',async()=>{
+  const f=fixture({complete:false});const original=f.transport.request;
+  f.transport.request=async(method,params)=>{const result=await original(method,params);
+    if(method==='turn/start')queueMicrotask(()=>f.transport.emit('notification','turn/completed',{threadId:'thread',turn:{id:'turn',status:'failed'}}));return result;};
+  await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:'discuss'}),error=>error.code==='AI_TURN_FAILED'&&error.settled===true&&error.turnId==='turn');
+});
+test('a completed turn with an unusable answer is settled too',async()=>{
+  const f=fixture({answer:{summary:'建議調整',replacementDayJson:'{}'}});
+  await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:'整趟行程太緊了'}),error=>error.code==='AI_OUTPUT_INVALID'&&error.settled===true&&error.turnId==='turn');
+});
+test('transport loss mid-turn stays unsettled so the answer can still be recovered',async()=>{
+  const f=fixture({complete:false});const original=f.transport.request;
+  f.transport.request=async(method,params)=>{const result=await original(method,params);if(method==='turn/start')queueMicrotask(()=>{f.transport.state='closed';f.transport.emit('close');});return result;};
+  await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:'discuss'}),error=>error.code==='AI_RESULT_UNKNOWN'&&error.settled!==true);
+});
+// 停止後伺服器遲遲沒有回報結束：限時放開畫面，狀態標成「停止尚未確認」讓人稍後核對，不要一直轉圈。
+test('stop releases the request after a grace period even if the server never confirms',async()=>{
+  const f=fixture({complete:false});f.editor.stopGraceMs=50;const original=f.transport.request;
+  f.transport.request=async(method,params)=>method==='turn/interrupt'?{}:original(method,params);
+  const started=new Promise(resolve=>f.transport.once('started',resolve));
+  const pending=f.editor.generate({snapshot:f.snapshot,dayId:null,text:'discuss'});
+  const stopped=assert.rejects(pending,error=>error.code==='AI_CANCELED'&&error.stopConfirmed===false);
+  await started;const began=Date.now();await f.editor.stop();await stopped;
+  assert.ok(Date.now()-began<2000);assert.equal(f.editor.active,null);
+});

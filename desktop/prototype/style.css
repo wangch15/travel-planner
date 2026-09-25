@@ -425,6 +425,7 @@ select option[hidden] { display:none; }
 .chat-event-actions { display:flex; justify-content:center; margin-top:10px; gap:8px; }
 .chat-event-actions:empty { display:none; }
 .chat-event-actions button { background:transparent; }
+.chat-event-actions button.primary { color:var(--on-button); background:var(--button); border-color:transparent; }
 @media(max-width:1100px){.conversation-header { padding:8px 18px; }.chat-event { padding:0 22px; }}
 
 /* Compact settings use one control size and explicit project/account hierarchy. */

@@ -80,7 +80,7 @@ app.whenReady().then(async()=>{
   await waitFor('document.querySelector(".message.assistant .action-card")?.textContent.includes("備份到你的私人 GitHub")');
   assert.deepEqual(backupCalls,[]);
   await win.webContents.executeJavaScript('[...document.querySelectorAll(".action-card button")].find(b=>b.textContent==="檢查要備份的內容").click()');
-  await waitFor('document.getElementById("sync-dialog").open && document.getElementById("sync-dialog-body").textContent.includes("私人專案：sample/private")');
+  await waitFor('document.getElementById("sync-dialog").open && document.getElementById("sync-dialog-body").textContent.includes("私人 GitHub：sample/private")');
   // 燈箱開著時，卡片的按鈕顯示執行中，不能再按一次。
   assert.equal(await win.webContents.executeJavaScript('document.querySelector(".action-card button[aria-busy=true]")?.disabled'),true);
   assert.deepEqual(backupCalls,['prepare:'+(await win.webContents.executeJavaScript('selected.trip.slug'))]);

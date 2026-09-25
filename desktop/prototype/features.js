@@ -42,7 +42,7 @@
     // 讀不到狀態時不假裝已備份：顯示「無法確認」，按下去在燈箱裡看原因。
     const pending=status&&(status.neverBackedUp||status.pendingFiles>0||status.unpushedCommits>0);
     button.hidden=!(pending||failure)||$('versions-open').hidden;if(button.hidden)return;
-    button.title=failure||'有改動還沒推送到你的私人 GitHub，點這裡核對並備份';
+    button.title=failure||'有改動還沒上傳到你的私人 GitHub，點這裡核對並備份';
     button.textContent=failure?'無法確認備份狀態':status.neverBackedUp?'尚未備份到 GitHub':'尚未備份'+(status.pendingFiles?` · ${status.pendingFiles} 個檔案`:'');
   }
   $('backup-status').onclick=()=>window.openSyncFlow({kind:'backup',scope:'trip'});
@@ -165,8 +165,8 @@
   window.setFeatureModels=value=>{models=value;window.refreshEffort();};
   window.refreshEffort=()=>{
     const model=models.find(m=>m.id===$('chat-model').value);const previous=selected?.trip.effort??featureState.effort??'';
-    const names={none:'不額外思考',minimal:'最少',low:'低',medium:'中',high:'高',xhigh:'更高',max:'最高'};
-    const specs=[{value:'',label:model?.defaultEffort?`模型預設（${names[model.defaultEffort]||model.defaultEffort}）`:'模型預設（由服務決定）'}];
+    const names={none:'不多想',minimal:'很快',low:'快',medium:'一般',high:'仔細',xhigh:'更仔細',max:'最仔細'};
+    const specs=[{value:'',label:model?.defaultEffort?`預設（${names[model.defaultEffort]||model.defaultEffort}）`:'預設'}];
     for(const item of model?.effort||[]){const value=typeof item==='string'?item:item.reasoningEffort;specs.push({value,label:names[value]||value});}
     const allowed=specs.some(o=>o.value===previous);syncSelect($('chat-effort'),specs,allowed?previous:'');
     if(model&&selected&&!selected.demo&&!allowed)selected.trip.effort='';
@@ -280,9 +280,11 @@
     const fallback=featureState.needsRestart&&(!featureState.job||!featureState.job.threadId||['running','completed'].includes(featureState.job.status));
     const job=fallback?{status:'unknown'}:featureState.job,box=$('job-card');box.replaceChildren();box.hidden=!selected||selected.demo||!job||['running','completed'].includes(job.status);if(box.hidden)return;
     const confirmedStop=featureState.stopped&&job.reason==='user-stopped',stopPending=featureState.stopRequested&&!featureState.stopped,legacyStopped=featureState.legacyStopped,priorTurnConfirmed=job.reason==='terminal-confirmed';
-    const heading=el('div',undefined,'chat-event-line'),copy=el('div',undefined,'chat-event-title');copy.append(icon('info'),el('span',confirmedStop?'已停止這輪':priorTurnConfirmed?'上一輪已結束':stopPending?'停止狀態尚未確認':legacyStopped?'上次工作狀態尚未確認':job.status==='paused'?'上次工作已暫停':job.status==='waiting_quota'?'目前一般額度暫時不可用':job.status==='failed'?'這次工作未完成':'上次回覆尚未確認'));heading.append(copy);box.append(heading);
+    const settledFailure=job.status==='failed'&&job.settled===true&&typeof job.input?.text==='string';
+    const heading=el('div',undefined,'chat-event-line'),copy=el('div',undefined,'chat-event-title');copy.append(icon('info'),el('span',settledFailure?'這輪沒有完成':confirmedStop?'已停止這輪':priorTurnConfirmed?'上一輪已結束':stopPending?'停止狀態尚未確認':legacyStopped?'上次工作狀態尚未確認':job.status==='paused'?'上次工作已暫停':job.status==='waiting_quota'?'目前一般額度暫時不可用':job.status==='failed'?'這次工作未完成':'上次回覆尚未確認'));heading.append(copy);box.append(heading);
     const details=el('p',undefined,'chat-event-description'),actions=el('div',undefined,'chat-event-actions');box.append(details,actions);
     if(fallback){details.textContent='沒有自動重送。上次狀態缺少可核對的紀錄，請重新開始後再送出新的要求。';const restart=button('重新開始（保留紀錄）',()=>$('restart-conversation').click());restart.className='job-restart';restart.disabled=$('restart-conversation').disabled;actions.append(restart);return;}
+    if(settledFailure){renderFailedTurn(job,details,actions);return;}
     if(confirmedStop){details.textContent='可以在原對話送出新訊息；上次要求不會自動重送。';return;}
     if(priorTurnConfirmed){details.textContent='可以在原對話送出新訊息；上次回覆未套用到行程。';return;}
     if(activeProvider!=='codex'){
@@ -297,6 +299,24 @@
       details.textContent=stopPending||legacyStopped?'沒有自動重送。先確認上一輪是否已結束。':job.status==='unknown'?'沒有自動重送。可以找回上次回覆，確認結果後再繼續。':'這次工作未完成，可嘗試找回上次回覆。';actions.append(button(stopPending?'確認停止狀態':legacyStopped?'確認上次狀態':'找回上次回覆',async()=>{try{const result=await api('job-recover',target());useConversation(result);window.acceptFeatureResult(result);if(result.proposal?.changed)stageProposal(result.proposal);if(result.message)notify(result.message);await refreshJob();}catch(e){notify(e.message);}}));if(featureState.needsRestart){const restart=button('重新開始（保留紀錄）',()=>$('restart-conversation').click());restart.className='job-restart';restart.disabled=$('restart-conversation').disabled;actions.append(restart);}
     }
   }
+  // 這輪確定結束、沒有東西在遠端繼續跑：不必找回或重新開始，直接給重送。
+  // 上方的回覆已經說明原因；卡片只講下一步，不重複整段。
+  const FAILED_TURN_HINTS={
+    LOGIN_REQUIRED:'先重新登入，再重送這則。',
+    AI_USAGE_LIMIT:'額度恢復後再重送，或從右上方選單改用其他 AI。',
+    AI_SERVICE_BUSY:'稍等一下再重送。',
+  };
+  function renderFailedTurn(job,details,actions){
+    details.textContent=FAILED_TURN_HINTS[job.reason]||'可以直接重送，或帶回輸入框改一改再送。';
+    if(job.reason==='LOGIN_REQUIRED'&&['codex','claude'].includes(activeProvider)){
+      const name=activeProvider==='codex'?'ChatGPT':'Claude';
+      // Claude 的登入過期時本機仍顯示已登入，要先登出再登入才會真的重新授權。
+      actions.append(button('重新登入 '+name,async()=>{const result=await api('provider-account-action',{id:activeProvider,action:activeProvider==='claude'?'switch':'login'});window.updateProviderRow?.(result.account);if(result.account.message)notify(result.account.message);}));
+    }
+    // 卡片常在回覆剛結束、畫面還在忙時畫出來，不在這裡停用；按下時再由 resendFailedRequest 判斷能不能送。
+    const resend=button('重送這則',()=>window.resendFailedRequest(job));resend.className='primary';
+    actions.append(resend,button('帶回輸入框',()=>window.recallFailedRequest(job)));
+  }
   async function refreshJob(){if(!selected||selected.demo)return;try{const result=await api('job-status',target());featureState.job=result.job;renderJob();}catch{}}
   setInterval(()=>{if(featureState.job?.status==='waiting_quota')refreshJob();},15000);
   window.travelDesktop?.onJobResult?.(event=>{if(project?.projectId!==event.projectId||selected?.trip.slug!==event.slug)return;if(event.started){aiBusy=true;updateComposer();const node=addMessage({role:'assistant',text:'一般額度已恢復，正在繼續原工作…'});markAIProgress(node);return;}aiBusy=false;document.getElementById('ai-progress')?.remove();useConversation(event.result);window.acceptFeatureResult(event.result);if(event.result.proposal?.changed)stageProposal(event.result.proposal);if(event.result.proposal?.applied){realPreview=null;renderPreview();window.refreshBackupStatus();}refreshJob();renderProposal();updateComposer();});
@@ -309,7 +329,7 @@
     const value=$('setup-repository').value.trim();if(!value)throw Error('請先填寫專案名稱。');
     const result=await api('project-setup-prepare',{kind,...(kind==='clone'?{repo:value}:{name:value})});if(result.canceled)return;
     setupPending={kind,token:result.preparation.token};const p=result.preparation;
-    $('setup-review').replaceChildren(el('p',`GitHub：${p.repo} · 私人`),el('p',`本機位置：${p.destination}`),el('p',p.warning||'只下載到新資料夾，不會推送或覆蓋既有資料。'));
+    $('setup-review').replaceChildren(el('p',`GitHub：${p.repo} · 私人`),el('p',`本機位置：${p.destination}`),el('p',p.warning||'只下載到新資料夾，不會上傳或覆蓋既有資料。'));
     $('setup-review').hidden=false;$('setup-confirm').hidden=false;$('setup-confirm').textContent=kind==='create'?'確認建立私人 GitHub 專案':'確認下載';tell('setup-result','請核對帳號、專案與存放位置。');
   });
   $('setup-confirm').onclick=()=>action('setup-confirm',async()=>{
@@ -335,7 +355,7 @@
   // ---------- 備份與發布：目前旅程下拉、狀態與第一次發布清單 ----------
   let syncScope='trip',syncRequest=0;
   const syncDate=iso=>{try{const d=new Date(iso);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch{return '';}};
-  function backupWords(st){if(!st)return {tone:'muted',head:'無法讀取備份狀態',sub:'請確認專案資料夾還在，或到「專案管理」重新連接。'};if(st.error)return {tone:'warn',head:'無法讀取備份狀態',sub:st.error};if(st.neverBackedUp)return {tone:'warn',head:'還沒有備份到 GitHub',sub:'第一次備份會把專案推送到你的私人 GitHub。'};if(st.pendingFiles>0)return {tone:'warn',head:`有 ${st.pendingFiles} 個檔案還沒備份`,sub:'備份會先列出這些檔案，你確認後才推送。'};if(st.unpushedCommits>0)return {tone:'warn',head:`有 ${st.unpushedCommits} 個提交還沒推送`,sub:'例如專案更新；備份時會一起推送。'};return {tone:'ok',head:'已經是最新的備份',sub:'這台電腦的內容都已經在你的私人 GitHub。'};}
+  function backupWords(st){if(!st)return {tone:'muted',head:'無法讀取備份狀態',sub:'請確認專案資料夾還在，或到「專案管理」重新連接。'};if(st.error)return {tone:'warn',head:'無法讀取備份狀態',sub:st.error};if(st.neverBackedUp)return {tone:'warn',head:'還沒有備份到 GitHub',sub:'第一次備份會把整個旅程資料夾上傳到你的私人 GitHub。'};if(st.pendingFiles>0)return {tone:'warn',head:`有 ${st.pendingFiles} 個檔案還沒備份`,sub:'備份會先列出這些檔案，你確認後才上傳。'};if(st.unpushedCommits>0)return {tone:'warn',head:`有 ${st.unpushedCommits} 個存好的版本還沒上傳`,sub:'例如專案更新；備份時會一起上傳。'};return {tone:'ok',head:'已經是最新的備份',sub:'這台電腦的內容都已經在你的私人 GitHub。'};}
   function setStatus(prefix,{tone,head,sub}){$(prefix+'-dot').dataset.tone=tone;$(prefix+'-headline').textContent=head;$(prefix+'-sub').textContent=sub;}
   window.renderSync=async()=>{
     if(!window.travelDesktop||$('setting-sync').hidden)return;
@@ -388,7 +408,7 @@
     {label:'重新核對連線',icon:'chat',action:()=>$(provider+'-status').click()},
     {label:'重新登入',icon:'external',disabled:aiBusy,action:()=>$(provider+'-connect').click()},
     {label:'取消登入',icon:'close',disabled:$(provider+'-cancel').hidden,action:()=>$(provider+'-cancel').click()},
-    ...(provider==='github'?[{separator:true},{label:'設定備份署名…',icon:'settings',disabled:!project,action:()=>$('identity-prepare').click()}]:[])
+    ...(provider==='github'?[{separator:true},{label:'設定備份紀錄上的名字…',icon:'settings',disabled:!project,action:()=>$('identity-prepare').click()}]:[])
   ]);
   async function authStatus(provider){const {auth}=await api('auth-status',{provider});$(provider+'-connect').hidden=auth.connected;$(provider+'-auth-badge').textContent=auth.connected?'已連接':'未連接';$(provider+'-auth-badge').dataset.status=auth.connected?'ready':'missing';$(provider+'-auth-message').hidden=auth.connected;tell(provider+'-auth-message',auth.connected?'已連接官方工具帳號。':'尚未連接，請完成官方頁面授權。');if(provider==='cloudflare'&&auth.connected)await cloudflareAccounts();return auth;}
   async function cloudflareAccounts(){const {selection}=await api('cloudflare-accounts');$('cloudflare-account').replaceChildren();const none=el('option','依登入帳號核對');none.value='';$('cloudflare-account').append(none);for(const a of selection.accounts){const option=el('option',a.name);option.value=a.id;$('cloudflare-account').append(option);}$('cloudflare-account').value=selection.selectedAccountId||'';}
@@ -463,7 +483,7 @@
   $('confirm-project-update').onclick=async()=>{
     if(!projectUpdatePlan)return;$('confirm-project-update').disabled=true;$('project-update-error').hidden=true;
     try{const response=await api('project-update-confirm',{token:projectUpdatePlan.token});projectUpdatePlan=null;$('project-update-dialog').close();await reloadProject(response);window.refreshBackupStatus();
-      const r=response.result,parts=[r.merged?'專案已更新到 App 內建的引擎版本。':'專案引擎已是最新。'];if(r.migrated.length)parts.push(`已升級 ${r.migrated.length} 趟行程的資料格式。`);parts.push(r.status.trusted?'下次私人備份會一起推送這次更新。':'備份保護程式仍和 App 不同，請更新 App 後再備份。');notify(parts.join(''));}
+      const r=response.result,parts=[r.merged?'專案已更新到 App 內建的引擎版本。':'專案引擎已是最新。'];if(r.migrated.length)parts.push(`已升級 ${r.migrated.length} 趟行程的資料格式。`);parts.push(r.status.trusted?'下次私人備份會一起上傳這次更新。':'備份保護程式仍和 App 不同，請更新 App 後再備份。');notify(parts.join(''));}
     catch(e){$('project-update-error').textContent=e.message;$('project-update-error').hidden=false;$('confirm-project-update').disabled=false;}
   };
   window.onFeatureSetting=section=>{if(section==='projects')window.renderProjectUpdate();if(section==='backup')authStatus('github').catch(()=>{});if(section==='publish')authStatus('cloudflare').catch(()=>{});if(section==='tools'){environment().catch(e=>notify(e.message));api('updates-status').then(({update})=>renderUpdate(update)).catch(()=>{});}if(['backup','publish'].includes(section)){tell(section+'-result','');window.renderSync();}};

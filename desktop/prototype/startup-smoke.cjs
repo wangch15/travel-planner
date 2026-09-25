@@ -50,7 +50,7 @@ function getTargets(port) {
           const targets = await getTargets(port);
           ready = targets.some(target => target.type === 'page'
             && target.url === 'travel-app://prototype/index.html'
-            && target.title === 'Travel Planner · 接手既有旅程');
+            && target.title === 'Travel Planner');
         } catch (error) { lastProbeError = error; }
         if (ready) break;
       }

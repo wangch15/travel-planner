@@ -31,14 +31,14 @@
     const open = async () => {
       const outcome = await window.openSyncFlow(opts());
       if (outcome.status === 'blocked') { if (outcome.message) c.say(outcome.message, 'warn'); return; }
-      if (outcome.status === 'canceled') { c.say('已取消，沒有推送或發布任何東西。'); c.set(c.btn(label, open, true, '核對中…')); return; }
+      if (outcome.status === 'canceled') { c.say('已取消，沒有上傳或發布任何東西。'); c.set(c.btn(label, open, true, '核對中…')); return; }
       c.say(outcome.message, outcome.tone);
       c.set(...(outcome.url ? [c.btn('開啟網站 ↗', async () => { await feature('open-link', { url: outcome.url }); }, false, '開啟中…')] : outcome.status === 'failed' ? [c.btn(label, open, true, '核對中…')] : []));
     };
     c.set(c.btn(label, open, true, '核對中…'));
     return c.card;
   }
-  const backupCard = () => flowCard('備份到你的私人 GitHub', '先列出這次會推送的內容，你確認後才推送。推送前會重新確認目的地是私人專案。', '檢查要備份的內容', () => ({ kind: 'backup', scope: realTrip() ? 'trip' : 'project' }));
+  const backupCard = () => flowCard('備份到你的私人 GitHub', '先列出這次會上傳的內容，你確認後才上傳。上傳前會重新確認目的地是私人的。', '檢查要備份的內容', () => ({ kind: 'backup', scope: realTrip() ? 'trip' : 'project' }));
   const publishCard = () => flowCard('把這趟行程發布成網站', '發布前要先看過預覽，並確認網站是「拿到網址的人都能開」的公開頁面。', '準備發布', () => ({ kind: 'publish' }));
 
   function projectUpdateCard() {
@@ -52,7 +52,7 @@
       c.set(c.btn('確認更新', async () => {
         const response = await feature('project-update-confirm', { token: u.token });
         await window.reloadProjectFromResult?.(response);
-        c.say(response.result.merged ? '專案已更新，下次私人備份會一起推送。' : '專案已是最新。', 'ok'); c.body.replaceChildren(); c.set(); window.refreshBackupStatus?.();
+        c.say(response.result.merged ? '專案已更新，下次私人備份會一起上傳。' : '專案已是最新。', 'ok'); c.body.replaceChildren(); c.set(); window.refreshBackupStatus?.();
       }, true, '更新中…'));
     };
     c.set(c.btn('檢查更新內容', prepare, true, '檢查中…'));

@@ -83,12 +83,12 @@
   const BACKUP_STEPS = ['檢查', '核對', '完成'];
   function backupRequest(scope, opts) { return scope === 'all' ? ['backup-prepare', { scope: 'all' }] : scope === 'project' ? ['backup-project-prepare', {}] : scope === 'archive' ? ['backup-prepare', { scope: 'archive', projectId: project.projectId, slug: opts.slug }] : ['backup-prepare', conversationTarget()]; }
   function backupReview(p) {
-    const nodes = [el('p', `私人專案：${p.repo} · 分支 ${p.branch}`, 'flow-meta'), dayChanges(p.dayChanges)];
+    const nodes = [el('p', `私人 GitHub：${p.repo}`, 'flow-meta'), dayChanges(p.dayChanges)];
     if (p.files.length) nodes.push(fold(`這次 ${p.files.length} 個檔案`, p.files.map(f => `${f.status === 'deleted' ? '刪除' : '保存'} · ${f.path}`), !p.dayChanges?.length && p.files.length <= 12));
-    if (p.unpublishedCommits) nodes.push(el('p', `另有 ${p.unpublishedCommits} 個既有提交會一起推送。`));
-    if (p.firstPush) nodes.push(el('p', '這是第一次推送到這個私人專案，會包含模板本身的所有檔案。'));
+    if (p.unpublishedCommits) nodes.push(el('p', `另有 ${p.unpublishedCommits} 個之前存好的版本會一起上傳。`));
+    if (p.firstPush) nodes.push(el('p', '這是第一次上傳到這個私人 GitHub，會包含模板本身的所有檔案。'));
     for (const warning of p.warnings || []) nodes.push(el('p', warning, 'flow-warning'));
-    if (p.unrelatedCommittedFiles?.length) nodes.push(fold(`既有未推送提交另包含 ${p.unrelatedCommittedFiles.length} 個檔案`, p.unrelatedCommittedFiles, false));
+    if (p.unrelatedCommittedFiles?.length) nodes.push(fold(`之前存好、還沒上傳的版本另包含 ${p.unrelatedCommittedFiles.length} 個檔案`, p.unrelatedCommittedFiles, false));
     return nodes;
   }
   // 備份前卡住、但 App 自己能處理的狀況：在燈箱裡給按鈕，不叫人去設定頁或終端機。
@@ -101,7 +101,7 @@
     steps(BACKUP_STEPS, 0);
     body(el('p', '每次備份都會記下一個名字與郵件。App 會用你的 GitHub 帳號設定這個專案：'), facts([['名字', p.author.name], ['郵件', p.author.email]]), p.warning ? el('p', p.warning, 'flow-meta') : null);
     say('郵件是 GitHub 提供的隱私地址，不會公開你的真實信箱。');
-    footer([], [closeButton('取消'), act('用這個署名', 'confirm', async () => { const { result } = await api('git-identity-confirm', { token: p.token }); if (!result.ready) throw Error(result.message); await next(); }, { variant: 'primary', busy: '設定中…' })]);
+    footer([], [closeButton('取消'), act('用這個名字', 'confirm', async () => { const { result } = await api('git-identity-confirm', { token: p.token }); if (!result.ready) throw Error(result.message); await next(); }, { variant: 'primary', busy: '設定中…' })]);
   }
   async function backup(opts) {
     const scope = opts.scope || 'trip';
@@ -109,13 +109,13 @@
     const p = await checking(BACKUP_STEPS, '正在列出這次要備份的內容…', async () => { const [name, input] = backupRequest(scope, opts); return (await api(name, input)).preparation; }, () => backup(opts), backupHelp(opts));
     if (!p) return;
     if (!p.files.length && !p.unpublishedCommits) { const text = '目前沒有需要備份的內容，已經是最新。'; done(BACKUP_STEPS, '已經是最新的備份', text, 'ok', { status: 'done', message: text, tone: 'ok' }); return; }
-    steps(BACKUP_STEPS, 1); body(...backupReview(p)); say('核對以上內容，確認後才推送到你的私人 GitHub。');
+    steps(BACKUP_STEPS, 1); body(...backupReview(p)); say('核對以上內容，確認後才上傳到你的私人 GitHub。');
     footer([scope === 'trip' && p.files.length ? act('全部不要…', 'discard', () => discard(opts), { variant: 'text-button danger-text', busy: '檢查中…' }) : null],
       [closeButton('取消'), act('確認備份', 'confirm', async () => {
         const { result } = await api('backup-confirm', { token: p.token }); refresh();
         const tone = result.backedUp === false ? 'warn' : 'ok';
         done(BACKUP_STEPS, tone === 'ok' ? '備份完成' : '備份沒有完成', result.message, tone, { status: tone === 'ok' ? 'done' : 'failed', message: result.message, tone });
-      }, { variant: 'primary', busy: '推送中…' })]);
+      }, { variant: 'primary', busy: '上傳中…' })]);
   }
   async function discard(opts) {
     title('回到上次備份');
@@ -179,7 +179,7 @@
     const label = el('label', undefined, 'flow-ack'); label.htmlFor = ack.id;
     label.append(ack, document.createTextNode('我已看過目前預覽，並了解網站是公開的，拿到網址的人都能打開。'));
     body(facts([['網站', p.name], ['Cloudflare', p.accountName || p.accountId]]), p.warning ? el('p', p.warning) : null,
-      p.backupFirst ? el('p', `發布前會先把${p.backupFirst.pendingFiles ? ` ${p.backupFirst.pendingFiles} 個` : '尚未備份的'}修改備份（commit + push）到你的私人 GitHub。`) : null, label);
+      p.backupFirst ? el('p', `發布前會先把${p.backupFirst.pendingFiles ? ` ${p.backupFirst.pendingFiles} 個` : '尚未備份的'}修改備份到你的私人 GitHub。`) : null, label);
     say('勾選上面的提醒後才能發布。'); footer([], [closeButton('取消'), confirm]);
   }
 

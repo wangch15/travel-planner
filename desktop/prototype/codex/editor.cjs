@@ -52,7 +52,7 @@ function decodeAnswer(text,{mode,threadId,turnId,model}){
 const error = code => Object.assign(Error(code), { code });
 
 class CodexEditor {
-  constructor(account, { timeoutMs = 180000 } = {}) { this.account = account; this.timeoutMs = timeoutMs; this.active = null; }
+  constructor(account, { timeoutMs = 180000, stopGraceMs = 10000 } = {}) { this.account = account; this.timeoutMs = timeoutMs; this.stopGraceMs = stopGraceMs; this.active = null; }
   async generate({ snapshot, dayId, text, model, onProgress = () => {}, thread = null, onThread = async () => {}, lastOutcome = '尚未產生提案。', mode:requestedMode, effort, attachments=[], planningDraft=null, handoff=null, requestId=null, onTurn=async()=>{}, onDelta=()=>{}, researchTools=null }) {
     if (this.active) throw error('AI_BUSY');
     if (typeof text !== 'string' || !text.trim() || text.length > 12000) throw error('INVALID_INPUT');
@@ -117,7 +117,7 @@ class CodexEditor {
       if (active.cancelled) throw error('AI_CANCELED');
       let resolveTurn, rejectTurn;
       const finished = new Promise((resolve, reject) => { resolveTurn = resolve; rejectTurn = reject; });
-      finished.catch(() => {});
+      finished.catch(() => {});active.rejectTurn=rejectTurn;
       let finalText = '',streamText='';
       const touch=()=>{clearTimeout(timer);timer=setTimeout(()=>{active.cancelled=true;rejectTurn(error('AI_RESULT_UNKNOWN'));},this.timeoutMs);};
       touch();hardTimer=setTimeout(()=>{active.cancelled=true;rejectTurn(error('AI_RESULT_UNKNOWN'));},Math.max(this.timeoutMs,15*60*1000));
@@ -170,6 +170,8 @@ class CodexEditor {
       if (active.cancelled) throw error('AI_CANCELED');
       return {...decodeAnswer(answerText,{mode,threadId:active.threadId,turnId:active.turnId,model:selected.id}),...(resolvedEffort?{resolvedEffort}:{})};
     } catch (failure) {
+      // 伺服器已回報這輪結束：確定沒有完成，App 可以讓人直接重送。
+      if (['completed','interrupted','failed'].includes(active.terminalStatus)) { failure.settled = true; if (active.turnId && !failure.turnId) failure.turnId = active.turnId; }
       if (active.stopRequested) {
         failure.stopConfirmed=!active.turnRequestSent||['completed','interrupted','failed'].includes(active.terminalStatus);
         if (failure.stopConfirmed && active.turnId) failure.turnId=active.turnId;
@@ -205,6 +207,8 @@ class CodexEditor {
     if (!active) return { requested: false };
     active.cancelled = true;
     active.stopRequested = true;
+    // 伺服器遲遲沒回報結束也要限時放開畫面；狀態留成「停止尚未確認」，之後再核對。
+    const grace = setTimeout(() => active.rejectTurn?.(error('AI_CANCELED')), this.stopGraceMs); grace.unref?.();
     if (active.threadId && active.turnId) await this.account.transport.request('turn/interrupt', { threadId: active.threadId, turnId: active.turnId });
     return { requested: true };
   }

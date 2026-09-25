@@ -38,10 +38,10 @@
     const model=defaultModels.find(m=>m.id===$('defaults-model').value)||defaultModels.find(m=>m.isDefault)||defaultModels[0];
     const efforts=(model?.effort||[]).map(e=>typeof e==='string'?e:e.reasoningEffort).filter(Boolean);
     field.hidden=defaults.provider!=='codex'||!efforts.length;
-    const names={none:'不額外思考',minimal:'最少',low:'低',medium:'中',high:'高',xhigh:'更高',max:'最高'};
+    const names={none:'不多想',minimal:'很快',low:'快',medium:'一般',high:'仔細',xhigh:'更仔細',max:'最仔細'};
     for(const effort of efforts){const option=el('option',names[effort]||effort);option.value=effort;select.append(option);}
     select.value=efforts.includes(defaults.effort)?defaults.effort:efforts.includes(model?.defaultEffort)?model.defaultEffort:efforts[0]||'';
-    $('defaults-effort-note').textContent=efforts.includes(defaults.effort)?'只套用新對話；仍可在聊天欄逐則調整。':'此模型不支援原本的強度；選擇並保存可用的強度。';
+    $('defaults-effort-note').textContent=efforts.includes(defaults.effort)?'只套用新對話；仍可在聊天欄逐則調整。':'這個模型不支援原本的選項；請重新選一個。';
   }
   async function loadDefaultModels(){
     const request=++modelRequest,id=defaults.provider,select=$('defaults-model');defaultModels=[];select.disabled=true;select.replaceChildren();const automatic=el('option','使用服務預設模型');automatic.value='';select.append(automatic);

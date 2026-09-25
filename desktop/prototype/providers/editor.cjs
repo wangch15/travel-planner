@@ -66,6 +66,15 @@ function boundedHistory(history, thread, provider) {
   return result;
 }
 
+// Claude 的失敗原因只歸成固定類別，不把 CLI 的原文（可能含網址或帳號資訊）往外傳。
+function claudeFailureCode(result, assistantError) {
+  const text = typeof result?.result === 'string' ? result.result.slice(0, 2000) : '';
+  if (assistantError === 'authentication_failed' || /\/login|invalid api key|oauth token|token (?:has )?(?:expired|been revoked)|not logged in|authenticat/i.test(text)) return 'LOGIN_REQUIRED';
+  if (['rate_limit', 'billing_error'].includes(assistantError) || /usage limit|rate.?limit|quota|credit balance|\b429\b/i.test(text)) return 'AI_USAGE_LIMIT';
+  if (assistantError === 'server_error' || /overloaded|\b5\d\d\b|internal server|service unavailable|ECONN|network/i.test(text)) return 'AI_SERVICE_BUSY';
+  return 'AI_TURN_FAILED';
+}
+
 class CliEditor {
   constructor(account, { timeoutMs = 180000 } = {}) { this.account = account; this.timeoutMs = timeoutMs; this.active = null; }
   async generate({ snapshot, dayId, text, mode: requestedMode, model, effort, attachments = [], history,
@@ -134,15 +143,16 @@ class CliEditor {
         args = [...geminiFlags(runtime, research), '--output-format', 'stream-json', '--model', selected.id,
           '--prompt', '依照 stdin JSON 的本輪 mode 與 outputSchema 作答。'];
       }
-      let result, output = '', initialized = false;
+      let result, output = '', initialized = false, assistantError = null;
       onProgress('正在送出本輪內容…');
       const update = () => { onDelta({ elapsedMs: Date.now() - began }); onProgress(research ? '正在整理公開來源與提案…' : '正在整理回覆…'); };
       const checkTool = name => {
         if ((research && name === (isClaude ? 'WebSearch' : 'google_web_search')) || (isClaude && name === 'StructuredOutput') || mcpTools.includes(name)) return;
         throw failure('POLICY_MISMATCH');
       };
+      // 多久沒有新輸出才算卡住（timeoutMs）；另設總上限，查核要開網頁所以給比較久。
       active.process = this.account.launch(args, runtime, {
-        timeoutMs: tools ? Math.max(this.timeoutMs, 600000) : this.timeoutMs,
+        idleTimeoutMs: this.timeoutMs, timeoutMs: Math.max(this.timeoutMs, research ? 20 * 60000 : 10 * 60000),
         input: isClaude ? JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: input }, ...images] } }) + '\n' : input,
         json: true, signal: active.controller.signal,
         onMessage: event => {
@@ -155,10 +165,14 @@ class CliEditor {
               if (initialized || !Array.isArray(event.tools) || !serversOk || !pluginsOk || (Array.isArray(event.skills) && event.skills.length)) throw failure('POLICY_MISMATCH');
               event.tools.forEach(checkTool); initialized = true;
             }
-            if (event.type === 'assistant') for (const block of event.message?.content || []) if (block.type === 'tool_use') checkTool(block.name);
+            if (event.type === 'assistant') {
+              if (typeof event.error === 'string') assistantError = event.error;
+              for (const block of event.message?.content || []) if (block.type === 'tool_use') checkTool(block.name);
+            }
             if (event.type === 'stream_event') update();
             if (event.type === 'result') {
-              if (result || event.is_error || event.subtype !== 'success') throw failure('AI_TURN_FAILED');
+              if (result) throw failure('AI_TURN_FAILED');
+              if (event.is_error || event.subtype !== 'success') throw failure(claudeFailureCode(event, assistantError));
               result = event.structured_output;
             }
           } else {
@@ -187,11 +201,14 @@ class CliEditor {
       if (!initialized || !result || typeof result !== 'object' || Array.isArray(result) || !validate(payload, SCHEMAS[mode])) throw failure('AI_OUTPUT_INVALID');
       return decodeAnswer(JSON.stringify(result), { mode, threadId, turnId, model: selected.id });
     } catch (error) {
+      // 每輪都是一次性程序（不保存 session），走到這裡程序已經結束，這輪確定沒有完成，可以直接重送。
+      const reported = error?.code === 'AI_RESULT_UNKNOWN' ? failure('AI_TIMEOUT') : error;
+      reported.settled = true;
       if (active.stopRequested) {
-        error.stopConfirmed = !active.process || active.processClosed;
-        if (error.stopConfirmed && active.turnId) error.turnId = active.turnId;
+        reported.stopConfirmed = !active.process || active.processClosed;
+        if (reported.stopConfirmed && active.turnId) reported.turnId = active.turnId;
       }
-      throw error;
+      throw reported;
     } finally { if (this.active === active) this.active = null; }
   }
   async stop() {

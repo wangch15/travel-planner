@@ -17,7 +17,7 @@ function authFailureCategory(stderr) {
 
 // The CLI owns OAuth. Only its JSON protocol and bounded status text cross this boundary.
 function startProcess(command, args, runtime, { spawnProcess = spawn, input, json = false,
-  onMessage = () => {}, timeoutMs = 180000, signal, allowedExitCodes = [0], maxBytes = 2 * 1024 * 1024,
+  onMessage = () => {}, timeoutMs = 180000, idleTimeoutMs = 0, signal, allowedExitCodes = [0], maxBytes = 2 * 1024 * 1024,
   classifyAuthFailure = false } = {}) {
   const child = spawnProcess(command, args, { cwd: runtime.work, env: runtime.env, shell: false,
     windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -26,7 +26,11 @@ function startProcess(command, args, runtime, { spawnProcess = spawn, input, jso
   let resolve, reject;
   const done = new Promise((yes, no) => { resolve = yes; reject = no; });
   done.catch(() => {});
+  // timeoutMs 是總上限；idleTimeoutMs 是「多久沒有新輸出」，每收到輸出重新計時，慢但持續回覆的不會被切斷。
   const timer = setTimeout(() => cancel('AI_RESULT_UNKNOWN'), timeoutMs);
+  let idleTimer;
+  const touch = () => { if (!idleTimeoutMs) return; clearTimeout(idleTimer); idleTimer = setTimeout(() => cancel('AI_RESULT_UNKNOWN'), idleTimeoutMs); };
+  touch();
   function cancel(code = 'AI_CANCELED') {
     if (settled || failed) return;
     failed = failure(code); child.kill('SIGTERM');
@@ -47,7 +51,7 @@ function startProcess(command, args, runtime, { spawnProcess = spawn, input, jso
   }
   child.stdout.on('data', chunk => {
     if (failed) return;
-    bytes += chunk.length;
+    bytes += chunk.length; touch();
     if (bytes > maxBytes) return cancel('AI_OUTPUT_TOO_LARGE');
     try { consume(decoder.write(chunk)); } catch (error) { cancel(error.code || 'AI_OUTPUT_INVALID'); }
   });
@@ -73,7 +77,7 @@ function startProcess(command, args, runtime, { spawnProcess = spawn, input, jso
   });
   function finish(error, value) {
     if (settled) return;
-    settled = true; clearTimeout(timer); clearTimeout(killTimer); signal?.removeEventListener('abort', abort);
+    settled = true; clearTimeout(timer); clearTimeout(idleTimer); clearTimeout(killTimer); signal?.removeEventListener('abort', abort);
     if (error) reject(error); else resolve(value);
   }
   if (input !== undefined) child.stdin.end(input);

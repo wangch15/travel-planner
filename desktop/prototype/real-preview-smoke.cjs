@@ -32,7 +32,8 @@ app.whenReady().then(async () => {
   await waitFor(() => win.webContents.executeJavaScript('document.documentElement.dataset.ready === "true"'));
   assert.equal(await win.webContents.executeJavaScript('document.getElementById("trip-title").textContent'), config.title);
   assert.equal(await win.webContents.executeJavaScript('document.documentElement.dataset.theme'), 'dark');
-  await win.webContents.executeJavaScript('document.getElementById("preview-toggle").click()');
+  // 面板預設可能已開啟；明確打開，不用切換（切換會把開著的關掉）。面板關著時不載入預覽，免得被記成「看過」。
+  await win.webContents.executeJavaScript('setPreview(true)');
   await waitFor(() => win.webContents.executeJavaScript('document.getElementById("preview").getAttribute("src")?.startsWith("travel-preview://")'));
   let frame;
   await waitFor(async () => {

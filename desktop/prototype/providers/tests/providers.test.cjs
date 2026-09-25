@@ -50,6 +50,9 @@ if (args.includes('--acp')) {
       const mcpAt=args.indexOf('--mcp-config'),mcp=mcpAt>=0?JSON.parse(args[mcpAt+1]).mcpServers:{};
       const allowed=args.includes('--allowedTools')?args[args.indexOf('--allowedTools')+1].split(','):[];
       send({type:'system',subtype:'init',session_id:sid,tools:allowed.filter(t=>t.startsWith('mcp__')),mcp_servers:[...Object.keys(mcp).map(name=>({name,status:'connected'})),...(payload.request==='rogue-mcp'?[{name:'rogue',status:'connected'}]:[])],plugins:payload.request==='user-plugin'?[{name:'x',source:'x@market'}]:[{name:'telemetry',source:'telemetry@builtin'}],skills:[]});
+      if(payload.request.startsWith('result-error:')){send({type:'result',subtype:'success',is_error:true,result:payload.request.slice(13)});return;}
+      if(payload.request.startsWith('assistant-error:')){send({type:'assistant',error:payload.request.slice(16),message:{content:[{type:'text',text:'API Error'}]}});send({type:'result',subtype:'success',is_error:true,result:'API Error'});return;}
+      if(payload.request==='slow-stream'){let n=0;const timer=setInterval(()=>{send({type:'stream_event',event:{type:'content_block_delta',delta:{type:'text_delta',text:'x'}}});if(++n===6){clearInterval(timer);send({type:'result',subtype:'success',is_error:false,session_id:sid,structured_output:answer});}},60);return;}
       if(payload.request==='mcp-call')send({type:'assistant',message:{content:[{type:'tool_use',name:'mcp__travel_research__research_open',input:{url:'https://example.invalid'}}]}});
       if(payload.request==='other-mcp-call')send({type:'assistant',message:{content:[{type:'tool_use',name:'mcp__travel_research__shell',input:{}}]}});
       if(payload.request==='forbidden-tool')send({type:'assistant',message:{content:[{type:'tool_use',name:'Bash',input:{command:'never executed'}}]}});
@@ -247,10 +250,50 @@ test('external Gemini admin policies block launch instead of silently overriding
   assert.equal(f.launches.length,before);
 });
 
-test('a stalled model process reaches a bounded unknown-result failure',async t=>{
+test('a stalled model process ends as a settled timeout the user can resend',async t=>{
   const f=await fixture(t,'gemini',{timeoutMs:100});
-  await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:'hang'}),{code:'AI_RESULT_UNKNOWN'});
+  await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:'hang'}),error=>error.code==='AI_TIMEOUT'&&error.settled===true);
   assert.equal(f.editor.active,null);
+});
+
+// 一次性的 CLI 程序結束就代表這輪確定結束：錯誤要標成 settled，App 才不會鎖住送出。
+test('claude: failed turns name the cause without exposing its text, and are settled',async t=>{
+  const f=await fixture(t,'claude');
+  for(const [text,code] of [
+    ['result-error:Invalid API key · Please run /login','LOGIN_REQUIRED'],
+    ['result-error:OAuth token has expired. Please obtain a new token or refresh your existing token.','LOGIN_REQUIRED'],
+    ['result-error:Claude AI usage limit reached|1760000000','AI_USAGE_LIMIT'],
+    ['result-error:API Error: 529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}','AI_SERVICE_BUSY'],
+    ['assistant-error:authentication_failed','LOGIN_REQUIRED'],
+    ['assistant-error:rate_limit','AI_USAGE_LIMIT'],
+    ['assistant-error:server_error','AI_SERVICE_BUSY'],
+    ['result-error:something unexpected','AI_TURN_FAILED'],
+    ['crash','AI_TURN_FAILED'],['bad-json','AI_OUTPUT_INVALID'],
+  ]){
+    await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text}),error=>{
+      assert.equal(error.code,code,text);assert.equal(error.settled,true,text);
+      assert.doesNotMatch(error.message,/API Error|usage limit|OAuth/,text);return true;
+    });
+  }
+});
+
+test('claude: a slow but steady reply is not cut off, while silence times out',async t=>{
+  const f=await fixture(t,'claude',{timeoutMs:200});
+  const answer=await f.editor.generate({snapshot:f.snapshot,dayId:null,text:'slow-stream'});
+  assert.equal(answer.summary,'完成');
+  await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:'hang'}),error=>error.code==='AI_TIMEOUT'&&error.settled===true);
+});
+
+test('process idle timeout restarts on output but a total cap still applies',async()=>{
+  const runtime={work:os.tmpdir(),env:{PATH:process.env.PATH}};
+  const ticking='let n=0;const t=setInterval(()=>{process.stdout.write("tick\\n");if(++n===5){clearInterval(t);}},50);';
+  const steady=startProcess(process.execPath,['-e',ticking],runtime,{input:'',idleTimeoutMs:150,timeoutMs:5000});
+  assert.equal((await steady.done).exitCode,0);
+  const endless=startProcess(process.execPath,['-e','setInterval(()=>process.stdout.write("tick\\n"),30);'],runtime,{input:'',idleTimeoutMs:150,timeoutMs:400});
+  await assert.rejects(endless.done,{code:'AI_RESULT_UNKNOWN'});
+  const began=Date.now(),silent=startProcess(process.execPath,['-e','setInterval(()=>{},1000);'],runtime,{input:'',idleTimeoutMs:100,timeoutMs:5000});
+  await assert.rejects(silent.done,{code:'AI_RESULT_UNKNOWN'});
+  assert.ok(Date.now()-began<2000,'silence must end at the idle limit, not the total cap');
 });
 
 test('missing CLI executables have a distinct installation-needed error',async()=>{
