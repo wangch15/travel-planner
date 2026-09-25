@@ -1,12 +1,14 @@
-name: Desktop Windows package
+name: Desktop packages (Windows, Intel Mac)
 
-# 手動觸發：在 GitHub 的 Windows 機器上打包免安裝 ZIP，下載後給使用者試用。
-# 未簽章。填了 release_tag 才會把 ZIP 附加到既有的 desktop release；否則只放在這次執行的 Artifacts。
+# 手動觸發：在 GitHub 的機器上打包 Windows 免安裝 ZIP 與 Intel Mac 的 DMG，下載後給使用者試用。
+# M 系列 Mac 的 DMG 在本機打包（build-local-dmg.cjs）。打包會直接用那台機器裝好的 Electron 與原生套件，
+# 所以 Intel 版必須在 Intel 機器上打包。
+# 未簽章。填了 release_tag 才會把檔案附加到既有的 desktop release；否則只放在這次執行的 Artifacts。
 on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: '要附加 ZIP 的既有 release（例如 desktop-v0.4.0）；留空只上傳到 Artifacts'
+        description: '要附加檔案的既有 release（例如 desktop-v0.4.0）；留空只上傳到 Artifacts'
         required: false
         default: ''
 
@@ -50,3 +52,40 @@ jobs:
           [ -f "$zip" ] || { echo "找不到 $zip；App 版本和 release 不一致"; exit 1; }
           gh release view "$TAG" >/dev/null
           gh release upload "$TAG" "$zip" "$zip.sha256" --clobber
+
+  mac-intel:
+    # Intel（x64）機器；arm64 的 macos-latest 打出來只能給 M 系列用。
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --workspaces --include-workspace-root
+      - name: Build app
+        run: node desktop/prototype/distribution/package.cjs
+      - name: Launch packaged app with disposable state
+        run: node desktop/prototype/distribution/smoke.cjs
+      - name: Build DMG
+        run: node desktop/prototype/distribution/build-local-dmg.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: travel-planner-mac-x64
+          path: |
+            .local/distribution/TravelPlanner-*-mac-x64-unsigned.dmg
+            .local/distribution/TravelPlanner-*-mac-x64-unsigned.dmg.sha256
+          if-no-files-found: error
+          retention-days: 30
+      - name: Attach DMG to release
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          [[ "$TAG" =~ ^desktop-v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || { echo "release_tag 必須是 desktop-vX.Y.Z"; exit 1; }
+          version="${BASH_REMATCH[1]}"
+          dmg=".local/distribution/TravelPlanner-${version}-mac-x64-unsigned.dmg"
+          [ -f "$dmg" ] || { echo "找不到 $dmg；App 版本和 release 不一致"; exit 1; }
+          gh release view "$TAG" >/dev/null
+          gh release upload "$TAG" "$dmg" "$dmg.sha256" --clobber
