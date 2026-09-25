@@ -1,5 +1,5 @@
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs/promises');const os=require('node:os');const path=require('node:path');const {createHash}=require('node:crypto');
-const {ToolSupport,prepareToolEnvironment}=require('../services/tool-support.cjs');
+const {ToolSupport,prepareToolEnvironment,downloadAccept,extractDefault}=require('../services/tool-support.cjs');
 async function fixture(t,options={}){const root=await fs.mkdtemp(path.join(os.tmpdir(),'tool-support-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));const terminal=[];const service=new ToolSupport(root,{platform:'darwin',arch:'arm64',home:path.join(root,'home'),env:{PATH:'/usr/bin:/bin'},run:async command=>{if(command===process.execPath)return {stdout:'4.135.0'};throw Error('missing');},openTerminal:async value=>{terminal.push(value);},...options});return {root,service,terminal};}
 test('only allowlisted install plans run, require explicit confirmation, and terminal launch is not reported installed',async t=>{const {service,terminal}=await fixture(t);await assert.rejects(service.prepare('gh; rm -rf /'));const plan=await service.prepare('gemini');assert.equal(plan.method,'terminal');assert.match(plan.commandPreview,/@google\/gemini-cli/);await assert.rejects(service.install(plan.token),{code:'TOOL_CONFIRMATION_REQUIRED'});assert.equal(terminal.length,0);const result=await service.install(plan.token,{confirmed:true});assert.equal(result.state,'terminal-opened');assert.equal(result.installed,false);assert.equal(terminal.length,1);await assert.rejects(service.install(plan.token,{confirmed:true}),{code:'INSTALL_PLAN_EXPIRED'});});
 test('bundled Wrangler needs no installer, and provider recipes install into app-owned prefix without a stale version',async t=>{const {service,terminal}=await fixture(t);const w=await service.prepare('wrangler');assert.equal(w.method,'bundled');assert.equal((await service.install(w.token,{confirmed:true})).state,'ready');assert.equal(terminal.length,0);const codex=await service.prepare('codex');assert.match(codex.commandPreview,/@openai\/codex\b/);assert.doesNotMatch(codex.commandPreview,/@openai\/codex@\d/);assert.match(codex.commandPreview,/--prefix/);assert.doesNotMatch(codex.commandPreview,/npm install -g/);const gemini=await service.prepare('gemini');assert.match(gemini.commandPreview,/@google\/gemini-cli@0\.46\.0/);});
@@ -60,4 +60,22 @@ test('a tampered Node.js download is never extracted, and Codex is not reported 
   const plan=await service.prepare('codex');
   await assert.rejects(service.install(plan.token,{confirmed:true}),{code:'TOOL_CHECKSUM_MISMATCH'});
   assert.equal(calls.some(c=>c.args.includes('install')),false);
+});
+test('Windows finds Codex and Claude that npm -g installed next to node.exe (nvm-windows), not only under %APPDATA%\npm',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'tool-support-npm-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ const prefix=path.join(root,'nvm','nodejs'),other=path.join(root,'other'),bin=path.join(prefix,'node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin'),cli=path.join(prefix,'node_modules/@anthropic-ai/claude-code/cli.js');
+ await fs.mkdir(bin,{recursive:true});await fs.mkdir(path.dirname(cli),{recursive:true});await fs.mkdir(path.join(other,'node_modules'),{recursive:true});
+ for(const file of [path.join(prefix,'codex.cmd'),path.join(prefix,'claude.cmd'),path.join(prefix,'node.exe'),path.join(bin,'codex.exe'),cli])await fs.writeFile(file,'');
+ const service=new ToolSupport(path.join(root,'state'),{platform:'win32',arch:'x64',home:path.join(root,'home'),env:{PATH:[other,prefix].join(';'),APPDATA:path.join(root,'appdata')}});
+ assert.deepEqual(await service.npmGlobalRoots(),[path.join(root,'appdata','npm/node_modules'),path.join(prefix,'node_modules')],'a PATH folder without an npm tool shim is not an npm root');
+ assert.ok((await service.environment()).PATH.split(';').includes(bin));
+ assert.deepEqual(await service.resolveCommand('claude'),{command:path.join(prefix,'node.exe'),args:[cli],env:await service.environment(),source:'system'});
+});
+test('GitHub release metadata is requested as JSON; downloads stay binary',()=>{
+ assert.equal(downloadAccept(new URL('https://api.github.com/repos/cli/cli/releases/latest')),'application/vnd.github+json');
+ for(const url of ['https://github.com/cli/cli/releases/download/v2.0.0/gh.zip','https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt'])assert.equal(downloadAccept(new URL(url)),'application/octet-stream');
+});
+test('Windows extracts with the system tar, not a Git-bundled GNU tar that happens to be first on PATH',async()=>{
+ const commands=[];await extractDefault('archive.zip','out',{platform:'win32',systemRoot:'C:\Windows',run:async command=>{commands.push(command);return {stdout:'node-v24.0.0-win-x64/\nnode-v24.0.0-win-x64/node.exe\n'};}});
+ assert.deepEqual(commands,[path.join('C:\Windows','System32','tar.exe'),path.join('C:\Windows','System32','tar.exe')]);
 });

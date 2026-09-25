@@ -414,13 +414,15 @@
   function authMessage(provider,text){tell(provider+'-auth-message',text);document.querySelectorAll(`[data-auth-message="${provider}"]`).forEach(n=>{n.textContent=text||'';});}
   async function authStatus(provider){const {auth}=await api('auth-status',{provider});$(provider+'-connect').hidden=auth.connected;if(provider==='github'){$('backup-github-needed').hidden=auth.connected;$('setup-github-needed').hidden=auth.connected;}$(provider+'-auth-badge').textContent=auth.connected?'已連接':'未連接';$(provider+'-auth-badge').dataset.status=auth.connected?'ready':'missing';$(provider+'-auth-message').hidden=auth.connected;authMessage(provider,auth.connected?'已連接官方工具帳號。':'');if(provider==='cloudflare'&&auth.connected)await cloudflareAccounts();return auth;}
   async function cloudflareAccounts(){const {selection}=await api('cloudflare-accounts');$('cloudflare-account').replaceChildren();const none=el('option','依登入帳號核對');none.value='';$('cloudflare-account').append(none);for(const a of selection.accounts){const option=el('option',a.name);option.value=a.id;$('cloudflare-account').append(option);}$('cloudflare-account').value=selection.selectedAccountId||'';}
+  // GitHub 登入靠 GitHub CLI；這台還沒有就先下載官方版本（跟首次設定精靈同一條路），不然按了只會失敗。
+  async function ensureGitHubCLI(){const {tools}=await api('environment');if(tools.find(t=>t.id==='gh')?.status==='ready')return;authMessage('github','正在下載 GitHub 官方工具…');const {preparation}=await api('tool-prepare',{id:'gh'});await api('tool-install',{token:preparation.token,confirmed:true});}
   for(const provider of ['github','cloudflare']){
-    $(provider+'-connect').onclick=()=>action(provider+'-connect',async()=>{const {auth}=await api('auth-start',{provider});authMessage(provider,auth.message||'請在官方瀏覽器頁面完成授權。');$(provider+'-cancel').hidden=!auth.started;});
+    $(provider+'-connect').onclick=()=>action(provider+'-connect',async()=>{if(provider==='github')await ensureGitHubCLI();const {auth}=await api('auth-start',{provider});authMessage(provider,auth.message||'請在官方瀏覽器頁面完成授權。');$(provider+'-cancel').hidden=!auth.started;});
     $(provider+'-cancel').onclick=()=>action(provider+'-cancel',async()=>{await api('auth-cancel',{provider});$(provider+'-cancel').hidden=true;await authStatus(provider);});
     $(provider+'-status').onclick=()=>action(provider+'-status',()=>authStatus(provider));
   }
   // 備份卡片、取得旅程資料夾那裡的「登入 GitHub」：就地開始登入，不用先跑去帳號連線頁。
-  for(const id of ['backup-github-login','setup-github-login'])$(id).onclick=()=>action(id,async()=>{const {auth}=await api('auth-start',{provider:'github'});authMessage('github',auth.message||'請在瀏覽器完成 GitHub 授權，完成後會自動更新。');$('github-cancel').hidden=!auth.started;},'等待授權…');
+  for(const id of ['backup-github-login','setup-github-login'])$(id).onclick=()=>action(id,async()=>{await ensureGitHubCLI();const {auth}=await api('auth-start',{provider:'github'});authMessage('github',auth.message||'請在瀏覽器完成 GitHub 授權，完成後會自動更新。');$('github-cancel').hidden=!auth.started;},'等待授權…');
   window.checkGithubAuth=()=>authStatus('github').catch(()=>{});
   // 分享網頁清單裡的「連接 Cloudflare」：同樣就地登入，進度與代碼寫在這一行底下。
   function cloudflareInPlace(){const box=el('span',undefined,'inline-auth');const start=button('連接 Cloudflare',async()=>{const {auth}=await api('auth-start',{provider:'cloudflare'});authMessage('cloudflare',auth.message||'請在瀏覽器完成 Cloudflare 登入，完成後會自動打勾。');$('cloudflare-cancel').hidden=!auth.started;});const status=el('span','','inline-need-status');status.dataset.authMessage='cloudflare';status.setAttribute('role','status');box.append(start,status);return box;}

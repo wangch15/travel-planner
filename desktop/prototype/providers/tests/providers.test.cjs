@@ -301,6 +301,15 @@ test('missing CLI executables have a distinct installation-needed error',async()
   await assert.rejects(process.done,{code:'CLI_MISSING'});
 });
 
+test('a CLI too old for the App flags reports an update-needed error even when exit 1 is allowed',async()=>{
+  const script='process.stderr.write("error: unknown option \'--safe-mode\'\\n");process.exit(1);';
+  const outdated=startProcess(process.execPath,['-e',script],{work:os.tmpdir(),env:process.env},{input:'',allowedExitCodes:[0,1]});
+  await assert.rejects(outdated.done,{code:'CLI_OUTDATED'});
+  // Ordinary stderr on an allowed exit keeps its normal result.
+  const loggedOut=startProcess(process.execPath,['-e','process.stderr.write("not logged in\\n");process.stdout.write("{}");process.exit(1);'],{work:os.tmpdir(),env:process.env},{input:'',allowedExitCodes:[0,1]});
+  assert.deepEqual(await loggedOut.done,{stdout:'{}',exitCode:1});
+});
+
 test('Gemini login completes after authentication even if ACP waits after stdin closes',async t=>{
   const f=await fixture(t,'gemini',{loginExitGraceMs:20});
   await fs.unlink(path.join(f.account.runtime.home,'.gemini/oauth_creds.json'));

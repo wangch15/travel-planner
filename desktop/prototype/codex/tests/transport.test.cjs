@@ -208,3 +208,12 @@ test('rejects invalid timer and line limits instead of unbounded or overflowing 
   await server.start();
   await assert.rejects(server.request('stats', {}, { timeoutMs: 2 ** 31 }), TypeError);
 });
+
+test('an older Codex that rejects the App config at startup reports an update-needed error', async (t) => {
+  const reject = 'process.stderr.write("Error: config.toml:29:1: unknown configuration field `features.new_flag`\n"); process.exit(1);';
+  const outdated = transport(t, { args: ['-e', reject] });
+  await assert.rejects(outdated.start(), { code: 'CLI_OUTDATED' });
+  // Any other early exit keeps its original error.
+  const crashed = transport(t, { args: ['-e', 'process.stderr.write("panic\n"); process.exit(1);'] });
+  await assert.rejects(crashed.start(), (error) => error.code !== 'CLI_OUTDATED');
+});

@@ -79,3 +79,10 @@ test('shutdown during workspace preparation cannot start a late browser login', 
   const starting = f.tools.start('github'); await f.tools.close(); release();
   await assert.rejects(starting, { code: 'AUTH_CLOSED' }); assert.equal(f.state.children.length, 0);
 });
+test('GitHub login without GitHub CLI says to install it instead of a vague failure', async () => {
+  const f = fixture(); await f.tools.start('github');
+  const done = new Promise(resolve => { const check = () => { const last = f.state.progress.at(-1); if (last?.state === 'failed') resolve(last); else setTimeout(check, 5); }; check(); });
+  f.state.children[0].emit('error', Object.assign(Error('spawn gh.exe ENOENT'), { code: 'ENOENT' }));
+  const result = await done;
+  assert.match(result.message, /還沒有 GitHub CLI/);
+});

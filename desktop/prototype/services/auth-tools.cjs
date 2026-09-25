@@ -86,7 +86,7 @@ class AuthTools {
         if (active.settled) return; active.settled = true; clearTimeout(active.timer); clearTimeout(active.forceTimer); clearTimeout(active.finishTimer);
         const actual = await this.status(provider);
         const state = active.reason || (error || code !== 0 ? 'failed' : actual.connected ? 'connected' : 'needs-login');
-        const result = { ...actual, id: active.id, state, message: state === 'connected' ? '官方工具登入已確認。' : state === 'canceled' ? '已停止這次登入，並重新檢查目前帳號狀態。' : state === 'timed-out' ? '登入等待已到期；請重新開始並在官方頁面完成授權。' : '登入尚未確認完成；請檢查工具與官方授權頁。' };
+        const result = { ...actual, id: active.id, state, message: state === 'connected' ? '官方工具登入已確認。' : active.missing ? (provider === 'github' ? '這台電腦還沒有 GitHub CLI；請先到「設定 → 工具」安裝，再回來登入。' : '找不到登入工具；請到「設定 → 工具」重新檢查。') : state === 'canceled' ? '已停止這次登入，並重新檢查目前帳號狀態。' : state === 'timed-out' ? '登入等待已到期；請重新開始並在官方頁面完成授權。' : '登入尚未確認完成；請檢查工具與官方授權頁。' };
         active.tail = ''; await fs.rm(workspace.directory, { recursive: true, force: true }).catch(() => {});
         if (this.active === active) this.active = null; this.emit(result); active.complete(result);
       };
@@ -105,7 +105,7 @@ class AuthTools {
         }
       };
       child.stdout?.on('data', receive); child.stderr?.on('data', receive);
-      child.once('error', () => { finish(null, true).catch(() => {}); });
+      child.once('error', error => { active.missing = error?.code === 'ENOENT'; finish(null, true).catch(() => {}); });
       child.once('close', code => { finish(code).catch(() => {}); });
       active.timer = setTimeout(() => this.terminate(active, 'timed-out'), this.timeoutMs); active.timer.unref?.();
       const result = { started: true, id: active.id, provider, state: 'waiting-browser', sharedWithCLI: true, message: '請在開啟的官方網頁親自完成登入。這份授權與本機 CLI 共用。' };

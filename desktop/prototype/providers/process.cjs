@@ -21,7 +21,7 @@ function startProcess(command, args, runtime, { spawnProcess = spawn, input, jso
   classifyAuthFailure = false } = {}) {
   const child = spawnProcess(command, args, { cwd: runtime.work, env: runtime.env, shell: false,
     windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
-  let stdout = '', pending = '', bytes = 0, stderrBytes = 0, stderr = '', failed, settled = false, killTimer;
+  let stdout = '', pending = '', bytes = 0, stderrBytes = 0, stderr = '', stderrHead = '', failed, settled = false, killTimer;
   const decoder = new StringDecoder('utf8');
   let resolve, reject;
   const done = new Promise((yes, no) => { resolve = yes; reject = no; });
@@ -57,6 +57,8 @@ function startProcess(command, args, runtime, { spawnProcess = spawn, input, jso
   });
   child.stderr.on('data', chunk => {
     // Do not expose stderr: authentication output may contain URLs with secrets.
+    // Only its opening lines are kept, to recognise an outdated CLI rejecting the App's flags.
+    if (stderrHead.length < 4096) stderrHead += chunk.toString('utf8').slice(0, 4096 - stderrHead.length);
     stderrBytes += chunk.length;
     if (stderrBytes > maxBytes) cancel('AI_OUTPUT_TOO_LARGE');
     else if (classifyAuthFailure) stderr += chunk.toString('utf8');
@@ -70,9 +72,11 @@ function startProcess(command, args, runtime, { spawnProcess = spawn, input, jso
         if (json && pending.trim()) onMessage(JSON.parse(pending));
       } catch (error) { failed = failure(error.code || 'AI_OUTPUT_INVALID'); }
     }
-    const error = failed || (!allowedExitCodes.includes(code) ? failure('AI_TURN_FAILED') : null);
+    // An older CLI exits on flags it does not know yet, even for commands whose exit 1 is allowed.
+    const outdated = code !== 0 && /^error: unknown option '--[\w-]+'/m.test(stderrHead);
+    const error = failed || (outdated ? failure('CLI_OUTDATED') : !allowedExitCodes.includes(code) ? failure('AI_TURN_FAILED') : null);
     if (error && classifyAuthFailure) error.authFailure = authFailureCategory(stderr);
-    stderr = '';
+    stderr = ''; stderrHead = '';
     finish(error, { stdout, exitCode: code });
   });
   function finish(error, value) {

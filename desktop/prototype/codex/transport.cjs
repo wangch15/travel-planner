@@ -61,7 +61,13 @@ class CodexTransport extends EventEmitter {
       if (!child.pid) this._finish(record, error, null, null);
       else this._fail(record, error);
     });
-    child.on('exit', (code, signal) => this._finish(record, failure('CHILD_EXIT', 'The app-server process exited'), code, signal));
+    child.on('exit', (code, signal) => {
+      const finish = () => this._finish(record, failure('CHILD_EXIT', 'The app-server process exited'), code, signal);
+      // A startup exit explains itself on stderr; let that drain before the pipes are closed.
+      if (this._state !== 'starting' || child.stderr.readableEnded) { finish(); return; }
+      const timer = setTimeout(finish, 200); record.timers.push(timer);
+      child.stderr.once('end', () => { clearTimeout(timer); finish(); });
+    });
     child.on('disconnect', () => this._fail(record, failure('CHILD_DISCONNECTED', 'The app-server disconnected')));
     child.stdin.on('error', () => this._fail(record, failure('CHILD_DISCONNECTED', 'The app-server input closed')));
     child.stdout.on('error', () => this._fail(record, failure('CHILD_DISCONNECTED', 'The app-server output failed')));
@@ -72,7 +78,13 @@ class CodexTransport extends EventEmitter {
         record.timers.push(setTimeout(() => this._fail(record, failure('CHILD_DISCONNECTED', 'The app-server output closed')), 10));
       }
     });
-    // Drain stderr without retaining or forwarding potentially sensitive diagnostics.
+    // Drain stderr without forwarding potentially sensitive diagnostics. Only the opening
+    // lines during startup are kept, to recognise an older Codex rejecting the App's config.
+    record.stderrHead = '';
+    record.stderrClosed = new Promise((resolve) => child.stderr.once('close', resolve));
+    child.stderr.on('data', (chunk) => {
+      if (this._state === 'starting' && record.stderrHead.length < 4096) record.stderrHead += chunk.toString('utf8').slice(0, 4096 - record.stderrHead.length);
+    });
     child.stderr.on('error', () => {});
     child.stderr.resume();
 
@@ -95,6 +107,9 @@ class CodexTransport extends EventEmitter {
     }).catch(async (error) => {
       // Failed initialization must not leave a live process available for later requests.
       if (this._record === record) await this.stop().catch(() => {});
+      // --strict-config makes an older Codex exit on settings it does not know yet.
+      await Promise.race([record.stderrClosed, new Promise((resolve) => setTimeout(resolve, 500))]);
+      if (/unknown configuration field/i.test(record.stderrHead)) throw failure('CLI_OUTDATED', 'The installed Codex is older than the App configuration');
       throw error;
     }).finally(() => clearTimeout(startupTimer));
     return this._startPromise;
