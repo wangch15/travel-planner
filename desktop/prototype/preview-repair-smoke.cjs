@@ -1,10 +1,10 @@
 // 預覽建不起來時不能只卡住：說出是哪個檔案、哪幾處沒過檢查；上次備份能用就給「回到上次備份」（先列清單再確認），
-// 「複製給幫忙的人」只複製不含行程內容的摘要；資料格式太舊時改給「更新旅程資料夾」。
-const {app,clipboard}=require('electron'),fs=require('node:fs/promises'),path=require('node:path'),assert=require('node:assert/strict'),{EventEmitter}=require('node:events');
+// 「回報給開發者」先顯示完整內容與公開目的地，按確認才開 issue，內容不含行程資料；資料格式太舊時改給「更新旅程資料夾」。
+const {app}=require('electron'),fs=require('node:fs/promises'),path=require('node:path'),assert=require('node:assert/strict'),{EventEmitter}=require('node:events');
 if(!process.env.TRAVEL_PLANNER_TEST_ROOT)throw Error('Run preview repair smoke through the native smoke runner');
 const root=require('node:fs').realpathSync(process.env.TRAVEL_PLANNER_TEST_ROOT);
 const {createWindow,shutdown}=require('./main.cjs'),{createProjectStore}=require('./project-store.cjs'),{ProposalStore}=require('./proposals.cjs');
-app.on('window-all-closed',()=>{});let win,status=0;
+app.on('window-all-closed',()=>{});let win,status=0;const submitted=[],opened=[];
 const js=async s=>{try{return await win.webContents.executeJavaScript(s);}catch(e){throw Error(s.slice(0,160)+' :: '+e.message);}};
 async function until(s,tries=400){for(let i=0;i<tries;i++){if(await js(s))return;await new Promise(r=>setTimeout(r,50));}throw Error('Preview repair condition: '+s);}
 const repairButtons=()=>js('[...document.querySelectorAll("#preview-repair-actions [data-repair]")].map(b=>b.dataset.repair)');
@@ -24,7 +24,10 @@ app.whenReady().then(async()=>{
   account.connect=async()=>account.account;account.refresh=account.connect;account.stop=async()=>{};account.models=async()=>[{id:'fake-model',name:'Fake model',isDefault:true}];
   win=await createWindow({stateDirectory:state,codexAccount:account,makeProposals:d=>new ProposalStore(d,{checkPrivate:async()=>{}}),
     makeProvider:id=>{const a=new EventEmitter();a.account={state:'needs-login',provider:id};a.connect=async()=>a.account;a.refresh=a.connect;a.models=async()=>[];a.stop=async()=>{};return {account:a,editor:{active:null,stop:async()=>{}}};},
-    makeEditor:()=>({active:null,stop:async()=>({requested:true}),generate:async({model})=>({model,threadId:'t',turnId:'u',summary:'收到',discussion:true})})});
+    makeEditor:()=>({active:null,stop:async()=>({requested:true}),generate:async({model})=>({model,threadId:'t',turnId:'u',summary:'收到',discussion:true})}),
+    // 不真的在 GitHub 開 issue：記下送出的內容，回傳假的 issue 網址。
+    makeIssueReporter:()=>{const {IssueReportService}=require('./services/issue-report.cjs');return new IssueReportService({run:async(bin,args)=>{submitted.push(args);return {stdout:'https://github.com/wangch15/travel-planner/issues/7\n'};}});},
+    openReportURL:url=>{opened.push(url);}});
   await js('setPreview(true)');
 
   // 1. 說清楚哪裡壞了，逐項問題收在「看詳細問題」；上次備份能用，所以第一顆是「回到上次備份」。
@@ -33,19 +36,29 @@ app.whenReady().then(async()=>{
   assert.equal(await js('document.getElementById("preview-empty-title").textContent'),'預覽還不能顯示');
   assert.match(await js('document.getElementById("preview-problem-list").textContent'),/color 不是 hex/);
   assert.match(await js('document.getElementById("preview-backup-note").textContent'),/上次備份.*可以正常顯示/);
-  assert.deepEqual(await repairButtons(),['last-backup','copy-report']);
+  assert.deepEqual(await repairButtons(),['last-backup','report']);
   assert.equal(await js('document.querySelector("#preview-repair-actions button").classList.contains("primary")'),true);
   assert.equal(await js('document.getElementById("retry-preview").hidden'),false);
   assert.match(await js('document.getElementById("composer-note").textContent'),/打開右側預覽/);
   assert.equal(await js('document.getElementById("send-message").disabled'),true,'資料壞掉時 AI 讀不到行程，仍不能送出');
 
-  // 2. 複製給幫忙的人：有版本與錯誤代碼，不含行程內容、旅程代號或電腦上的位置。
-  await clipboard.writeText('');
-  await js('document.querySelector("#preview-repair-actions [data-repair=copy-report]").click()');
-  for(let i=0;i<100&&!(await clipboard.readText());i++)await new Promise(r=>setTimeout(r,50));
-  const report=await clipboard.readText();
-  assert.match(report,/INVALID_TRIP/);assert.match(report,/data\.js.*1 處/);
-  for(const secret of ['secret-color','sample',project,root])assert.equal(report.includes(secret),false,'摘要不能含 '+secret);
+  // 2. 回報給開發者：先看到完整內容與公開目的地，按「送出回報」才開 issue；內容不含行程內容、旅程代號或電腦上的位置。
+  await js('document.querySelector("#preview-repair-actions [data-repair=report]").click()');
+  await until('document.getElementById("report-dialog").open');
+  assert.equal(submitted.length,0,'打開確認視窗不能就送出');
+  assert.equal(await js('document.getElementById("report-repo").textContent'),'wangch15/travel-planner');
+  assert.match(await js('document.querySelector("#report-dialog .dialog-note").textContent'),/公開/);
+  const shown=await js('document.getElementById("report-preview").textContent');
+  assert.match(shown,/INVALID_TRIP/);assert.match(shown,/data\.js.*1 處/);assert.match(shown,/Day 1 color 不是 hex/);
+  for(const secret of ['secret-color','sample',project,root])assert.equal(shown.includes(secret),false,'回報不能含 '+secret);
+  await js('document.getElementById("open-report").click()');
+  for(let i=0;i<100&&!opened.length;i++)await new Promise(r=>setTimeout(r,50));
+  assert.match(opened[0],/^https:\/\/github\.com\/wangch15\/travel-planner\/issues\/new\?/);assert.equal(opened[0].includes('secret-color'),false);
+  await js('document.getElementById("submit-report").click()');
+  await until('!document.getElementById("view-report").hidden && document.getElementById("report-result").textContent.includes("已送出")');
+  assert.equal(submitted.length,1);assert.equal(submitted[0][3],'wangch15/travel-planner');
+  assert.equal(`${submitted[0][5]}\n\n${submitted[0][7]}`,shown,'送出的就是畫面上給人看過的內容');
+  await js('document.getElementById("cancel-report").click()');
 
   // 3. 回到上次備份：先列出會改哪些檔案，確認後才動；預覽恢復、可以送出。
   await js('document.querySelector("#preview-repair-actions [data-repair=last-backup]").click()');
@@ -62,7 +75,7 @@ app.whenReady().then(async()=>{
   await fs.writeFile(data,good.replace(/color: '#[0-9A-Fa-f]{6}'/,"color: 'other-color'"));
   await js('document.getElementById("retry-preview").click()');
   await until('realPreview?.status==="error" && !document.getElementById("preview-repair").hidden');
-  assert.deepEqual(await repairButtons(),['copy-report']);
+  assert.deepEqual(await repairButtons(),['report']);
   assert.match(await js('document.getElementById("preview-backup-note").textContent'),/上次備份的版本也有問題/);
 
   // 5. 資料格式比 App 舊：第一步是更新旅程資料夾，不提議回到備份。
@@ -70,7 +83,7 @@ app.whenReady().then(async()=>{
   const cfg=JSON.parse(await fs.readFile(config,'utf8'));await fs.writeFile(config,JSON.stringify({...cfg,schemaVersion:0}));
   await js('document.getElementById("retry-preview").click()');
   await until('realPreview?.status==="error" && realPreview.diagnosis?.reason==="outdated"');
-  assert.deepEqual(await repairButtons(),['project-update','copy-report']);
+  assert.deepEqual(await repairButtons(),['project-update','report']);
   assert.match(await js('document.getElementById("preview-note").textContent'),/更新旅程資料夾/);
-  console.log(JSON.stringify({passed:true,explainsWhere:true,copiesDeidentified:true,lastBackupRestores:true,brokenBackupNotOffered:true,outdatedOffersUpdate:true}));
+  console.log(JSON.stringify({passed:true,explainsWhere:true,reportsDeidentifiedAfterReview:true,lastBackupRestores:true,brokenBackupNotOffered:true,outdatedOffersUpdate:true}));
 }).catch(async e=>{console.error(e);status=1;if(win&&!win.isDestroyed())console.error(await js('JSON.stringify({preview:realPreview&&{status:realPreview.status,message:realPreview.message,diagnosis:realPreview.diagnosis},note:document.getElementById("notification")?.textContent})').catch(()=>''));}).finally(async()=>{win?.destroy();try{await shutdown();}catch(error){console.error(error);status=1;}app.exit(status);});

@@ -8,6 +8,7 @@ const { userFacingMessage, unexpectedFailureMessage } = require('./services/fail
 const { createProjectStore } = require('./project-store.cjs');
 const { buildPreview, PREVIEW_CSP } = require('./preview.cjs');
 const { diagnosePreviewFailure } = require('./preview-diagnosis.cjs');
+const { IssueReportService, REPORT_REPO } = require('./services/issue-report.cjs');
 const { BrowserPreview } = require('./browser-preview.cjs');
 const { CodexAccount } = require('./codex/account.cjs');
 const { CodexEditor } = require('./codex/editor.cjs');
@@ -62,7 +63,8 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   makeVersions = directory => new VersionStore(directory),
   makeConversations = directory => new ConversationStore(directory),
   makeEditor = account => new CodexEditor(account), makeProposals = directory => new ProposalStore(directory),
-  defaultProjectParentDirectory = null, openLoginURL = url => shell.openExternal(url), copyLoginURL = url => clipboard.writeText(url), openPreviewURL = url => shell.openExternal(url) } = {}) {
+  defaultProjectParentDirectory = null, openLoginURL = url => shell.openExternal(url), copyLoginURL = url => clipboard.writeText(url), openPreviewURL = url => shell.openExternal(url),
+  makeIssueReporter = () => new IssueReportService(), openReportURL = url => shell.openExternal(url) } = {}) {
   const handle=(channel,fn)=>ipcMain.handle(channel,(...args)=>{if((shuttingDown||windowClosing)&&channel!=='conversation:preferences')throw Error('APP_CLOSING');return tracked(()=>fn(...args));});
   let sendToolProgress=()=>{};const toolSupport=makeToolSupport(stateDirectory,{onProgress:value=>sendToolProgress(value)});await toolSupport.applyEnvironment();
   const store = createProjectStore(stateDirectory);
@@ -322,7 +324,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     const status=await projectUpdate.status(target.root).catch(()=>null);
     const update=status&&{state:status.state,migrating:status.migrateTrips.includes(target.slug)};
     const lastBackup=update?.state==='app-older'||update?.migrating||error.code==='SOURCE_CHANGED'?null:await lastBackupUsable(target);
-    return diagnosePreviewFailure({code:error.code||String(error.message||''),file:error.file||null,problems:error.problems||[],update,backup:lastBackup,appVersion:app.getVersion(),platform:`${process.platform} ${process.arch}`});
+    return diagnosePreviewFailure({code:error.code||String(error.message||''),file:error.file||null,problems:error.problems||[],update,backup:lastBackup,appVersion:app.isPackaged?app.getVersion():require('./package.json').version,appCommit:buildInfo.commit,platform:`${process.platform} ${process.arch}`});
   }
   async function aiBaseline(target,conversation){
     const planning=await planningFor(target);
@@ -881,12 +883,20 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       if(!previewDataFailure(error))return workflowFailure(error);
       const diagnosis=await diagnosePreview(target,error);
       if(attempt!==previewAttempt)return {ok:false,code:'preview-stale'};
-      previewReport={key:`${target.projectId}\0${target.slug}`,text:diagnosis.report};
+      previewReport={key:`${target.projectId}\0${target.slug}`,issue:diagnosis.issue};
       return {ok:false,code:diagnosis.code,message:diagnosis.explanation,diagnosis};
     }finally{versionBusy=false;}
   });
   // 「複製給幫忙的人」：只複製 App 產生的去識別化摘要，不收畫面傳來的文字。
-  feature('preview-report-copy',async input=>{const target=selectedTarget(input);if(previewReport?.key!==`${target.projectId}\0${target.slug}`)throw Error('請先按「重新檢查」，再複製。');clipboard.writeText(previewReport.text);return {copied:true};});
+  // 回報給開發者：內容只用 main 剛產生的去識別化回報，不收畫面傳來的文字。畫面先顯示完整內容與公開目的地，人按確認才送。
+  const currentReport=input=>{const target=selectedTarget(input);if(previewReport?.key!==`${target.projectId}\0${target.slug}`)throw Object.assign(Error('REPORT_STALE'),{userMessage:'請先按「重新檢查」，再回報。'});return previewReport.issue;};
+  let issueReporter=null;
+  feature('preview-report-prepare',async input=>({issue:currentReport(input),repo:REPORT_REPO}));
+  feature('preview-report-submit',async input=>{const issue=currentReport(input);issueReporter??=makeIssueReporter();
+    try{return await issueReporter.submit(issue);}
+    catch(error){if(error.code==='GITHUB_LOGIN_REQUIRED')throw Object.assign(Error('GITHUB_LOGIN_REQUIRED'),{userMessage:'App 還沒登入 GitHub，所以沒有送出。可以改按「在瀏覽器開啟回報頁」，或先到「設定 → 帳號連線」登入 GitHub。'});throw Object.assign(Error('REPORT_FAILED'),{userMessage:'回報沒有送出（可能是網路不通）。可以改按「在瀏覽器開啟回報頁」。'});}});
+  feature('preview-report-open',async input=>{const issue=currentReport(input);issueReporter??=makeIssueReporter();await openReportURL(issueReporter.newIssueURL(issue));return {opened:true};});
+  feature('preview-report-copy',async input=>{const issue=currentReport(input);clipboard.writeText(`${issue.title}\n\n${issue.body}`);return {copied:true};});
   handle('versions:list',async(event,input)=>{
     assertSender(event);const target=selectedTarget(input);
     if(generating||proposals.saving||!await versionIdle()||generating||proposals.saving)return workflowFailure({code:'AI_BUSY'});

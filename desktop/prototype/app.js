@@ -447,14 +447,42 @@ function renderPreview() {
   // Coalesce changes and wait until the preview panel has a layout before loading.
   previewFrame = requestAnimationFrame(() => { $('preview').srcdoc = html; });
 }
-// 預覽建不起來時依原因給下一步：更新旅程資料夾／更新 App／回到上次備份（先列清單再確認）／複製給幫忙的人。
-// 逐項問題只在本機顯示；複製的是 App 產生的去識別化摘要（preview-report-copy）。
+// 預覽建不起來時依原因給下一步：更新旅程資料夾／更新 App／回到上次備份（先列清單再確認）／回報給開發者。
+// 逐項問題只在本機顯示；回報內容是 main 產生的去識別化 issue（preview-report-*）。
 const previewRepairActions = {
   'project-update': ['更新旅程資料夾…', () => window.openProjectUpdate?.()],
   'app-update': ['前往 App 更新', () => openSettings('about')],
   'last-backup': ['回到上次備份…', async () => { const outcome = await window.openSyncFlow({ kind: 'backup', mode: 'discard' }); if (outcome?.status === 'blocked' && outcome.message) notify(outcome.message); }],
-  'copy-report': ['複製給幫忙的人', async () => { const r = await window.travelDesktop.feature('preview-report-copy', conversationTarget()); notify(r.ok ? '已複製問題摘要（不含行程內容），可以貼給幫你的人。' : r.message); }],
+  'report': ['回報給開發者…', () => openReportDialog()],
 };
+// 回報給開發者：先顯示 App 產生的完整內容與公開目的地，人按「送出回報」才在 GitHub 開 issue；送不出去可改在瀏覽器開啟已填好的回報頁。
+let reportIssueURL = null;
+function reportSay(text, tone = '') { $('report-result').hidden = !text; $('report-result').textContent = text || ''; $('report-result').dataset.tone = tone; }
+async function openReportDialog() {
+  const r = await window.travelDesktop.feature('preview-report-prepare', conversationTarget());
+  if (!r.ok) { notify(r.message); return; }
+  reportIssueURL = null; reportSay('');
+  $('report-repo').textContent = r.repo;
+  $('report-preview').textContent = `${r.issue.title}\n\n${r.issue.body}`;
+  for (const id of ['submit-report', 'open-report', 'copy-report']) { $(id).hidden = false; $(id).disabled = false; }
+  $('view-report').hidden = true;
+  $('report-dialog').showModal();
+}
+async function reportAction(button, name, busyLabel, done) {
+  return withBusy(button, busyLabel, async () => {
+    try { const r = await window.travelDesktop.feature(name, conversationTarget()); if (r.ok) done(r); else reportSay(r.message, 'warn'); }
+    catch { reportSay('這個動作沒有完成，請再試一次。', 'warn'); }
+  });
+}
+$('cancel-report').onclick = () => $('report-dialog').close();
+$('submit-report').onclick = () => reportAction($('submit-report'), 'preview-report-submit', '送出中…', r => {
+  reportIssueURL = r.url; reportSay('已送出。開發者會在 GitHub 看到這則回報，之後的回覆也會出現在那裡。');
+  for (const id of ['submit-report', 'open-report']) $(id).hidden = true;
+  $('view-report').hidden = false; $('view-report').focus();
+});
+$('open-report').onclick = () => reportAction($('open-report'), 'preview-report-open', '開啟中…', () => reportSay('已在瀏覽器開啟回報頁；內容已經填好，看過後在那裡按「Submit new issue」送出。'));
+$('copy-report').onclick = () => reportAction($('copy-report'), 'preview-report-copy', '複製中…', () => reportSay('已複製回報內容。'));
+$('view-report').onclick = async () => { if (reportIssueURL) await window.travelDesktop.feature('open-link', { url: reportIssueURL }); };
 function renderPreviewRepair(diagnosis) {
   $('preview-repair').hidden = !diagnosis;
   // 「重新檢查」一直留在同一列最後面；依原因給的按鈕排在它前面。
@@ -465,7 +493,7 @@ function renderPreviewRepair(diagnosis) {
   $('preview-backup-note').hidden = !diagnosis.backupNote; $('preview-backup-note').textContent = diagnosis.backupNote || '';
   const buttons = (diagnosis.actions || []).filter(a => previewRepairActions[a]).map((action, i) => {
     const [label, run] = previewRepairActions[action];
-    const button = el('button', label, i === 0 && action !== 'copy-report' ? 'primary' : '');
+    const button = el('button', label, i === 0 && action !== 'report' ? 'primary' : '');
     button.type = 'button'; button.dataset.repair = action;
     button.onclick = () => { if (aiBusy || pendingProposal) { notify('請先等 AI 回覆完成，或確認／放棄目前的提案。'); return; } return withBusy(button, '處理中…', async () => { try { await run(); } catch { notify('這個動作沒有完成，請再試一次。'); } }); };
     return button;

@@ -1,4 +1,4 @@
-// 預覽建不起來時，把原因翻成人話、決定給哪些按鈕，並產生可以交給幫忙的人的去識別化摘要。
+// 預覽建不起來時，把原因翻成人話、決定給哪些按鈕，並產生回報給開發者的去識別化 issue。
 // 純函式：不讀檔、不碰 Electron。輸入由 main.cjs 收集（錯誤、旅程資料夾狀態、上次備份能不能用）。
 
 const FILE_LABELS = {
@@ -54,30 +54,65 @@ function explain(reason, where, areas, total) {
   }
 }
 
-function diagnosePreviewFailure({ code, file = null, problems = [], update = null, backup = null, appVersion = null, platform = null } = {}) {
+function diagnosePreviewFailure({ code, file = null, problems = [], update = null, backup = null, appVersion = null, appCommit = null, platform = null } = {}) {
   const list = Array.isArray(problems) ? problems.map(String) : [];
   const reason = update?.state === 'app-older' ? 'app-older' : update?.migrating ? 'outdated' : CODE_REASON[code] || 'unknown';
   const where = fileName(file), areas = reason === 'invalid' ? groupProblems(list) : [];
   const canGoBack = Boolean(backup?.usable && backup.pendingFiles > 0) && !['outdated', 'app-older', 'changed'].includes(reason);
   const actions = [
     ...(reason === 'outdated' ? ['project-update'] : reason === 'app-older' ? ['app-update'] : canGoBack ? ['last-backup'] : []),
-    'retry', ...(reason === 'changed' ? [] : ['copy-report']),
+    'retry', ...(reason === 'changed' ? [] : ['report']),
   ];
   const backupNote = !backup || !(backup.pendingFiles > 0) || ['outdated', 'app-older', 'changed'].includes(reason) ? ''
     : backup.usable ? `上次備份的版本可以正常顯示。可以回到那一版；之後還沒備份的 ${backup.pendingFiles} 個修改會丟掉。`
       : '上次備份的版本也有問題，回到那一版也沒辦法解決。';
-  // 給幫忙的人：只有版本、錯誤代碼、檔案種類與數量；不含行程內容、名稱、網址或本機路徑。
   const safeCode = /^[A-Za-z0-9_-]{1,40}$/.test(String(code || '')) ? code : 'UNKNOWN';
-  const report = [
-    'Travel Planner 桌面版：行程預覽無法建立',
-    `App 版本：${appVersion || '未知'}（${platform || '未知系統'}）`,
-    `錯誤代碼：${safeCode}`,
-    areas.length ? `問題所在：${areas.map(areaText).join('；')}` : where ? `問題所在：${named(where)}` : null,
-    update ? `旅程資料夾：${({ current: '已是最新', 'update-available': '需要更新', 'app-older': '比 App 新' })[update.state] || '未知'}${update.migrating ? '，這趟的資料格式需要升級' : ''}` : null,
-    backup ? `上次備份：${backup.pendingFiles > 0 ? (backup.usable ? '可以正常顯示' : '也無法顯示') : '沒有未備份的修改'}` : null,
-    '（為了保護隱私，這段不含行程內容、地點名稱、網址或電腦上的位置。）',
-  ].filter(Boolean).join('\n');
-  return { reason, code: safeCode, explanation: explain(reason, where, areas, list.length), areas, problems: list, actions, backupNote, report };
+  const issue = developerIssue({ safeCode, where, areas, list, update, backup, appVersion, appCommit, platform });
+  return { reason, code: safeCode, explanation: explain(reason, where, areas, list.length), areas, problems: list, actions, backupNote, issue };
 }
 
-module.exports = { diagnosePreviewFailure, problemFile, FILE_LABELS };
+// 引擎檢查訊息（packages/engine/schema.cjs）固定部分用到的字。去掉地點代碼與值之後，只要還有這以外的字就整行不送。
+const TEMPLATE_TEXT = 'basemap.json 缺 meta.bbox：重跑 npm run basemap CHECKLIST 為空 DAYS 為空 trip.config 缺 deploy.name（部署用的 Worker／Pages 專案名稱）'
+  + ' 缺 detail ADDONS 未知地點 缺 day/why/cost 的 bbox 與 不符 的清單少了 先更新實際 Maps 清單再改 map-lists.js 停留點不足 2 個 缺 date/title/theme 缺 Google Maps 清單'
+  + ' alt 沒有詳細說明 引用未知地點 color 不是 hex meal 缺 slot/time/plan/fallback 地點或詳細說明不存在 缺餐食規劃（sections.dining 已開啟） stop 缺 time kind 不合法'
+  + ' 自駕的 leg 缺 dist 大眾運輸的 leg 缺 via（路線名） leg.mode id 應為 實際 deploy.target DETAILS 缺 refs 缺 stay highlights 不足 點 info 每列需為 [標籤, 內容] ref 網址不合法 summary 太短'
+  + ' OVERVIEW_ROUTE PHOTOS 直接網址缺 credit 缺來源頁面連結 授權不明 PLACES 缺 gq 或 gurl 缺 name 的 parking 缺座標 座標超出 region.bbox 座標不是數字 cat STAYS 的 day 指向不存在的天 nights'
+  + ' schemaVersion 是 引擎需要 Day';
+const TEMPLATE_WORDS = new Set(TEMPLATE_TEXT.match(/[A-Za-z_]+/g));
+const TEMPLATE_CHARS = new Set([...TEMPLATE_TEXT.replace(/[\x00-\x7f]/g, ''), '＊', '，']);
+
+// 把一條檢查訊息變成「問題類型」：去掉地點代碼、全形冒號後的值、不是數字的天數代號；認不得的字就整行換成「其他規則」。
+function generalizeProblem(message) {
+  const m = String(message).split('：')[0]
+    .replace(/^(PLACES|DETAILS|PHOTOS)\.[^\s[]+/, '$1.＊')
+    .replace(/^Day (\S+)/, (all, id) => /^\d{1,3}$/.test(id) ? all : 'Day ＊')
+    .replace(/(引用未知地點|未知地點|的清單少了) \S+/, '$1 ＊')
+    .replace(/ 的 \S+ 沒有詳細說明$/, ' 的 ＊ 沒有詳細說明')
+    .replace(/^\S+ 缺 detail$/, '＊ 缺 detail')
+    .replace(/，實際 .*$/, '，實際 ＊')
+    .replace(/schemaVersion 是 [^，]*，/, 'schemaVersion 是 ＊，');
+  const words = m.match(/[A-Za-z_]+/g) || [], chars = [...m.replace(/[\x00-\x7f]/g, '')];
+  if (m.length > 120 || !words.every(w => TEMPLATE_WORDS.has(w)) || !chars.every(c => TEMPLATE_CHARS.has(c))) return '（其他規則）';
+  return m;
+}
+
+// 回報給開發者的 issue：只有版本、錯誤代碼、檔案種類與處數、去識別化的問題類型；不含行程內容、名稱、網址或本機路徑。
+function developerIssue({ safeCode, where, areas, list, update, backup, appVersion, appCommit, platform }) {
+  const kinds = new Map();
+  for (const p of list) { const k = generalizeProblem(p); kinds.set(k, (kinds.get(k) || 0) + 1); }
+  const mainFile = areas.find(a => a.file)?.file || where?.file || null;
+  const version = `${appVersion || '未知'}${/^[0-9a-f]{7,40}$/.test(appCommit || '') ? `（commit ${appCommit.slice(0, 7)}）` : ''}`;
+  const lines = [
+    '## 環境', `- App 版本：${version}`, `- 作業系統：${platform || '未知'}`, '',
+    '## 發生什麼事', `行程預覽無法建立。錯誤代碼：\`${safeCode}\``, '',
+    ...(areas.length || where ? ['## 問題所在', ...(areas.length ? areas.map(a => `- ${areaText(a)}`) : [`- ${named(where)}`]), ''] : []),
+    ...(kinds.size ? ['## 問題類型', ...[...kinds].slice(0, 30).map(([k, n]) => `- ${k}${n > 1 ? `（${n} 處）` : ''}`), ...(kinds.size > 30 ? [`- …另外 ${kinds.size - 30} 種`] : []), ''] : []),
+    '## 狀態',
+    ...(update ? [`- 旅程資料夾：${({ current: '已是最新', 'update-available': '需要更新', 'app-older': '比 App 新' })[update.state] || '未知'}${update.migrating ? '，這趟的資料格式需要升級' : ''}`] : []),
+    `- 上次備份：${!backup ? '無法確認' : backup.pendingFiles > 0 ? (backup.usable ? '可以正常顯示' : '也無法顯示') : '沒有未備份的修改'}`,
+    '', '_由 Travel Planner 桌面版產生，已去掉行程內容、地點代碼、網址與電腦上的位置。_',
+  ];
+  return { title: `[App 回報] 預覽無法建立：${safeCode}${mainFile ? `（${mainFile}）` : ''}`, body: lines.join('\n') };
+}
+
+module.exports = { diagnosePreviewFailure, problemFile, generalizeProblem, FILE_LABELS };
