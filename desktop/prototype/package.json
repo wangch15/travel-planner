@@ -1,6 +1,6 @@
 {
   "name": "@travel-planner/desktop",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "description": "Travel planning desktop workspace with local history, research, backup and publishing",
   "main": "boot.cjs",
