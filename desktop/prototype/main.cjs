@@ -87,6 +87,9 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   let previewAttempt = 0;
   let generating = false;
   let versionBusy=false;
+  // 改完檔案後預覽會在背景重建（期間 versionBusy）；使用者馬上按「回到修改前」或打開版本紀錄時，
+  // 先等這次重建結束，不要回「AI 正在執行」。AI 真的在跑或有提案時仍然直接拒絕。
+  async function versionIdle(ms=30000){const end=Date.now()+ms;while(versionBusy&&Date.now()<end)await new Promise(r=>setTimeout(r,50));return !versionBusy;}
   let generationNonce = 0, explicitStopNonce = null, activeGenerationTarget = null, activeGenerationRunId = null;
   let accountSwitching = false;
   let pendingLoginURL = null;
@@ -886,7 +889,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   feature('preview-report-copy',async input=>{const target=selectedTarget(input);if(previewReport?.key!==`${target.projectId}\0${target.slug}`)throw Error('請先按「重新檢查」，再複製。');clipboard.writeText(previewReport.text);return {copied:true};});
   handle('versions:list',async(event,input)=>{
     assertSender(event);const target=selectedTarget(input);
-    if(versionBusy||generating||proposals.saving)return workflowFailure({code:'AI_BUSY'});
+    if(generating||proposals.saving||!await versionIdle()||generating||proposals.saving)return workflowFailure({code:'AI_BUSY'});
     versionBusy=true;
     try{
       const baseline=await buildPreview(target.root,target.slug);const latest=await observeVersions(target,baseline);
@@ -905,7 +908,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   });
   handle('versions:restore',async(event,input)=>{
     assertSender(event);const target=selectedTarget(input);
-    if(versionBusy||generating||proposals.saving||proposals.pending)return workflowFailure({code:'AI_BUSY'});
+    if(generating||proposals.saving||proposals.pending||!await versionIdle()||generating||proposals.saving||proposals.pending)return workflowFailure({code:'AI_BUSY'});
     versionBusy=true;
     try{
       const baseline=await buildPreview(target.root,target.slug);await observeVersions(target,baseline);
