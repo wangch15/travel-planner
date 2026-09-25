@@ -25,8 +25,10 @@ app.whenReady().then(async()=>{
       if(failNext){const error=failNext;failNext=null;throw error;}
       return {model,threadId:'t',turnId:'u'+calls.length,summary:'收到：'+text,discussion:true};}})});
   // 預覽面板關著：背景驗證完成後就能送出，iframe 卻不能載入（載入就算「看過預覽」）。
-  await js('setPreview(false)');
-  await until('document.documentElement.dataset.ready==="true" && realPreview?.status==="ready" && !document.getElementById("edit-day").disabled');
+  // 啟動時 App 會自動打開上次的旅程與預覽；等啟動完成再關面板，並重新做一次背景驗證，慢機器上才不會被啟動流程蓋回去。
+  await until('document.documentElement.dataset.ready==="true"');
+  await js('setPreview(false);document.getElementById("preview").removeAttribute("src");realPreview=null;renderPreview()');
+  await until('realPreview?.status==="ready" && !document.getElementById("edit-day").disabled');
   assert.equal(await js('document.getElementById("preview-panel").hidden'),true);
   assert.equal(await js('document.getElementById("send-message").disabled'),false,'預覽面板關著也要能送出');
   assert.equal(await js('document.getElementById("preview").getAttribute("src")'),null,'面板關著不能載入預覽，否則會被記成看過');
