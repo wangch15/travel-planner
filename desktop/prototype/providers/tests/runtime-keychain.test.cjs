@@ -18,3 +18,12 @@ test('macOS Claude keeps system home for Keychain while all provider configurati
 test('Gemini retains its isolated home and its own configuration location',async t=>{const runtime=await prepareRuntime(await fixture(t),'gemini');assert.equal(runtime.env.HOME,runtime.home);assert.equal(runtime.env.GEMINI_CLI_HOME,runtime.home);assert.equal(runtime.env.CLAUDE_CONFIG_DIR,undefined);await runtime.assertPolicy();});
 
 test('shared Anthropic profile directory cannot be redirected outside the app profile',async t=>{const root=await fixture(t),runtime=await prepareRuntime(root,'claude'),external=path.join(root,'outside');await fs.mkdir(external);await fs.rmdir(runtime.env.ANTHROPIC_CONFIG_DIR);await fs.symlink(external,runtime.env.ANTHROPIC_CONFIG_DIR,process.platform==='win32'?'junction':'dir');await assert.rejects(runtime.assertPolicy(),{code:'POLICY_MISMATCH'});});
+test('Windows policy check runs PowerShell by absolute path and tells a failed check apart from a real policy',async t=>{
+  const {assertNoExternalPolicy}=require('../runtime.cjs');const calls=[];
+  const exec=result=>(file,args,options,callback)=>{calls.push(file);const child={stdin:{on(){},end(){}}};setImmediate(()=>result instanceof Error?callback(result):callback(null,result));return child;};
+  const options=extra=>({platform:'win32',env:{SystemRoot:'C:\\Windows'},...extra});
+  await assertNoExternalPolicy('claude',options({execFile:exec('absent\r\n')}));
+  assert.equal(calls[0],path.win32.join('C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe'));
+  await assert.rejects(assertNoExternalPolicy('claude',options({execFile:exec('present\r\n')})),{code:'EXTERNAL_PROVIDER_POLICY'});
+  await assert.rejects(assertNoExternalPolicy('claude',options({execFile:exec(Object.assign(Error('spawn powershell.exe ENOENT'),{code:'ENOENT'}))})),{code:'POLICY_CHECK_FAILED'});
+});

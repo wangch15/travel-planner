@@ -7,10 +7,10 @@
   function renderProvider(id){
     const value=records.get(id)||{state:'disconnected'},old=document.getElementById('provider-row-'+id),focused=old?.contains(document.activeElement)?document.activeElement.dataset.providerAction:null;
     const row=el('div',undefined,'provider-row setting-row');row.id='provider-row-'+id;row.dataset.provider=id;
-    const content=el('div',undefined,'setting-copy'),heading=el('div',undefined,'inline-heading'),title=el('h3',catalog[id].name),badge=el('span',value.cachedAuth?'登入已保存':stateLabels[value.state]||'需要確認','status-pill');badge.dataset.status=value.state==='connected'?'ready':value.state;heading.append(title,badge);content.append(heading);
+    const content=el('div',undefined,'setting-copy'),heading=el('div',undefined,'inline-heading'),title=el('h3',catalog[id].name),needsUpdate=value.state==='unavailable'&&['CLI_OUTDATED','CLAUDE_PLAN_UNKNOWN'].includes(value.code),badge=el('span',value.cachedAuth?'登入已保存':needsUpdate?'需要更新':stateLabels[value.state]||'需要確認','status-pill');badge.dataset.status=value.state==='connected'?'ready':value.state;heading.append(title,badge);content.append(heading);
     const text=value.message||(value.state==='connected'?(value.label||'登入已保存'):value.state==='waiting-login'?'請在官方頁面完成登入，完成後會自動更新。':catalog[id].hint);
     const description=el('p',text);description.id='provider-description-'+id;description.title=text;content.append(description);
-    const actions=el('div',undefined,'settings-actions'),connect=el('button',value.state==='unavailable'?'安裝…':value.state==='waiting-login'?'重新確認':'連接');connect.dataset.providerAction='connect';connect.disabled=busy.has(id);connect.hidden=value.state==='connected';connect.setAttribute('aria-describedby',description.id);connect.onclick=()=>value.state==='unavailable'?window.openToolSetup?.(id):runAccountAction(id,value.state==='waiting-login'?'check':'login');
+    const actions=el('div',undefined,'settings-actions'),connect=el('button',needsUpdate?'更新…':value.state==='unavailable'?'安裝…':value.state==='waiting-login'?'重新確認':'連接');connect.dataset.providerAction='connect';connect.disabled=busy.has(id);connect.hidden=value.state==='connected';connect.setAttribute('aria-describedby',description.id);connect.onclick=()=>value.state==='unavailable'?window.openToolSetup?.(id):runAccountAction(id,value.state==='waiting-login'?'check':'login');
     const more=moreButton(catalog[id].name+' 帳號操作',()=>[
       {label:'重新核對登入',icon:'chat',disabled:busy.has(id),action:()=>runAccountAction(id,'check')},
       {label:'更換帳號',icon:'chat',disabled:busy.has(id)||value.state!=='connected'||value.capabilities?.switchAccount===false,action:()=>runAccountAction(id,'switch')},
@@ -30,6 +30,8 @@
   window.refreshProviderOptions=syncProviderOptions;
   window.updateProviderRow=value=>{if(!catalog[value.provider])return;const previous=records.get(value.provider);records.set(value.provider,value);renderProvider(value.provider);syncProviderOptions();if(previous?.state==='waiting-login'&&value.state==='connected'&&defaults.provider===value.provider)loadDefaultModels();};
   window.travelDesktop?.onProviderAccount?.(window.updateProviderRow);
+  // 工具裝好或更新後，帳號這一列要重新確認，否則會停在「待安裝」。
+  window.recheckProvider=id=>catalog[id]?runAccountAction(id,'check'):Promise.resolve();
   async function runAccountAction(id,action){if(busy.has(id))return;busy.add(id);renderProvider(id);try{const result=await api('provider-account-action',{id,action});window.updateProviderRow(result.account);if(result.copied)notify('登入連結已複製。');if(result.account.state==='connected'&&defaults.provider===id)await loadDefaultModels();}catch(e){notify(e.message);}finally{busy.delete(id);renderProvider(id);}}
   function renderDefaults(){syncProviderOptions();}
   let defaultModels=[];

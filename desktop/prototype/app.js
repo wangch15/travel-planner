@@ -894,7 +894,7 @@ async function restoreAIConnection(){
   const request=++accountRequest,provider=activeProvider;
   if(provider==='gemini'){renderCodexAccount({provider,state:'paused'});return;}
   renderCodexAccount({state:'checking'});
-  try{const result=await window.travelDesktop.connectCodex();if(request!==accountRequest||provider!==activeProvider)return;if(result.ok)renderCodexAccount(result.account);else{renderCodexAccount({state:['CLI_MISSING','CLI_OUTDATED'].includes(result.code)?'unavailable':'error'});$('codex-message').textContent=result.message;$('codex-message').hidden=false;}}
+  try{const result=await window.travelDesktop.connectCodex();if(request!==accountRequest||provider!==activeProvider)return;if(result.ok)renderCodexAccount(result.account);else{renderCodexAccount({state:['CLI_MISSING','CLI_OUTDATED','CLAUDE_PLAN_UNKNOWN'].includes(result.code)?'unavailable':'error'});$('codex-message').textContent=result.message;$('codex-message').hidden=false;}}
   catch{if(request!==accountRequest||provider!==activeProvider)return;renderCodexAccount({state:'error'});$('codex-message').textContent='無法核對登入，請稍後重試；已保存的登入資料仍保留。';$('codex-message').hidden=false;}
 }
 async function codexAction(method) {

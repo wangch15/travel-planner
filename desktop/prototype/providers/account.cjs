@@ -103,6 +103,8 @@ class CliAccount extends EventEmitter {
     if (typeof auth?.loggedIn !== 'boolean') throw failure('PROVIDER_AUTH_INVALID');
     if (auth.loggedIn && (auth.authMethod !== 'claude.ai' || auth.apiProvider !== 'firstParty')) throw failure('SUBSCRIPTION_LOGIN_REQUIRED');
     // Teams/Enterprise can fetch remote managed hooks/settings that outrank host flags.
+    // Older Claude Code may not report the plan at all; that is not a company policy.
+    if (auth.loggedIn && (auth.subscriptionType === null || auth.subscriptionType === undefined)) throw failure('CLAUDE_PLAN_UNKNOWN');
     if (auth.loggedIn && !['pro', 'max'].includes(auth.subscriptionType)) throw failure('EXTERNAL_PROVIDER_POLICY');
     return { state: auth.loggedIn ? 'connected' : 'needs-login', label: auth.loggedIn ? accountEmail(auth.email) : null,
       plan: auth.subscriptionType || null, message: null, authFailure: null };
@@ -167,6 +169,8 @@ class CliAccount extends EventEmitter {
               authFailure: unsupported ? 'unsupported-account' : 'status-check',
               message: error.code === 'SUBSCRIPTION_LOGIN_REQUIRED' ? '請使用 Claude Pro 或 Max 官方訂閱帳號登入；App 不會改用付費 API。'
                 : error.code === 'EXTERNAL_PROVIDER_POLICY' ? '此帳號或管理原則不支援 App 的隔離設定。'
+                : error.code === 'CLAUDE_PLAN_UNKNOWN' ? 'Claude 沒有回報你的訂閱方案；請先在「設定 → 帳號連線」更新 Claude，再重新登入。'
+                : error.code === 'POLICY_CHECK_FAILED' ? '這次沒能完成 Claude 的安全檢查，請按重新確認。'
                   : '無法核對 Claude Code 的登入狀態，請按重新確認。' });
             return;
           }

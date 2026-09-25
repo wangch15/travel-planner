@@ -7,28 +7,30 @@ const { execFile } = require('node:child_process');
 const { failure } = require('./process.cjs');
 
 const VERSIONS = { gemini: '0.46.0' }; // Legacy Gemini adapter only.
-async function assertNoExternalPolicy(provider) {
+async function assertNoExternalPolicy(provider, { platform = process.platform, env = process.env, execFile: exec = execFile } = {}) {
   const systemRoot = provider === 'gemini'
-    ? process.platform === 'darwin' ? '/Library/Application Support/GeminiCli/policies' : process.platform === 'win32' ? 'C:\\ProgramData\\gemini-cli\\policies' : '/etc/gemini-cli/policies'
-    : process.platform === 'darwin' ? '/Library/Application Support/ClaudeCode' : process.platform === 'win32' ? 'C:\\Program Files\\ClaudeCode' : '/etc/claude-code';
+    ? platform === 'darwin' ? '/Library/Application Support/GeminiCli/policies' : platform === 'win32' ? 'C:\\ProgramData\\gemini-cli\\policies' : '/etc/gemini-cli/policies'
+    : platform === 'darwin' ? '/Library/Application Support/ClaudeCode' : platform === 'win32' ? 'C:\\Program Files\\ClaudeCode' : '/etc/claude-code';
   const candidates = provider === 'claude'
     ? ['managed-settings.json', 'managed-settings.d', 'managed-mcp.json'].map(name => path.join(systemRoot, name))
     : [systemRoot];
-  if (provider === 'claude' && process.platform === 'darwin') {
+  if (provider === 'claude' && platform === 'darwin') {
     candidates.push('/Library/Managed Preferences/com.anthropic.claudecode.plist', '/Library/Preferences/com.anthropic.claudecode.plist');
-    if (process.env.USER) candidates.push(path.join('/Library/Managed Preferences', process.env.USER, 'com.anthropic.claudecode.plist'));
+    if (env.USER) candidates.push(path.join('/Library/Managed Preferences', env.USER, 'com.anthropic.claudecode.plist'));
   }
   for (const file of candidates) {
     try { await fs.lstat(file); throw failure('EXTERNAL_PROVIDER_POLICY'); }
     catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
-  if (provider === 'claude' && process.platform === 'win32') {
+  if (provider === 'claude' && platform === 'win32') {
     // Only ask whether a managed key exists; never read or return registry values.
     const script = "$ErrorActionPreference='Stop'; if ((Test-Path -LiteralPath 'HKLM:\\SOFTWARE\\Policies\\ClaudeCode') -or (Test-Path -LiteralPath 'HKCU:\\SOFTWARE\\Policies\\ClaudeCode')) { 'present' } else { 'absent' }; exit 0";
+    // By absolute path: PATH may not reach PowerShell, and a missing PowerShell is not a company policy.
+    const powershell = path.win32.join(env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
     let result;
     try {
       result = await new Promise((resolve, reject) => {
-        const child = execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script],
+        const child = exec(powershell, ['-NoProfile', '-NonInteractive', '-Command', script],
           { timeout: 15000, maxBuffer: 1024, windowsHide: true },
           (error, stdout) => error ? reject(error) : resolve({ stdout }));
         // This is a one-shot query, never an interactive terminal. Give the
@@ -37,8 +39,10 @@ async function assertNoExternalPolicy(provider) {
         child.stdin?.end();
       });
     }
-    catch { throw failure('EXTERNAL_PROVIDER_POLICY'); }
-    if (result.stdout.trim() !== 'absent') throw failure('EXTERNAL_PROVIDER_POLICY');
+    catch { throw failure('POLICY_CHECK_FAILED'); }
+    const answer = String(result.stdout).trim();
+    if (answer === 'present') throw failure('EXTERNAL_PROVIDER_POLICY');
+    if (answer !== 'absent') throw failure('POLICY_CHECK_FAILED');
   }
 }
 const CLAUDE_SETTINGS = { forceLoginMethod: 'claudeai', disableAllHooks: true, autoMemoryEnabled: false,
@@ -139,4 +143,4 @@ function claudeFlags(runtime, researchTools = null) {
 function geminiFlags(runtime, research = false) {
   return ['--extensions', 'none', '--approval-mode', 'default', '--admin-policy', research ? runtime.researchPolicy : runtime.normalPolicy];
 }
-module.exports = { VERSIONS, prepareRuntime, claudeFlags, geminiFlags, geminiSettings };
+module.exports = { VERSIONS, assertNoExternalPolicy, prepareRuntime, claudeFlags, geminiFlags, geminiSettings };

@@ -204,7 +204,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     catch (error) {
       const messages = {
         ENOENT: '尚未找到所選 AI 工具。請到「設定 → 帳號連線」按「安裝」。',
-        CLI_MISSING:'尚未找到所選 AI 工具，請到「設定 → 帳號連線」按「安裝」。',CLI_OUTDATED:'這台電腦上的 AI 工具版本太舊，請到「設定 → 帳號連線」按「安裝」更新到最新版。',PROVIDER_UNAVAILABLE:'Gemini 連線暫停；既有對話仍保留，請改用 Codex 或 Claude。',EXTERNAL_PROVIDER_POLICY:'這個工具的公司管理原則與 App 隔離設定不相容，原設定保持不變。Claude 目前支援 Pro／Max 帳號。',UNSUPPORTED_PROVIDER_VERSION:'舊版 Gemini CLI 接法無法驗證目前工具的安全限制；不會只因版本號而忽略限制。',SUBSCRIPTION_LOGIN_REQUIRED:'請使用這個服務的官方帳號登入；App 不會自動改用付費 API。',PROVIDER_AUTH_INVALID:'登入資料需要重新核對，請使用更多選單重新登入。',
+        CLI_MISSING:'尚未找到所選 AI 工具，請到「設定 → 帳號連線」按「安裝」。',CLI_OUTDATED:'這台電腦上的 AI 工具版本太舊，請到「設定 → 帳號連線」按「更新」。',CLAUDE_PLAN_UNKNOWN:'Claude 沒有回報你的訂閱方案，通常是版本太舊；請到「設定 → 帳號連線」按「更新」。',POLICY_CHECK_FAILED:'這次沒能完成 Claude 的安全檢查，請再連接一次。',PROVIDER_UNAVAILABLE:'Gemini 連線暫停；既有對話仍保留，請改用 Codex 或 Claude。',EXTERNAL_PROVIDER_POLICY:'這個 Claude 帳號是公司方案（Team／Enterprise），或這台電腦有公司管理設定；App 目前只支援 Pro／Max 個人方案。',UNSUPPORTED_PROVIDER_VERSION:'舊版 Gemini CLI 接法無法驗證目前工具的安全限制；不會只因版本號而忽略限制。',SUBSCRIPTION_LOGIN_REQUIRED:'請使用這個服務的官方帳號登入；App 不會自動改用付費 API。',PROVIDER_AUTH_INVALID:'登入資料需要重新核對，請使用更多選單重新登入。',
         'login-already-pending': '登入正在進行，請完成瀏覽器授權，或先取消再重試。',
         'unexpected-login-url': '登入網址不符合預期，已停止連接。',
         'logout-not-confirmed': '尚未確認舊帳號已登出，請重新確認狀態後再試。',
@@ -613,7 +613,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       else result=await item.account.switchAccount();
       if(result?.authUrl){providerLoginURLs.set(id,result.authUrl);if(id===providerId)pendingLoginURL=result.authUrl;await openLoginURL(result.authUrl);}
       return {account:providerView(id)};
-    }catch(error){const code=error.code||error.message;const messages={CLI_MISSING:'尚未安裝，按「安裝」就能裝好。',ENOENT:'尚未安裝，按「安裝」就能裝好。',CLI_OUTDATED:'版本太舊，按「安裝」更新到最新版就能連接。',UNSUPPORTED_PROVIDER_VERSION:'舊版 Gemini CLI 接法無法驗證目前工具的安全限制。',EXTERNAL_PROVIDER_POLICY:'帳號或公司管理原則與這版隔離設定不相容。',SUBSCRIPTION_LOGIN_REQUIRED:'請以官方訂閱帳號登入。'};return {account:{...providerView(id),state:['CLI_MISSING','CLI_OUTDATED','ENOENT'].includes(code)?'unavailable':'error',message:messages[code]||'連線未完成，請重新檢查或重試。'}};}
+    }catch(error){const code=error.code||error.message;const messages={CLI_MISSING:'尚未安裝，按「安裝」就能裝好。',ENOENT:'尚未安裝，按「安裝」就能裝好。',CLI_OUTDATED:'版本太舊，按「更新」就能連接。',CLAUDE_PLAN_UNKNOWN:'Claude 沒有回報你的訂閱方案，通常是版本太舊；按「更新」後會重新確認。',POLICY_CHECK_FAILED:'這次沒能完成安全檢查，請再按一次「連接」。',UNSUPPORTED_PROVIDER_VERSION:'舊版 Gemini CLI 接法無法驗證目前工具的安全限制。',EXTERNAL_PROVIDER_POLICY:'這是公司方案（Team／Enterprise）帳號，或這台電腦有公司管理設定；App 目前只支援 Pro／Max 個人方案。',SUBSCRIPTION_LOGIN_REQUIRED:'請以官方訂閱帳號登入。'};return {account:{...providerView(id),code,state:['CLI_MISSING','CLI_OUTDATED','CLAUDE_PLAN_UNKNOWN','ENOENT'].includes(code)?'unavailable':'error',message:messages[code]||'連線未完成，請重新檢查或重試。'}};}
     finally{providerAuthBusy.delete(id);}
   });
   feature('provider-models',async input=>{if(input.id==='gemini')throw Object.assign(Error('PROVIDER_UNAVAILABLE'),{code:'PROVIDER_UNAVAILABLE'});return {models:await getProvider(input.id).account.models()};});

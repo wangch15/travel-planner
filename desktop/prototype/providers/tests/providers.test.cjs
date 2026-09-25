@@ -237,6 +237,9 @@ test('API-key and managed Claude accounts fail closed independently of CLI versi
   await assert.rejects(f.account.connect(),{code:'SUBSCRIPTION_LOGIN_REQUIRED'});
   await fs.writeFile(script,FAKE.replace("subscriptionType:'pro'","subscriptionType:'enterprise'"));
   await assert.rejects(f.account.connect(),{code:'EXTERNAL_PROVIDER_POLICY'});
+  // A plan Claude did not report is not a company policy; it must not be described as one.
+  await fs.writeFile(script,FAKE.replace("subscriptionType:'pro'","subscriptionType:null"));
+  await assert.rejects(f.account.connect(),{code:'CLAUDE_PLAN_UNKNOWN'});
   assert.equal(f.launches.some(l=>l.args.includes('--print')),false);
 });
 

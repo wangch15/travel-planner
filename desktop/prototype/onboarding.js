@@ -203,8 +203,16 @@
         const { preparation } = await feature('tool-prepare', { id });
         await feature('tool-install', { token: preparation.token, confirmed: true });
       }
+      let { account } = await feature('provider-account-action', { id, action: 'login' });
+      // 已經裝了但太舊：在背景更新 App 用的那一份，再登入一次，不叫人去開終端機。
+      if (account?.state === 'unavailable' && ['CLI_OUTDATED', 'CLAUDE_PLAN_UNKNOWN'].includes(account.code)) {
+        detail.ai.progress = '這台電腦上的版本太舊，正在更新，約一兩分鐘…'; render();
+        const { preparation } = await feature('tool-prepare', { id });
+        await feature('tool-install', { token: preparation.token, confirmed: true });
+        ({ account } = await feature('provider-account-action', { id, action: 'login' }));
+      }
+      if (['unavailable', 'error'].includes(account?.state)) throw Error(account.message || 'AI 助手沒有準備好，請再試一次。');
       detail.ai.progress = '已開啟瀏覽器登入，完成後會自動繼續…'; render();
-      await feature('provider-account-action', { id, action: 'login' });
       poll(async () => { const accounts = await feature('provider-accounts').then(r => r.accounts).catch(() => []); const ok = accounts.some(a => (a.provider || a.id) === id && a.state === 'connected'); if (ok) { await feature('ai-defaults-set', { provider: id }).catch(() => {}); await feature('provider-select', { id }).catch(() => {}); restoreAIConnection(); } return ok; }, 3000, 15 * 60 * 1000, () => fail('ai', null, '登入還沒完成。可以再按一次登入，或到瀏覽器確認是否已授權。'));
     } catch (e) { detail.ai = {}; fail('ai', e, 'AI 助手沒有準備好，請再試一次。'); }
   }
