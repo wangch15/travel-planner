@@ -287,9 +287,9 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       AI_SERVICE_BUSY:`${name} 的服務暫時忙線或連不上，這輪沒有完成，行程沒有被修改。稍等一下再按「重送這則」。`,
       AI_TIMEOUT:`${name} 很久沒有新的進度，這輪已停止，行程沒有被修改。可以按「重送這則」再試一次；要求很大時，拆成幾次小一點的要求會比較快。`,
       AI_OUTPUT_INVALID:`${name} 這次的回覆格式不完整，App 沒有套用，行程沒有被修改。可以按「重送這則」再試一次。`,
-      AI_CANCELED:'這輪未完成，狀態需要確認。', AI_RESULT_UNKNOWN:'回覆結果未能確認，沒有重送，也沒有保存到原專案。',
+      AI_CANCELED:'這輪未完成，狀態需要確認。', AI_RESULT_UNKNOWN:'回覆結果未能確認，沒有重送，也沒有改你的行程。',
       UNKNOWN_RESULT:'送出結果未能確認，沒有自動重送。', AI_TURN_FAILED:`${name} 這次沒有完成回覆，行程沒有被修改。可以按「重送這則」再試一次。`,
-      CONTENT_CHANGED:'原始行程已有新修改，這份提案已失效，請重新產生。', PRIVATE_REPO_REQUIRED:'無法確認你的 GitHub 專案是私人的（可能是網路不通或 GitHub 沒登入），這次修改沒有保存。確認連線後再說一次即可。',
+      CONTENT_CHANGED:'原始行程已有新修改，這份提案已失效，請重新產生。', PRIVATE_REPO_REQUIRED:'無法確認你在 GitHub 上的備份是私人的（可能是網路不通或 GitHub 沒登入），這次修改沒有保存。確認連線後再說一次即可。',
       PREVIEW_REQUIRED:'請先開啟這份提案的預覽，再確認保存。', RESEARCH_REQUIRED:'停留或交通有變動，需要先完成來源與可行性查核。',
       STALE_PROPOSAL:'這份提案已失效，請重新產生。', INVALID_CANDIDATE:'AI 的修改沒有通過行程資料檢查，行程沒有被修改。',
       UNSUPPORTED_DAY_CHANGE:'AI 改到了這次不能改的欄位，行程沒有被修改。', MODEL_UNAVAILABLE:'目前沒有可用模型，請重新確認帳號連接。',
@@ -475,7 +475,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       try{return {ok:true,...await handler(input)};}catch(error){const failure=workflowFailure(error);return {...failure,message:featureMessage(error)};}finally{if(exclusive)versionBusy=false;}});
   };
   function featureMessage(error){
-    const texts={RESET_LOGOUT_FAILED:'無法確認 AI 帳號已登出，資料沒有重置。請到「設定 → 帳號連線」重新核對登入狀態後再試。',SESSION_PROVIDER_LOCKED:'這段對話的 AI 服務已固定，請使用「使用其他 AI 開新對話」。',WAIT_UNSUPPORTED:'此 AI 服務目前不支援自動等待額度。請稍後自行重試，不會自動轉用其他付費方式。',TRIP_CHANGED:'旅程已變動，請重新核對移除內容。',SITE_STILL_PUBLISHED:'這趟旅程的網站還在線上。請先下架網站，再永久刪除。',TRASH_NOT_IGNORED:'這個專案的設定比較舊，App 無法確定回收區不會被一起備份上去，所以旅程先不移除。請先到「設定 → 我的旅程資料」按「更新專案」，完成後再試。',TRIP_EXISTS:'原位置已有同名旅程，無法覆蓋還原。',GIT_IDENTITY_REQUIRED:'還沒設定備份紀錄上的名字（每次備份會記下的名字與郵件）。按「用我的 GitHub 帳號設定」，App 會用你的 GitHub 名稱與 GitHub 提供的隱私郵件設定好；原檔不變。',INVALID_REPOSITORY:'請填寫正確的 GitHub 擁有者／專案名稱。',NESTED_PROJECT:'這個位置在另一個專案資料夾裡面，請換一個位置（例如「文件」或「桌面」）。',DESTINATION_EXISTS:'目的地資料夾已存在，請選擇其他位置。',STALE_CONFIRMATION:'確認已過期，請重新核對。',CONVERSATION_LIMIT:'這趟旅程已達50段對話上限，舊紀錄完整保留。可先複製重要紀錄，暫時繼續使用既有對話。',NO_PROJECT:'請先到「設定 → 我的旅程資料」連接你的旅程資料夾。',PRIVATE_PROJECT_REQUIRED:'建立旅程需要可確認的私人專案。',UNSUPPORTED_ATTACHMENT_TYPE:'目前支援文字、Markdown、JSON、PNG、JPEG 與 WebP；PDF/OCR 尚未支援。',ATTACHMENT_LIMIT:'附件數量已達上限，請先移除不需要的附件。',UNSAFE_REFERENCE_ADDRESS:'參考網址必須是公開網站，不能讀取本機或內部網路。',REFERENCE_TIMEOUT:'網站未在時間內回應，請稍後重試或附上文字。',REFERENCE_HTTP_ERROR:'未能讀取這個網站，請檢查網址或使用文字附件。',PLAN_CONFIRMATION_REQUIRED:'請先確認最新逐日草案。',RESEARCH_CONFIRMATION_REQUIRED:'請先完成查核並確認摘要。',RESEARCH_INCOMPLETE:'仍有未核對的來源或待確認事項，請補充來源並重新查核。',DRAFT_CHANGED:'草稿或候選資料已變動，請重新建立預覽。',PREVIEW_CONFIRMATION_REQUIRED:'請先查看這份候選預覽。',ADOPTION_REQUIRED:'網站已存在，請先查核並明確接管，避免覆蓋其他網站。',TRUSTED_HOOK_REQUIRED:'App 沒辦法自動啟用這個專案的備份保護：專案裡的保護程式和 App 內建的版本不同，或已經設定了其他 Git hook。請先到「設定 → 我的旅程資料」按「更新專案」，完成後再備份。',NO_WAITING_JOB:'目前沒有可自動等待的工作。',STALE_JOB:'工作已更新，請重新載入。',MISSING_TOOL:'所需工具尚未安裝，請到「設定 → App 更新 → 疑難排解」查看。',PRIVATE_DATA_IN_TRIP:'候選內容含有訂房確認碼或私人網站網址，不能寫進會公開的行程檔，已擋下。請再請 AI 修改一次。',UNSAFE_PRIVATE_NOTES:'這趟的 docs 資料夾狀態異常（可能是捷徑），私人筆記沒有寫入。',PRIVATE_SITE_NOT_CONNECTED:'這個網站尚未連接，請先在「資料來源」連接。',TOOL_CHECKSUM_MISMATCH:'下載的檔案和官方檢查碼不符，已停止安裝，電腦沒有被改動。請稍後重試。',TOOL_INSTALL_UNVERIFIED:'安裝跑完了，但 App 沒找到可用的工具。請按「重新檢查」，或稍後重試。',TOOL_DOWNLOAD_FAILED:'下載失敗，請確認網路連線後重試。',TOOL_DOWNLOAD_TIMEOUT:'下載太久沒有完成，請確認網路連線後重試。',TOOL_INSTALL_BUSY:'另一個工具正在安裝，請等它完成。',PRIVATE_SITE_INVALID:'網站資料不正確，請重新整理後再試。',UNSAFE_ATTACHMENT:'這個檔案無法加入：可能超過 8MB（文字 1MB），或檔名不正確。',INVALID_IMAGE:'無法辨識這張圖片，或尺寸超過 8192px；請換成 PNG、JPEG 或 WebP 截圖。',INVALID_TEXT:'文字檔不是 UTF-8 文字，請另存為純文字後再加入。'};
+    const texts={RESET_LOGOUT_FAILED:'無法確認 AI 帳號已登出，資料沒有重置。請到「設定 → 帳號連線」重新核對登入狀態後再試。',SESSION_PROVIDER_LOCKED:'這段對話的 AI 服務已固定，請使用「使用其他 AI 開新對話」。',WAIT_UNSUPPORTED:'此 AI 服務目前不支援自動等待額度。請稍後自行重試，不會自動轉用其他付費方式。',TRIP_CHANGED:'旅程已變動，請重新核對移除內容。',SITE_STILL_PUBLISHED:'這趟旅程的網站還在線上。請先下架網站，再永久刪除。',TRASH_NOT_IGNORED:'這個旅程資料夾的設定比較舊，App 無法確定回收區不會被一起備份上去，所以旅程先不移除。請先到「設定 → 我的旅程資料」按「更新旅程資料夾」，完成後再試。',TRIP_EXISTS:'原位置已有同名旅程，無法覆蓋還原。',GIT_IDENTITY_REQUIRED:'還沒設定備份紀錄上的名字（每次備份會記下的名字與郵件）。按「用我的 GitHub 帳號設定」，App 會用你的 GitHub 名稱與 GitHub 提供的隱私郵件設定好；原檔不變。',INVALID_REPOSITORY:'請填寫正確的 GitHub 帳號／備份名稱。',NESTED_PROJECT:'這個位置在另一個 Git 資料夾裡面，請換一個位置（例如「文件」或「桌面」）。',DESTINATION_EXISTS:'目的地資料夾已存在，請選擇其他位置。',STALE_CONFIRMATION:'確認已過期，請重新核對。',CONVERSATION_LIMIT:'這趟旅程已達50段對話上限，舊紀錄完整保留。可先複製重要紀錄，暫時繼續使用既有對話。',NO_PROJECT:'請先到「設定 → 我的旅程資料」連接你的旅程資料夾。',PRIVATE_PROJECT_REQUIRED:'建立旅程需要可確認的旅程資料夾。',UNSUPPORTED_ATTACHMENT_TYPE:'目前支援文字、Markdown、JSON、PNG、JPEG 與 WebP；PDF/OCR 尚未支援。',ATTACHMENT_LIMIT:'附件數量已達上限，請先移除不需要的附件。',UNSAFE_REFERENCE_ADDRESS:'參考網址必須是公開網站，不能讀取本機或內部網路。',REFERENCE_TIMEOUT:'網站未在時間內回應，請稍後重試或附上文字。',REFERENCE_HTTP_ERROR:'未能讀取這個網站，請檢查網址或使用文字附件。',PLAN_CONFIRMATION_REQUIRED:'請先確認最新逐日草案。',RESEARCH_CONFIRMATION_REQUIRED:'請先完成查核並確認摘要。',RESEARCH_INCOMPLETE:'仍有未核對的來源或待確認事項，請補充來源並重新查核。',DRAFT_CHANGED:'草稿或候選資料已變動，請重新建立預覽。',PREVIEW_CONFIRMATION_REQUIRED:'請先查看這份候選預覽。',ADOPTION_REQUIRED:'網站已存在，請先查核並明確接管，避免覆蓋其他網站。',TRUSTED_HOOK_REQUIRED:'App 沒辦法自動啟用這個旅程資料夾的備份保護：旅程資料夾裡的保護程式和 App 內建的版本不同，或已經設定了其他 Git hook。請先到「設定 → 我的旅程資料」按「更新旅程資料夾」，完成後再備份。',NO_WAITING_JOB:'目前沒有可自動等待的工作。',STALE_JOB:'工作已更新，請重新載入。',MISSING_TOOL:'所需工具尚未安裝，請到「設定 → App 更新 → 疑難排解」查看。',PRIVATE_DATA_IN_TRIP:'候選內容含有訂房確認碼或私人網站網址，不能寫進會公開的行程檔，已擋下。請再請 AI 修改一次。',UNSAFE_PRIVATE_NOTES:'這趟的 docs 資料夾狀態異常（可能是捷徑），私人筆記沒有寫入。',PRIVATE_SITE_NOT_CONNECTED:'這個網站尚未連接，請先在「資料來源」連接。',TOOL_CHECKSUM_MISMATCH:'下載的檔案和官方檢查碼不符，已停止安裝，電腦沒有被改動。請稍後重試。',TOOL_INSTALL_UNVERIFIED:'安裝跑完了，但 App 沒找到可用的工具。請按「重新檢查」，或稍後重試。',TOOL_DOWNLOAD_FAILED:'下載失敗，請確認網路連線後重試。',TOOL_DOWNLOAD_TIMEOUT:'下載太久沒有完成，請確認網路連線後重試。',TOOL_INSTALL_BUSY:'另一個工具正在安裝，請等它完成。',PRIVATE_SITE_INVALID:'網站資料不正確，請重新整理後再試。',UNSAFE_ATTACHMENT:'這個檔案無法加入：可能超過 8MB（文字 1MB），或檔名不正確。',INVALID_IMAGE:'無法辨識這張圖片，或尺寸超過 8192px；請換成 PNG、JPEG 或 WebP 截圖。',INVALID_TEXT:'文字檔不是 UTF-8 文字，請另存為純文字後再加入。'};
     if(/^PRIVATE_SITE_/.test(error.code||'')&&error.hint)return error.hint;
     if(typeof error.userMessage==='string')return error.userMessage;
     // 功能操作（備份、發布、專案…）：服務附的說明最貼近實際情況，優先於 AI 保存流程的共用對照表。
@@ -499,7 +499,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   feature('project-setup-prepare',async input=>{
     if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});
     if(!['clone','create'].includes(input.kind))throw Error('INVALID_INPUT');
-    const choice=await(pickProjectParent?pickProjectParent():dialog.showOpenDialog(win,{title:'選擇專案存放位置',properties:['openDirectory','createDirectory']}));
+    const choice=await(pickProjectParent?pickProjectParent():dialog.showOpenDialog(win,{title:'選擇旅程資料夾要放在哪裡',properties:['openDirectory','createDirectory']}));
     if(choice.canceled||!choice.filePaths?.length)return {canceled:true};
     const preparation=await projectSetup[input.kind==='clone'?'prepareClone':'prepareCreate']({...input,parentDirectory:choice.filePaths[0]});
     return {preparation,kind:input.kind};
@@ -507,7 +507,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   // 首次引導：預設放在「文件／Travel Planner」，使用者可改名稱或位置。
   const defaultProjectParent=async()=>{const dir=defaultProjectParentDirectory||path.join(app.getPath('documents'),'Travel Planner');await fs.mkdir(dir,{recursive:true});return dir;};
   feature('onboarding-project-plan',async()=>{if(!pickedProjectParent)pickedProjectParent=await defaultProjectParent();return {suggestion:await projectSetup.suggestCreate({parentDirectory:pickedProjectParent})};});
-  feature('onboarding-project-location',async()=>{const choice=await(pickProjectParent?pickProjectParent():dialog.showOpenDialog(win,{title:'選擇專案存放位置',properties:['openDirectory','createDirectory']}));if(choice.canceled||!choice.filePaths?.length)return {canceled:true};pickedProjectParent=choice.filePaths[0];return {suggestion:await projectSetup.suggestCreate({parentDirectory:pickedProjectParent})};});
+  feature('onboarding-project-location',async()=>{const choice=await(pickProjectParent?pickProjectParent():dialog.showOpenDialog(win,{title:'選擇旅程資料夾要放在哪裡',properties:['openDirectory','createDirectory']}));if(choice.canceled||!choice.filePaths?.length)return {canceled:true};pickedProjectParent=choice.filePaths[0];return {suggestion:await projectSetup.suggestCreate({parentDirectory:pickedProjectParent})};});
   feature('onboarding-project-prepare',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});if(!pickedProjectParent)pickedProjectParent=await defaultProjectParent();return {preparation:await projectSetup.prepareCreate({name:input.name,parentDirectory:pickedProjectParent}),kind:'create'};},{exclusive:true});
   // 已有 GitHub 私人專案：下載到預設位置（引導內使用，不跳到設定頁）。
   feature('onboarding-clone-prepare',async input=>{if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});if(!pickedProjectParent)pickedProjectParent=await defaultProjectParent();return {preparation:await projectSetup.prepareClone({repo:input.repo,parentDirectory:pickedProjectParent}),kind:'clone'};},{exclusive:true});
@@ -519,7 +519,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     const result=await projectSetup[input.kind==='clone'?'confirmClone':'confirmCreate'](input.token);
     if(!result.ready)return {result};
     const checked=await inspectProject(result.root);
-    if(!checked.ok)return {result:{...result,ready:false,message:'專案已下載，但格式檢查未通過。資料保留在所選位置，尚未切換目前專案。'}};
+    if(!checked.ok)return {result:{...result,ready:false,message:'旅程資料夾已下載，但格式檢查未通過。資料保留在所選位置，尚未切換目前的旅程資料夾。'}};
     const projectId=randomUUID();await store.connect({id:projectId,root:checked.root});
     currentProject={...checked,projectId};activeSlug=null;autoTarget=null;restoreWarning=null;artifact=null;previewSeenURL=null;previewAttempt++;
     return {result,project:currentProject,selectedSlug:null};
@@ -926,7 +926,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     selecting = true;versionBusy=true;
     try {
       const choice = await (pickDirectory ? pickDirectory() : dialog.showOpenDialog(win, {
-        title: '選擇既有 travel-planner 專案', buttonLabel: '檢查這個專案', properties: ['openDirectory'],
+        title: '選擇旅程資料夾', buttonLabel: '檢查這個旅程資料夾', properties: ['openDirectory'],
       }));
       if (choice.canceled || !choice.filePaths.length) return { canceled: true };
       await newTrips.recover?.(choice.filePaths[0]);

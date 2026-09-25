@@ -99,13 +99,13 @@
   async function identity(opts, next = () => backup(opts)) {
     const { preparation: p } = await api('git-identity-prepare');
     steps(BACKUP_STEPS, 0);
-    body(el('p', '每次備份都會記下一個名字與郵件。App 會用你的 GitHub 帳號設定這個專案：'), facts([['名字', p.author.name], ['郵件', p.author.email]]), p.warning ? el('p', p.warning, 'flow-meta') : null);
+    body(el('p', '每次備份都會記下一個名字與郵件。App 會用你的 GitHub 帳號設定這個旅程資料夾：'), facts([['名字', p.author.name], ['郵件', p.author.email]]), p.warning ? el('p', p.warning, 'flow-meta') : null);
     say('郵件是 GitHub 提供的隱私地址，不會公開你的真實信箱。');
     footer([], [closeButton('取消'), act('用這個名字', 'confirm', async () => { const { result } = await api('git-identity-confirm', { token: p.token }); if (!result.ready) throw Error(result.message); await next(); }, { variant: 'primary', busy: '設定中…' })]);
   }
   async function backup(opts) {
     const scope = opts.scope || 'trip';
-    title(scope === 'all' ? '備份所有旅程到 GitHub' : scope === 'project' ? '備份專案到 GitHub' : scope === 'archive' ? '把這次變動備份到 GitHub' : '備份到 GitHub');
+    title(scope === 'all' ? '備份所有旅程到 GitHub' : scope === 'project' ? '備份整個旅程資料夾到 GitHub' : scope === 'archive' ? '把這次變動備份到 GitHub' : '備份到 GitHub');
     const p = await checking(BACKUP_STEPS, '正在列出這次要備份的內容…', async () => { const [name, input] = backupRequest(scope, opts); return (await api(name, input)).preparation; }, () => backup(opts), backupHelp(opts));
     if (!p) return;
     if (!p.files.length && !p.unpublishedCommits) { const text = '目前沒有需要備份的內容，已經是最新。'; done(BACKUP_STEPS, '已經是最新的備份', text, 'ok', { status: 'done', message: text, tone: 'ok' }); return; }

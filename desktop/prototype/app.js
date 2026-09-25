@@ -34,9 +34,9 @@ let conversationError = false;
 let tripGroupOpen = true;
 try { const stored = localStorage.getItem('travel-planner.theme'); if (['system', 'light', 'dark'].includes(stored)) ui.theme = stored; } catch { /* Preference storage is optional. */ }
 const issues = {
-  'workspace-busy': '請先停止目前的 AI 工作，再切換專案。',
-  'workspace-pending-proposal': '請先確認或放棄目前的提案，再切換專案。',
-  'schema-unsupported': '資料格式和 App 的版本不同；請按上方的「更新專案」。',
+  'workspace-busy': '請先停止目前的 AI 工作，再切換旅程資料夾。',
+  'workspace-pending-proposal': '請先確認或放棄目前的提案，再切換旅程資料夾。',
+  'schema-unsupported': '資料格式和 App 的版本不同；請按上方的「更新旅程資料夾」。',
   'title-invalid': '旅程名稱缺漏或格式不符。', 'dates-invalid': '日期缺漏或格式不符。',
   'deployment-invalid': '部署設定缺漏或格式不符。', 'data-files-missing': '部分行程資料檔尚未齊全。',
   'config-invalid': '設定檔不是可讀取的 JSON 物件。', 'config-unreadable': '設定檔缺漏或無法讀取。',
@@ -267,7 +267,7 @@ function renderSetupChecklist() {
   // 桌面版改用完整的首次引導（onboarding.js）；這份清單只在瀏覽器預覽模式保留。
   list.hidden = true; list.replaceChildren(); if (window.travelDesktop) return;
   const steps = [
-    { done: hasProject, title: '連接或建立你的私人專案', hint: '行程資料會存在你自己的私人 GitHub 專案，換電腦也不會不見。', label: '前往我的旅程資料', go: () => openSettings('projects') },
+    { done: hasProject, title: '連接或建立你的旅程資料夾', hint: '行程資料會存在你自己的私人 GitHub 備份，換電腦也不會不見。', label: '前往我的旅程資料', go: () => openSettings('projects') },
     { done: aiReady, title: '安裝並連接 AI（Codex 或 Claude）', hint: state === 'unavailable' ? '這台電腦還沒有 AI 工具，App 可以幫你下載安裝。' : '用你的 ChatGPT 或 Claude 帳號登入一次。', label: state === 'unavailable' ? '安裝 AI 工具' : '連接 AI', go: () => { openSettings(state === 'unavailable' ? 'tools' : 'ai'); if (state === 'unavailable') window.openToolSetup?.(activeProvider === 'claude' ? 'claude' : 'codex'); } },
     { optional: true, title: '要分享給同行朋友時，再連接 Cloudflare', hint: '發布網站前才需要，現在可以先跳過。', label: '了解發布', go: () => { openSettings('sync'); settingTab('publish'); } },
   ];
@@ -366,7 +366,7 @@ async function selectTrip(trip, demo = false) {
       applyConversation(result.conversation,trip);
       if(accountState.state==='disconnected')restoreAIConnection();
     });
-    selectionReady.catch(() => {if(selected?.trip===trip){conversationLoading=false;conversationError=true;updateComposer();notify('無法恢復這趟旅程的對話，請重新連接專案。');}});
+    selectionReady.catch(() => {if(selected?.trip===trip){conversationLoading=false;conversationError=true;updateComposer();notify('無法恢復這趟旅程的對話，請重新連接旅程資料夾。');}});
   }
   notify('');
   $('welcome').hidden = true;
@@ -469,18 +469,18 @@ $('retry-preview').onclick = () => { realPreview = null; loadRealPreview(); };
 $('choose-project').onclick = async () => {
   if(aiBusy||pendingProposal){notify('請先完成目前工作或處理提案。');return;}
   if(window.hasMaterialization?.()){notify('請先保存或放棄正式行程候選。');return;}
-  if (!window.travelDesktop) { notify('瀏覽器版可試用示範流程；請在桌面 App 中選取本機專案。'); return; }
+  if (!window.travelDesktop) { notify('瀏覽器版可試用示範流程；請在桌面 App 中選擇旅程資料夾。'); return; }
   aiBusy=true;proposalBusy=true;updateComposer();
   if(!await flushConversationDraft()){aiBusy=false;proposalBusy=false;updateComposer();return;}
   const button = $('choose-project'); button.disabled = true; button.textContent = '正在檢查…';
   try {
     const result = await window.travelDesktop.chooseProject();
-    if (result.canceled) { notify('已取消選取，目前的專案與旅程保留。'); return; }
-    if (!result.ok) { notify(result.code === 'not-project' ? '沒有辨識到 travel-planner 專案，請選擇包含 trips 與 scripts 的專案根資料夾。' : issues[result.code] || '無法讀取這個資料夾，請確認位置與讀取權限後重試。'); return; }
+    if (result.canceled) { notify('已取消選取，目前的旅程資料夾與旅程保留。'); return; }
+    if (!result.ok) { notify(result.code === 'not-project' ? '沒有辨識到旅程資料夾，請選擇包含 trips 與 scripts 的那一層資料夾。' : issues[result.code] || '無法讀取這個資料夾，請確認位置與讀取權限後重試。'); return; }
     project = result;
     if (selected && !selected.demo) {
       selected = null; $('welcome').hidden = false; $('messages').hidden = true; $('messages').replaceChildren();
-      $('trip-title').textContent = '選擇一趟旅程'; $('trip-status').textContent = '已切換專案';
+      $('trip-title').textContent = '選擇一趟旅程'; $('trip-status').textContent = '已切換旅程資料夾';
       $('message').disabled = true; $('send-message').disabled = true; $('message').value = ''; renderPreview();
     }
     navigation(); renderProject(); notify('已連接這個旅程資料夾，可以從左側選一趟旅程開始。');
@@ -586,7 +586,7 @@ function renderProposal() {
   // 需要查核時，主要按鈕直接開始查核，不讓人對著停用的按鈕不知道下一步。
   const research=pendingProposal.requiresResearch;
   $('proposal-note').textContent=research?'這次改到停留或交通，保存前要先查核來源與可行性。按「先查核，再保存」開始；也可以在「查看修改對照」取消這些項目。':pendingProposal.previewLoaded?'請檢查候選預覽，確認後建立新的本機版本。':'請先查看右側候選預覽，再確認保存。';
-  $('save-proposal').textContent=research?'先查核，再保存':'確認保存到原專案';
+  $('save-proposal').textContent=research?'先查核，再保存':'確認保存到你的行程';
   $('save-proposal').disabled=research?aiBusy:!pendingProposal.previewLoaded||aiBusy||!pendingProposal.selectedKeys?.length;
   $('discard-proposal').disabled=aiBusy;$('review-changes').disabled=aiBusy;
   if($('changes-dialog').open)renderChanges();
@@ -687,7 +687,7 @@ $('chat-form').onsubmit = async event => {
   composerNav.reset();
   if (selected.demo) {
     trip.messages.push({ role:'user',text:message }); trip.day=`第一天，保留彈性安排。\n\n你的調整：${message}`; trip.revision++;
-    trip.messages.push({ role:'assistant',text:`已把你的想法加入第一天。\n\n右側預覽已更新為第 ${trip.revision} 版。這次是示範修改，沒有呼叫 AI 或寫入原專案。` });
+    trip.messages.push({ role:'assistant',text:`已把你的想法加入第一天。\n\n右側預覽已更新為第 ${trip.revision} 版。這次是示範修改，沒有呼叫 AI，也沒有改你的行程。` });
     trip.draft=''; selectTrip(trip,true); $('message').focus(); return;
   }
   if (accountState.state !== 'connected' || !['ready','planning'].includes(realPreview?.status)) { notify('請先驗證行程並連接 AI。'); return; }
@@ -765,7 +765,7 @@ $('save-proposal').onclick = async () => {
     const result=await window.travelDesktop.applyProposal({projectId:pendingProposal.projectId,slug:pendingProposal.slug,proposalId:pendingProposal.id});
     if (!result.ok) notify(result.message);
     else {
-      appendRealMessage(selected.trip,{role:'assistant',text:`已保存到原專案的本機檔案，並保留修改前的還原副本。尚未異地備份，也沒有部署。${result.statusUpdated ? '' : '\n進度紀錄未能同步更新，請稍後核對。'}`});
+      appendRealMessage(selected.trip,{role:'assistant',text:`已保存到這台電腦上的行程檔案，並保留修改前的還原副本。尚未異地備份，也沒有部署。${result.statusUpdated ? '' : '\n進度紀錄未能同步更新，請稍後核對。'}`});
       if(result.versionRecorded===false)notify('內容已保存，但版本紀錄尚待核對；請重新載入後確認，避免重複保存。');
       window.refreshBackupStatus?.();
       if(result.version)appendRealMessage(selected.trip,{role:'assistant',text:`已建立本機日程版本 V${result.version.number}。可從上方版本紀錄查看或回復。`});
@@ -805,8 +805,8 @@ async function initializeWorkspace() {
       navigation(); renderProject();
       const trip = project?.trips.find(item => item.slug === saved.selectedSlug);
       if (trip) { selectTrip(trip); setPreview(true); }
-      if (saved.warning) notify(saved.warning === 'project-recovery-required' ? '上次關閉時有一次保存沒有完成，App 需要重新確認專案。請到「設定 → 我的旅程資料」重新選取原本的旅程資料夾；你的檔案都還在。' : saved.warning === 'project-unavailable' ? '上次的專案目前無法讀取，請到設定重新選擇資料夾。' : '連接紀錄無法讀取，原紀錄已保留，請讓 coding agent 協助處理。');
-    } catch { notify('無法恢復上次的專案連接，請到設定重新選擇。'); }
+      if (saved.warning) notify(saved.warning === 'project-recovery-required' ? '上次關閉時有一次保存沒有完成，App 需要重新確認旅程資料夾。請到「設定 → 我的旅程資料」重新選取原本的旅程資料夾；你的檔案都還在。' : saved.warning === 'project-unavailable' ? '上次的旅程資料夾目前無法讀取，請到設定重新選擇資料夾。' : '連接紀錄無法讀取，原紀錄已保留，請讓 coding agent 協助處理。');
+    } catch { notify('無法恢復上次的旅程資料夾連接，請到設定重新選擇。'); }
   }
   renderTheme();
   document.documentElement.dataset.ready = 'true';

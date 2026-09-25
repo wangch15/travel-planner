@@ -45,9 +45,9 @@ app.whenReady().then(async()=>{
   // 3 私人專案：預設名稱與位置，建立後自動第一次備份
   await until('document.getElementById("ob-project-name")?.value==="travel-planner-trips"');await shot('3-project.png');
   // 「我已經有專案了」留在引導裡：直接選資料夾或從 GitHub 下載，不露出一般畫面或設定頁
-  await press('我已經有專案了');await until('onboarding.state().view==="existing" && !document.getElementById("onboarding").hidden && document.getElementById("settings").hidden');
+  await press('我已經有旅程資料夾了');await until('onboarding.state().view==="existing" && !document.getElementById("onboarding").hidden && document.getElementById("settings").hidden');
   assert.ok(await js('[...document.querySelectorAll("#onboarding button")].some(b=>b.textContent.startsWith("選擇資料夾")) && Boolean(document.getElementById("ob-existing-repo"))'));await shot('3b-existing.png');
-  await press('← 改成建立新的專案');await until('onboarding.state().view==="project"');
+  await press('← 改成建立新的旅程資料夾');await until('onboarding.state().view==="project"');
   await press('建立並完成第一次備份');await until('onboarding.state().view==="ai"',300);
   assert.deepEqual(calls.filter(c=>/^(prepare|backup)/.test(c)),['prepare:travel-planner-trips','backup-prepare:project','backup-confirm:backup-token']);
   assert.equal(await js('project?.root'),projectRoot);

@@ -19,7 +19,7 @@ async function readLock(root) {
 async function claimProject(root, { pid = process.pid, dataDir, kind, isAlive = alive } = {}) {
   const other = await readLock(root);
   const warning = other && other.pid !== pid && other.dataDir !== dataDir && isAlive(other.pid)
-    ? `這個專案同時在另一個 Travel Planner（${other.kind === 'dev' ? '從原始碼執行的開發版' : '安裝版'}）開著。兩邊同時修改可能互相覆蓋，請先關掉其中一個。`
+    ? `這個旅程資料夾同時在另一個 Travel Planner（${other.kind === 'dev' ? '從原始碼執行的開發版' : '安裝版'}）開著。兩邊同時修改可能互相覆蓋，請先關掉其中一個。`
     : null;
   try {
     await fs.mkdir(path.join(root, '.local'), { recursive: true });

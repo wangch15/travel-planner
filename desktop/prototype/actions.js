@@ -42,17 +42,17 @@
   const publishCard = () => flowCard('把這趟行程發布成網站', '發布前要先看過預覽，並確認網站是「拿到網址的人都能開」的公開頁面。', '準備發布', () => ({ kind: 'publish' }));
 
   function projectUpdateCard() {
-    const c = shell('更新專案', '只更新模板的引擎檔案，不會改動你的行程、照片與私人筆記。會先預演，有衝突就停下。');
+    const c = shell('更新旅程資料夾', '只更新資料夾裡的網頁程式，不會改動你的行程、照片與私人筆記。會先預演，有衝突就停下。');
     const prepare = async () => {
       const { update: u } = await feature('project-update-prepare');
       if (!u.token) { c.say(u.message, 'ok'); c.set(); return; }
-      c.body.replaceChildren(h('p', {}, u.upToDate ? '模板已是最新，只需要升級行程資料格式。' : `專案引擎 ${u.fromVersion || '未知'} → ${u.toVersion || '未知'}，共 ${u.changedFiles} 個引擎檔案。`),
+      c.body.replaceChildren(h('p', {}, u.upToDate ? '模板已是最新，只需要升級行程資料格式。' : `資料夾裡的網頁程式 ${u.fromVersion || '未知'} → ${u.toVersion || '未知'}，共 ${u.changedFiles} 個引擎檔案。`),
         ...u.highlights.map(e => h('div', {}, h('strong', {}, `${e.version}（${e.date}）`), list(e.highlights, 4))),
         u.migrateTrips.length ? h('p', {}, '會升級這些行程的資料格式：' + u.migrateTrips.join('、')) : null);
       c.set(c.btn('確認更新', async () => {
         const response = await feature('project-update-confirm', { token: u.token });
         await window.reloadProjectFromResult?.(response);
-        c.say(response.result.merged ? '專案已更新，下次私人備份會一起上傳。' : '專案已是最新。', 'ok'); c.body.replaceChildren(); c.set(); window.refreshBackupStatus?.();
+        c.say(response.result.merged ? '旅程資料夾已更新，下次私人備份會一起上傳。' : '旅程資料夾已是最新。', 'ok'); c.body.replaceChildren(); c.set(); window.refreshBackupStatus?.();
       }, true, '更新中…'));
     };
     c.set(c.btn('檢查更新內容', prepare, true, '檢查中…'));

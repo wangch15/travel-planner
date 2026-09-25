@@ -64,23 +64,23 @@ class BackupService {
         || ['core.fsmonitor', 'core.sshcommand', 'core.gitproxy', 'core.askpass', 'diff.external', 'core.alternateRefsCommand'.toLowerCase()].includes(key)
         || (['commit.gpgsign', 'push.gpgsign'].includes(key) && !['false', 'no', '0'].includes(value))
         || (/^credential(?:\..+)?\.helper$/.test(key) && !/^(|osxkeychain|manager|manager-core|wincred|cache(?: --timeout=\d+)?|!gh auth git-credential|!\/(?:opt\/homebrew|usr\/local)\/bin\/gh auth git-credential)$/.test(value))) {
-        throw fail('UNSAFE_GIT_CONFIG', `這個專案的 Git 設定裡有會執行其他程式的項目（${key}），為了安全 App 這次沒有備份。這通常是其他工具加進去的，請把這個畫面給幫你設定電腦的人看。`);
+        throw fail('UNSAFE_GIT_CONFIG', `這個旅程資料夾的 Git 設定裡有會執行其他程式的項目（${key}），為了安全 App 這次沒有備份。這通常是其他工具加進去的，請把這個畫面給幫你設定電腦的人看。`);
       }
     }
-    if (values.get('core.hookspath') !== '.githooks') throw fail('TRUSTED_HOOK_REQUIRED', '需要安裝並核對專案的私人備份 pre-push 保護。');
+    if (values.get('core.hookspath') !== '.githooks') throw fail('TRUSTED_HOOK_REQUIRED', '需要安裝並核對旅程資料夾的備份保護程式。');
     if (values.get('core.worktree') && path.resolve(root, values.get('core.worktree')) !== root) throw fail('UNSAFE_GIT_CONFIG');
     // Git for Windows prints forward slashes even when realpath uses native separators.
     // Keep the canonical root check above; normalize only Git's path representation.
     if (path.resolve((await this.git(root, ['rev-parse', '--show-toplevel'])).trim()) !== root) throw fail('UNSAFE_PATH');
     const hookStat = await fs.lstat(path.join(root, '.githooks/pre-push'));
-    if (process.platform !== 'win32' && !(hookStat.mode & 0o111)) throw fail('TRUSTED_HOOK_REQUIRED', '專案的備份保護程式沒有執行權限，App 無法啟用，這次沒有備份。請把這個畫面給幫你設定電腦的人看。');
+    if (process.platform !== 'win32' && !(hookStat.mode & 0o111)) throw fail('TRUSTED_HOOK_REQUIRED', '旅程資料夾的備份保護程式沒有執行權限，App 無法啟用，這次沒有備份。請把這個畫面給幫你設定電腦的人看。');
     const entries = await fs.readdir(path.join(root, '.githooks'));
     for (const entry of entries) {
       if (entry.endsWith('.sample')) continue;
-      if (entry !== 'pre-push') throw fail('UNTRUSTED_HOOK', '專案的 .githooks 裡有 App 不認得的程式（除了備份保護以外的 Git hook），App 不會執行它，這次沒有備份。');
+      if (entry !== 'pre-push') throw fail('UNTRUSTED_HOOK', '旅程資料夾的 .githooks 裡有 App 不認得的程式（除了備份保護以外的 Git hook），App 不會執行它，這次沒有備份。');
     }
     for (const relative of TRUSTED_FILES) {
-      if (!trustedFile(relative, await regularBytes(path.join(root, relative), 1024 * 1024), await regularBytes(path.join(this.trustedRoot, relative), 1024 * 1024))) throw fail('UNTRUSTED_HOOK', '專案裡的備份保護程式和 App 內建的版本不同。請先到「設定 → 我的旅程資料」按「更新專案」，完成後再備份。');
+      if (!trustedFile(relative, await regularBytes(path.join(root, relative), 1024 * 1024), await regularBytes(path.join(this.trustedRoot, relative), 1024 * 1024))) throw fail('UNTRUSTED_HOOK', '旅程資料夾裡的備份保護程式和 App 內建的版本不同。請先到「設定 → 我的旅程資料」按「更新旅程資料夾」，完成後再備份。');
     }
     // A package type override would change how the trusted hook imports are executed.
     for (const folder of ['', 'scripts', 'scripts/lib']) {
@@ -89,7 +89,7 @@ class BackupService {
     }
     for (const marker of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REBASE_HEAD']) {
       const file = (await this.git(root, ['rev-parse', '--git-path', marker])).trim();
-      try { await fs.lstat(path.resolve(root, file)); throw fail('GIT_OPERATION_ACTIVE', '這個專案有一個還沒完成的 Git 合併（通常是其他工具留下的）。App 不會替你決定怎麼處理，這次沒有備份。請把這個畫面給幫你設定電腦的人看。'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      try { await fs.lstat(path.resolve(root, file)); throw fail('GIT_OPERATION_ACTIVE', '這個旅程資料夾有一個還沒完成的 Git 合併（通常是其他工具留下的）。App 不會替你決定怎麼處理，這次沒有備份。請把這個畫面給幫你設定電腦的人看。'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
     }
     return hash(config);
   }
@@ -99,11 +99,11 @@ class BackupService {
     const urls = (await this.git(root, ['remote', 'get-url', '--push', '--all', 'origin'])).trim().split(/\r?\n/);
     const repo = urls.length === 1 && destinationRepo(urls[0]);
     const branch = (await this.git(root, ['branch', '--show-current'])).trim();
-    if (!repo || repo.toLowerCase() === 'wangch15/travel-planner' || !branch || /[\s:~^?*\[\\]/.test(branch) || branch.startsWith('-')) throw fail('PRIVATE_REPO_REQUIRED', '這個專案的 GitHub 備份位置不明確（沒有設定、設了不只一個，或指向公開模板），App 不會猜要推到哪裡，這次沒有備份。請把這個畫面給幫你設定電腦的人看。');
+    if (!repo || repo.toLowerCase() === 'wangch15/travel-planner' || !branch || /[\s:~^?*\[\\]/.test(branch) || branch.startsWith('-')) throw fail('PRIVATE_REPO_REQUIRED', '這個旅程資料夾的 GitHub 備份位置不明確（沒有設定、設了不只一個，或指向公開模板），App 不會猜要推到哪裡，這次沒有備份。請把這個畫面給幫你設定電腦的人看。');
     const response = await this.run('gh', ['repo', 'view', repo, '--json', 'visibility'], { cwd: root });
-    if (response?.status && response.status !== 0) throw fail('PRIVATE_REPO_REQUIRED', '無法向 GitHub 確認這個專案是私人的（可能是網路不通，或 GitHub 還沒連接），這次沒有備份。確認連線後再試。');
+    if (response?.status && response.status !== 0) throw fail('PRIVATE_REPO_REQUIRED', '無法向 GitHub 確認你的備份是私人的（可能是網路不通，或 GitHub 還沒連接），這次沒有備份。確認連線後再試。');
     let visibility = null; try { visibility = JSON.parse(response.stdout).visibility; } catch {}
-    if (visibility !== 'PRIVATE') throw fail('PRIVATE_REPO_REQUIRED', '備份位置不是「私人」的 GitHub 專案。為了保護訂房等私人資料，App 不會推送。請到 GitHub 網站把這個專案設成 Private 後再備份。');
+    if (visibility !== 'PRIVATE') throw fail('PRIVATE_REPO_REQUIRED', 'GitHub 上的備份位置不是「私人」的。為了保護訂房等私人資料，App 不會推送。請到 GitHub 網站把這個備份設成 Private 後再備份。');
     return { url: urls[0], repo, branch };
   }
   async inspect(target) {
@@ -117,7 +117,7 @@ class BackupService {
     if (!authorReady) throw fail('GIT_IDENTITY_REQUIRED', '還沒設定備份署名（每次備份會記下的名字與郵件）。');
     const head = (await this.git(root, ['rev-parse', 'HEAD'])).trim();
     const staged = await this.git(root, ['diff', '--no-ext-diff', '--no-textconv', '--cached', '--name-only', '-z']);
-    if (staged) throw fail('STAGED_CHANGES', '專案裡有被其他工具「暫存」、準備提交的改動。按「取消暫存」會讓它們回到一般的修改（檔案內容不變），App 再一起列出來讓你核對。');
+    if (staged) throw fail('STAGED_CHANGES', '旅程資料夾裡有被其他工具「暫存」、準備提交的改動。按「取消暫存」會讓它們回到一般的修改（檔案內容不變），App 再一起列出來讓你核對。');
     // scope 'archive'：封存、還原或永久刪除一趟旅程時，旅程原位置與 trips/_archived/ 的同名資料夾一起備份。
     const prefixes = slug === null ? [] : slug === '*' ? ['trips/'] : scope === 'archive' ? [`trips/${slug}/`, `trips/_archived/${slug}/`] : [`trips/${slug}/`];
     const inScope = name => prefixes.some(prefix => name.startsWith(prefix));

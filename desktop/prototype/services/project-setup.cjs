@@ -31,7 +31,7 @@ async function anchor(directory) {
 async function verify(a) { const now = await fs.lstat(a.directory); if (!now.isDirectory() || now.isSymbolicLink() || !same(now, a.stat) || await fs.realpath(a.directory) !== a.canonical) throw fail('PROJECT_CHANGED'); }
 async function noRepositoryParent(directory) {
   for (let current = directory;; current = path.dirname(current)) {
-    try { await fs.lstat(path.join(current, '.git')); throw fail('NESTED_PROJECT', '請選擇 Git 專案以外的資料夾，避免把私人專案放進另一個專案。'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    try { await fs.lstat(path.join(current, '.git')); throw fail('NESTED_PROJECT', '請選擇不在其他 Git 資料夾裡的位置，避免把旅程資料夾放進別的資料夾裡。'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
     try { await fs.stat(path.join(current, 'HEAD')); const objects = await fs.stat(path.join(current, 'objects')); if (objects.isDirectory()) throw fail('NESTED_PROJECT'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
     if (path.dirname(current) === current) break;
   }
@@ -48,12 +48,12 @@ class ProjectSetupService {
       if (!trustedFilter(key, value) && /^(includeif\.|filter\.|gpg\.|diff\..*\.(command|textconv)$|url\..*\.(insteadof|pushinsteadof)$|remote\..*\.(receivepack|uploadpack|vcs|proxy)$)/.test(key)
         || ['core.fsmonitor', 'core.sshcommand', 'core.gitproxy', 'core.askpass', 'diff.external', 'core.alternaterefscommand', 'core.hookspath', 'core.worktree', 'init.templatedir'].includes(key)
         || key === 'core.bare' && !['false', 'no', '0'].includes(value)
-        || /^credential(?:\..+)?\.helper$/.test(key) && !/^(|osxkeychain|manager|manager-core|wincred|cache(?: --timeout=\d+)?|!gh auth git-credential|!\/(?:opt\/homebrew|usr\/local)\/bin\/gh auth git-credential)$/.test(value)) throw fail('UNSAFE_GIT_CONFIG', `你的 Git 設定有「${key}」，它可能在下載時執行其他程式；為了安全，App 不會在這種設定下建立或下載專案。請確認這個設定後再試。`);
+        || /^credential(?:\..+)?\.helper$/.test(key) && !/^(|osxkeychain|manager|manager-core|wincred|cache(?: --timeout=\d+)?|!gh auth git-credential|!\/(?:opt\/homebrew|usr\/local)\/bin\/gh auth git-credential)$/.test(value)) throw fail('UNSAFE_GIT_CONFIG', `你的 Git 設定有「${key}」，它可能在下載時執行其他程式；為了安全，App 不會在這種設定下建立或下載旅程資料夾。請確認這個設定後再試。`);
     }
   }
   async privateRepo(repo, cwd) {
-    let info; try { info = JSON.parse(await this.github(['repo', 'view', repo, '--json', 'nameWithOwner,visibility'], cwd)); } catch { throw fail('PRIVATE_REPO_REQUIRED', '請先連接 GitHub，並確認你能存取這個私人專案。'); }
-    if (info.visibility !== 'PRIVATE' || typeof info.nameWithOwner !== 'string' || info.nameWithOwner.toLowerCase() !== repo.toLowerCase()) throw fail('PRIVATE_REPO_REQUIRED', '這個 GitHub 專案不是「私人」的（或無法確認）。為了保護訂房等私人資料，App 只使用私人專案；請到 GitHub 網站把它設成 Private，或換一個私人專案。');
+    let info; try { info = JSON.parse(await this.github(['repo', 'view', repo, '--json', 'nameWithOwner,visibility'], cwd)); } catch { throw fail('PRIVATE_REPO_REQUIRED', '請先連接 GitHub，並確認你能存取這個私人備份。'); }
+    if (info.visibility !== 'PRIVATE' || typeof info.nameWithOwner !== 'string' || info.nameWithOwner.toLowerCase() !== repo.toLowerCase()) throw fail('PRIVATE_REPO_REQUIRED', '這個 GitHub 備份不是「私人」的（或無法確認）。為了保護訂房等私人資料，App 只使用私人備份；請到 GitHub 網站把它設成 Private，或換一個私人的。');
     return info;
   }
   async parent(parentDirectory, name) {
@@ -99,7 +99,7 @@ class ProjectSetupService {
     if (this.busy) throw fail('PROJECT_SETUP_BUSY');
     const target = await this.identityTarget(root), account = await this.authenticatedAuthor(target.root);
     const token = this.keep('identity', { ...target, ...account });
-    return { token, root: target.root, repo: target.repo, author: account.author, warning: '只會設定這個專案的備份署名，不影響電腦上的其他專案，也不會備份或推送任何資料。' };
+    return { token, root: target.root, repo: target.repo, author: account.author, warning: '只會設定這個旅程資料夾的備份署名，不影響電腦上的其他資料夾，也不會備份或推送任何資料。' };
   }
   async confirmIdentity(token) {
     const pending = this.take(token, 'identity');
@@ -117,7 +117,7 @@ class ProjectSetupService {
       const name = String(await this.git(['config', 'user.name'], { cwd: pending.root })).trim(), email = String(await this.git(['config', 'user.email'], { cwd: pending.root })).trim();
       if (name !== pending.author.name || email !== pending.author.email) throw fail('IDENTITY_NOT_EFFECTIVE');
       return { ready: true, identityReady: true, root: pending.root, repo: pending.repo, message: '備份署名已設定好，現在可以備份了。' };
-    } catch (error) { return { ready: false, identityReady: false, root: pending.root, repo: pending.repo, code: error.code || 'IDENTITY_SETUP_FAILED', message: '備份署名沒有設定成功，專案其他設定沒有變動。請確認 GitHub 已連接後再試一次。' }; }
+    } catch (error) { return { ready: false, identityReady: false, root: pending.root, repo: pending.repo, code: error.code || 'IDENTITY_SETUP_FAILED', message: '備份署名沒有設定成功，旅程資料夾其他設定沒有變動。請確認 GitHub 已連接後再試一次。' }; }
     finally { this.busy = false; }
   }
   // 首次引導用：在預設位置找一個本機與 GitHub 都還沒用過的名稱（travel-planner-trips、-2、-3…）。
@@ -130,14 +130,14 @@ class ProjectSetupService {
       const taken = await this.gh(['repo', 'view', `${account.owner}/${name}`, '--json', 'name'], { cwd: parent.canonical }).then(r => !r || !r.error && (r.status === undefined || r.status === 0), () => false);
       if (!taken) return { name, owner: account.owner, parentDirectory: parent.canonical, destination: path.join(parent.canonical, name) };
     }
-    throw fail('NAME_UNAVAILABLE', '找不到可用的專案名稱，請自行輸入一個。');
+    throw fail('NAME_UNAVAILABLE', '找不到可用的備份名稱，請自行輸入一個。');
   }
   async prepareCreate({ name, parentDirectory }) {
     if (this.busy) throw fail('PROJECT_SETUP_BUSY');
     if (typeof name !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,99}$/.test(name) || !safePart(name)) throw fail('INVALID_REPOSITORY');
     const location = await this.parent(parentDirectory, name), account = await this.authenticatedAuthor(location.parent.canonical);
     const identity = repository(`${account.owner}/${name}`), token = this.keep('create', { ...identity, ...location, ...account });
-    return { token, repo: identity.repo, owner: account.owner, author: account.author, visibility: 'PRIVATE', destination: location.destination, templateSource: TEMPLATE, warning: '確認後會建立 GitHub 私人專案，並僅為這份新複本設定你的 GitHub 名稱與 noreply 郵件作為提交作者；不變更全域 Git 設定，也不自動推送。' };
+    return { token, repo: identity.repo, owner: account.owner, author: account.author, visibility: 'PRIVATE', destination: location.destination, templateSource: TEMPLATE, warning: '確認後會建立 GitHub 私人備份，並僅為這份新複本設定你的 GitHub 名稱與 noreply 郵件作為提交作者；不變更全域 Git 設定，也不自動推送。' };
   }
   take(token, kind) {
     if (this.busy) throw fail('PROJECT_SETUP_BUSY');
@@ -156,14 +156,14 @@ class ProjectSetupService {
     const entries = [], folded = new Set(); let total = 0;
     for (const row of tree.split('\0').filter(Boolean)) {
       const match = /^(100644|100755) blob ([a-f0-9]{40}|[a-f0-9]{64}) +([0-9]+)\t(.+)$/s.exec(row);
-      if (!match || !safePath(match[4])) throw fail('UNSAFE_PROJECT_TREE', '專案含符號連結、子模組或不安全路徑，已停止下載展開。');
+      if (!match || !safePath(match[4])) throw fail('UNSAFE_PROJECT_TREE', '旅程資料夾含符號連結、子模組或不安全路徑，已停止下載展開。');
       const size = Number(match[3]), key = match[4].normalize('NFC').toLowerCase();
       if (folded.has(key)) throw fail('UNSAFE_PROJECT_TREE'); folded.add(key);
       if (!Number.isSafeInteger(size) || size > MAX_FILE || (total += size) > MAX_TOTAL || entries.length >= 10000) throw fail('PROJECT_TOO_LARGE');
       if (sourceURL === `https://github.com/${TEMPLATE}.git` && match[4].startsWith('trips/') && !match[4].startsWith('trips/_example/')) throw fail('INVALID_TEMPLATE');
       entries.push({ mode: match[1], oid: match[2], size, name: match[4] });
     }
-    if (!entries.length) throw fail('EMPTY_PROJECT', '私人專案目前沒有提交；請使用建立私人專案流程取得模板。');
+    if (!entries.length) throw fail('EMPTY_PROJECT', '旅程資料夾目前沒有提交；請使用建立旅程資料夾流程取得模板。');
     for (const entry of entries) {
       await verify(owned); await verify(gitDir);
       const output = await this.git(['cat-file', 'blob', entry.oid], { cwd: pending.destination, encoding: 'buffer', maxBuffer: MAX_FILE + 1024 });
@@ -217,7 +217,7 @@ class ProjectSetupService {
       localCreated = true; await this.materialize(pending, pending.url);
       await this.privateRepo(pending.repo, pending.destination);
       const backupReady = await this.installTrustedHooks(pending.destination), identityReady = await this.identityReady(pending.destination);
-      return { ready: true, root: pending.destination, repo: pending.repo, backupReady, identityReady, warning: !backupReady ? '專案已下載。它的備份保護程式和 App 的版本不同，第一次備份前請到「設定 → 我的旅程資料」按「更新專案」。' : !identityReady ? '專案已下載。第一次備份時 App 會請你確認備份署名（用你的 GitHub 帳號）。' : null };
+      return { ready: true, root: pending.destination, repo: pending.repo, backupReady, identityReady, warning: !backupReady ? '旅程資料夾已下載。它的備份保護程式和 App 的版本不同，第一次備份前請到「設定 → 我的旅程資料」按「更新旅程資料夾」。' : !identityReady ? '旅程資料夾已下載。第一次備份時 App 會請你確認備份署名（用你的 GitHub 帳號）。' : null };
     } catch (error) { return { ready: false, ...(localCreated ? { root: pending.destination } : {}), repo: pending.repo, code: error.code || 'PROJECT_DOWNLOAD_FAILED', message: '下載未完成；已產生的本機資料保留，沒有覆蓋既有資料夾，也沒有推送。請核對位置、權限與網路。' }; }
     finally { this.busy = false; }
   }
@@ -241,8 +241,8 @@ class ProjectSetupService {
       await this.git(['config', '--local', 'user.email', pending.author.email], { cwd: pending.destination });
       const backupReady = await this.installTrustedHooks(pending.destination);
       return { ready: true, created: true, identityReady: true, root: pending.destination, repo: pending.repo, backupReady, backedUp: false,
-        warning: backupReady ? '私人專案與本機複本已建立；尚未推送，請在備份區確認第一次備份。' : '私人專案已建立；備份保護未通過核對，尚未推送。' };
-    } catch (error) { return { ready: false, created, creationOutcome: created ? 'created' : createAttempted ? 'unknown' : 'not-started', ...(localCreated ? { root: pending.destination } : {}), repo: pending.repo, code: error.code || 'PROJECT_CREATE_FAILED', message: created ? 'GitHub 私人專案已建立，但本機設定未完成；遠端與本機資料均保留，請核對後再處理，不要重複建立。' : createAttempted ? 'GitHub 建立結果尚未確認，遠端可能已存在；請先核對，不要直接重試建立。' : '建立尚未開始；請先確認 GitHub 帳號、專案名稱與目前遠端狀態，再決定下一步。' }; }
+        warning: backupReady ? 'GitHub 私人備份與本機的旅程資料夾已建立；尚未推送，請在備份區確認第一次備份。' : 'GitHub 私人備份已建立；備份保護未通過核對，尚未推送。' };
+    } catch (error) { return { ready: false, created, creationOutcome: created ? 'created' : createAttempted ? 'unknown' : 'not-started', ...(localCreated ? { root: pending.destination } : {}), repo: pending.repo, code: error.code || 'PROJECT_CREATE_FAILED', message: created ? 'GitHub 私人備份已建立，但本機設定未完成；遠端與本機資料均保留，請核對後再處理，不要重複建立。' : createAttempted ? 'GitHub 建立結果尚未確認，遠端可能已存在；請先核對，不要直接重試建立。' : '建立尚未開始；請先確認 GitHub 帳號、備份名稱與目前遠端狀態，再決定下一步。' }; }
     finally { this.busy = false; }
   }
 }

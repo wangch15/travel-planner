@@ -6,7 +6,7 @@
   const reveal = () => { if (document.body.dataset.onboarding === 'pending') delete document.body.dataset.onboarding; };
   const feature = async (name, input = {}) => { const r = await window.travelDesktop.feature(name, input); if (!r.ok) throw Error(r.message || '操作未完成'); return r; };
   const root = $('onboarding');
-  const STEPS = [['github', 'GitHub'], ['git', 'Git'], ['project', '私人專案'], ['ai', 'AI 助手'], ['cloudflare', 'Cloudflare']];
+  const STEPS = [['github', 'GitHub'], ['git', 'Git'], ['project', '旅程資料夾'], ['ai', 'AI 助手'], ['cloudflare', 'Cloudflare']];
   let facts = null, saved = { completed: false, cloudflareSkipped: false }, view = null, busy = false, message = null, detail = {};
   let dismissedForSession = false, pollTimer = null, authWatch = null;
 
@@ -62,19 +62,19 @@
     card(h('ol', { class: 'ob-overview' }, [
       ['連接 GitHub', '行程存在你自己的私人 GitHub，換電腦也不會不見。沒有帳號的話先免費註冊。'],
       ['準備 Git', 'Mac 沒有的話會跳出 Apple 的安裝視窗。'],
-      ['建立私人專案', 'App 自動建立並完成第一次備份。'],
+      ['建立旅程資料夾', 'App 自動建立並完成第一次備份。'],
       ['連接 AI 助手', 'Codex（ChatGPT）或 Claude，選一個登入。'],
       ['連接 Cloudflare（可跳過）', '要把行程網頁分享給旅伴時才需要。'],
     ].map(([t, d], i) => h('li', {}, h('span', { class: 'ob-num' }, String(i + 1)), h('div', {}, h('strong', {}, t), h('span', {}, d))))),
       h('p', { class: 'ob-note' }, 'Node.js、GitHub 工具、Cloudflare 工具與行程網頁引擎都已經內建在 App 裡，不用另外安裝。')),
     h('div', { class: 'ob-actions ob-center' }, button('開始準備', () => go(firstOpen())),
-      link('我已經有專案了', () => { go('existing'); }),
+      link('我已經有旅程資料夾了', () => { go('existing'); }),
       link('先看看示範旅程', () => { dismissedForSession = true; hide(); openDemo(); }, 'ob-quiet'))];
   }
 
   function githubStep() {
     const d = detail.github || {};
-    const body = [heading('連接你的 GitHub', '你的行程、照片和私人筆記會存在你自己的「私人」GitHub 專案裡，只有你看得到。')];
+    const body = [heading('連接你的 GitHub', '你的行程、照片和私人筆記會存在你自己的「私人」GitHub 備份裡，只有你看得到。')];
     const main = card(
       status(facts.ghTool ? 'GitHub 工具已準備好' : 'App 會先下載 GitHub 官方工具（約 15 MB）', facts.ghTool ? 'ok' : 'muted'),
       h('div', { class: 'ob-actions' }, button(d.waiting ? '重新開啟 GitHub 登入頁' : '在瀏覽器連接 GitHub', d.waiting ? () => open(d.url || 'https://github.com/login/device') : connectGitHub, { external: true, disabled: busy && !d.waiting }), button('還沒有帳號？免費註冊', () => open('https://github.com/signup'), { primary: false, external: true })),
@@ -124,25 +124,25 @@
     const d = detail.project || {};
     if (!d.suggestion && !d.loading && !d.running) { d.loading = true; detail.project = d; feature('onboarding-project-plan').then(r => { d.suggestion = r.suggestion; d.name = r.suggestion.name; }).catch(e => { message = { step: 'project', text: e.message }; }).finally(() => { d.loading = false; render(); }); }
     const s = d.suggestion;
-    const nameInput = h('input', { id: 'ob-project-name', value: d.name || '', maxlength: 90, 'aria-label': 'GitHub 專案名稱', oninput: e => { d.name = e.target.value.trim(); } });
-    const body = [heading('建立你的私人專案', 'App 會在你的 GitHub 建立一個私人專案，並在這台電腦放一份，之後所有行程都存在這裡。')];
+    const nameInput = h('input', { id: 'ob-project-name', value: d.name || '', maxlength: 90, 'aria-label': 'GitHub 備份名稱', oninput: e => { d.name = e.target.value.trim(); } });
+    const body = [heading('建立你的旅程資料夾', 'App 會在這台電腦建立旅程資料夾，並在你的 GitHub 開一個私人備份，之後所有行程都存在這裡。')];
     body.push(card(
-      h('div', { class: 'ob-row' }, h('span', {}, 'GitHub 專案'), h('div', { class: 'ob-inline' }, h('span', { class: 'ob-muted' }, s ? s.owner + ' /' : '…'), nameInput)),
+      h('div', { class: 'ob-row' }, h('span', {}, 'GitHub 私人備份'), h('div', { class: 'ob-inline' }, h('span', { class: 'ob-muted' }, s ? s.owner + ' /' : '…'), nameInput)),
       h('div', { class: 'ob-row' }, h('span', {}, '可見度'), h('strong', { class: 'ob-okText' }, '私人（只有你看得到）')),
       h('div', { class: 'ob-row' }, h('span', {}, '這台電腦'), h('span', { class: 'ob-path', title: s ? s.parentDirectory : '' }, s ? '…/' + s.parentDirectory.split(/[\\/]/).filter(Boolean).slice(-1)[0] + '/' + (d.name || s.name) : '…'), link('改位置', async () => { try { const r = await feature('onboarding-project-location'); if (r.suggestion) { d.suggestion = r.suggestion; d.name = r.suggestion.name; render(); } } catch (e) { fail('project', e); } })),
-      h('div', { class: 'ob-actions' }, button('建立並完成第一次備份', createProject, { disabled: busy || !s }), link('我已經有專案了', () => go('existing')))));
+      h('div', { class: 'ob-actions' }, button('建立並完成第一次備份', createProject, { disabled: busy || !s }), link('我已經有旅程資料夾了', () => go('existing')))));
     if (d.steps) body.push(card(...d.steps.map(([text, tone]) => status(text, tone))));
     return body;
   }
   async function createProject() {
     const d = detail.project; if (!d?.name) return;
-    busy = true; message = null; d.steps = [['建立 GitHub 私人專案…', 'active']]; render();
+    busy = true; message = null; d.steps = [['建立 GitHub 私人備份…', 'active']]; render();
     const mark = (i, text, tone) => { d.steps[i] = [text, tone]; render(); };
     try {
       const prep = await feature('onboarding-project-prepare', { name: d.name });
       const confirm = await feature('project-setup-confirm', { kind: 'create', token: prep.preparation.token });
-      if (!confirm.result.ready) throw Error(confirm.result.message || '專案沒有建立完成。');
-      mark(0, '已建立 GitHub 私人專案：' + confirm.result.repo, 'ok');
+      if (!confirm.result.ready) throw Error(confirm.result.message || '旅程資料夾沒有建立完成。');
+      mark(0, '已建立 GitHub 私人備份：' + confirm.result.repo, 'ok');
       await window.reloadProjectFromResult?.(confirm);
       d.steps.push(['下載模板並設定備份保護', 'ok'], ['第一次備份：上傳到你的私人 GitHub…', 'active']); render();
       try {
@@ -151,20 +151,20 @@
         mark(2, result.backedUp ? '第一次備份完成，遠端版本已核對' : '第一次備份沒有完成：' + result.message + '（之後可在「設定 → 備份與分享」重試）', result.backedUp ? 'ok' : 'warn');
       } catch (e) { mark(2, '第一次備份沒有完成：' + e.message + '（之後可在「設定 → 備份與分享」重試）', 'warn'); }
       busy = false; await refresh();
-    } catch (e) { d.steps = null; fail('project', e, '專案沒有建立完成，請再試一次。'); }
+    } catch (e) { d.steps = null; fail('project', e, '旅程資料夾沒有建立完成，請再試一次。'); }
   }
 
   // 已經有私人專案：在引導裡直接選資料夾或從 GitHub 下載，不跳到設定頁。
   function existingStep() {
     const d = detail.existing || (detail.existing = {});
-    const repoInput = h('input', { id: 'ob-existing-repo', value: d.repo || '', placeholder: '例如 your-name/travel-planner', 'aria-label': 'GitHub 私人專案', oninput: e => { d.repo = e.target.value.trim(); } });
-    return [heading('使用你已經有的專案', '行程會繼續存在原本的私人專案裡。連接時只檢查資料夾，不會改動任何檔案；之後你請 AI 修改時才會寫入。'),
-      card(h('strong', {}, '這台電腦上已經有專案資料夾'), h('span', { class: 'ob-muted' }, '例如之前用 AI 助手在終端機做的 travel-planner 專案。'),
+    const repoInput = h('input', { id: 'ob-existing-repo', value: d.repo || '', placeholder: '例如 your-name/travel-planner', 'aria-label': 'GitHub 私人備份', oninput: e => { d.repo = e.target.value.trim(); } });
+    return [heading('使用你已經有的旅程資料夾', '行程會繼續存在原本的旅程資料夾裡。連接時只檢查資料夾，不會改動任何檔案；之後你請 AI 修改時才會寫入。'),
+      card(h('strong', {}, '這台電腦上已經有旅程資料夾'), h('span', { class: 'ob-muted' }, '例如之前用 AI 助手在終端機做的 travel-planner 資料夾。'),
         h('div', { class: 'ob-actions' }, button('選擇資料夾…', chooseLocalProject, { disabled: busy }))),
-      card(h('strong', {}, '專案在 GitHub 上，這台電腦還沒有'), h('span', { class: 'ob-muted' }, '會下載到「文件／Travel Planner」，並確認它是私人專案。'),
-        h('div', { class: 'ob-inline' }, repoInput), h('div', { class: 'ob-actions' }, button('下載這個專案', cloneProject, { disabled: busy }))),
+      card(h('strong', {}, '備份在 GitHub 上，這台電腦還沒有'), h('span', { class: 'ob-muted' }, '會下載到「文件／Travel Planner」，並確認它是私人的。'),
+        h('div', { class: 'ob-inline' }, repoInput), h('div', { class: 'ob-actions' }, button('下載這個旅程資料夾', cloneProject, { disabled: busy }))),
       d.progress ? card(status(d.progress, 'active')) : null,
-      h('div', { class: 'ob-actions' }, link('← 改成建立新的專案', () => go('project')))];
+      h('div', { class: 'ob-actions' }, link('← 改成建立新的旅程資料夾', () => go('project')))];
   }
   async function chooseLocalProject() {
     busy = true; message = null; render();
@@ -172,16 +172,16 @@
     if (project) { await refresh(); } else render();
   }
   async function cloneProject() {
-    const d = detail.existing; if (!d?.repo || !/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/.test(d.repo)) { message = { step: 'existing', text: '請輸入「帳號/專案名稱」，例如 your-name/travel-planner。' }; render(); return; }
-    busy = true; message = null; d.progress = '正在確認這是你的私人專案…'; render();
+    const d = detail.existing; if (!d?.repo || !/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/.test(d.repo)) { message = { step: 'existing', text: '請輸入「帳號/備份名稱」，例如 your-name/travel-planner。' }; render(); return; }
+    busy = true; message = null; d.progress = '正在確認這是你的私人備份…'; render();
     try {
       const prep = await feature('onboarding-clone-prepare', { repo: d.repo });
-      d.progress = '正在下載專案…'; render();
+      d.progress = '正在下載旅程資料夾…'; render();
       const confirm = await feature('project-setup-confirm', { kind: 'clone', token: prep.preparation.token });
-      if (!confirm.result.ready) throw Error(confirm.result.message || '專案沒有下載完成。');
+      if (!confirm.result.ready) throw Error(confirm.result.message || '旅程資料夾沒有下載完成。');
       await window.reloadProjectFromResult?.(confirm);
       d.progress = null; busy = false; await refresh();
-    } catch (e) { d.progress = null; fail('existing', e, '專案沒有下載完成，請確認名稱與權限後再試。'); }
+    } catch (e) { d.progress = null; fail('existing', e, '旅程資料夾沒有下載完成，請確認名稱與權限後再試。'); }
   }
 
   function aiStep() {
@@ -231,7 +231,7 @@
     return [h('div', { class: 'ob-hero' }, h('span', { class: 'ob-okBig', 'aria-hidden': 'true' }, '✓'), h('h1', {}, '準備好了。想去哪裡？'), h('p', {}, '用平常說話的方式寫就好，想到什麼先寫什麼，AI 會幫你整理成逐日草案。')),
       h('div', { class: 'ob-card ob-compose' }, text, h('div', { class: 'ob-actions ob-between' }, h('span', { class: 'ob-muted' }, '下一步會請你幫這趟旅程取個名字'), button('開始規劃', () => startPlanning(text.value)))),
       h('div', { class: 'ob-chips' }, chips.map(c => h('button', { type: 'button', class: 'ob-chip', onclick: () => { text.value = (text.value ? text.value + '\n' : '') + c + '：'; text.focus(); } }, c))),
-      facts.project ? h('div', { class: 'ob-center' }, status('行程會存到你的私人專案', 'ok')) : null,
+      facts.project ? h('div', { class: 'ob-center' }, status('行程會存到你的旅程資料夾', 'ok')) : null,
       h('div', { class: 'ob-center' }, link('先不用，回到旅程', async () => { saved = { ...saved, completed: true }; await feature('onboarding-save', saved).catch(() => {}); hide(); }, 'ob-quiet'))];
   }
   async function startPlanning(request) {
