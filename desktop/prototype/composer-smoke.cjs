@@ -67,7 +67,8 @@ app.whenReady().then(async()=>{
   await js('document.getElementById("changes-dialog").close()');
   // 回到修改前：檔案回到原本內容，並記成新的一版。
   await js('[...document.querySelectorAll(".applied-actions button")].find(b=>b.textContent.startsWith("回到修改前")).click()');
-  await until('document.getElementById("messages").textContent.includes("已回到 V") && !document.getElementById("message").disabled');
+  // 回到修改前要重建預覽並記一版，CI 的機器比較慢：多給一點時間。
+  await until('document.getElementById("messages").textContent.includes("已回到 V") && !document.getElementById("message").disabled',400);
   assert.equal(await fs.readFile(path.join(project,'trips/sample/data.js'),'utf8'),before,'回到修改前要還原檔案');
   // 再改一次，然後在「備份與發布」按「全部不要」：列出清單、再確認，檔案回到上次備份。
   await until('realPreview?.status==="ready" && !aiBusy && !document.getElementById("send-message").disabled',300);

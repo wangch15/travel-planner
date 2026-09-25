@@ -28,7 +28,8 @@ test('all-trips status counts every trip folder but not the template example',as
 });
 
 test('discard returns only this trip to the last backup, after listing what will change',async t=>{
-  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'backup-discard-')));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  // .native：Windows 上 JS 版 realpathSync 不展開 8.3 短路徑（RUNNER~1），會和 App 用的 fs.promises.realpath 不一致。
+  const root=fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(),'backup-discard-')));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   git(root,'init','-q');for(const d of ['trips/a','trips/b'])fs.mkdirSync(path.join(root,d),{recursive:true});
   const data=fs.readFileSync(path.join(__dirname,'../../../trips/_example/data.js'),'utf8');
   fs.writeFileSync(path.join(root,'trips/a/data.js'),data);fs.writeFileSync(path.join(root,'trips/b/note.md'),'b');git(root,'add','.');git(root,'commit','-qm','base');

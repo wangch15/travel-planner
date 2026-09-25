@@ -146,7 +146,8 @@ test('a different existing hooksPath is never overwritten', async t => {
   assert.equal(await f.service.enableTrustedHooks(f.source), false);
   assert.equal((await f.git(['config', 'core.hooksPath'])).stdout.trim(), 'my-hooks');
 });
-test('a trusted hook copied without its executable bit is repaired, a changed one is not', async t => {
+// Windows 沒有執行權限位元（Git for Windows 也不看它），這項只在 macOS／Linux 有意義。
+test('a trusted hook copied without its executable bit is repaired, a changed one is not', { skip: process.platform === 'win32' && 'no executable bit on Windows' }, async t => {
   const f = await fixture(t); const hook = path.join(f.source, '.githooks/pre-push');
   await fs.chmod(hook, 0o644);
   assert.equal(await f.service.enableTrustedHooks(f.source), true);

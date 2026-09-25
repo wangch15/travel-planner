@@ -2,7 +2,7 @@ const test=require('node:test');const assert=require('node:assert/strict');const
 const {PublishingService}=require('../services/publishing.cjs');
 test('site status prefers the App record and falls back to the CLI record',async t=>{
   const base=fs.mkdtempSync(path.join(os.tmpdir(),'publish-status-'));t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
-  const root=fs.realpathSync(fs.mkdirSync(path.join(base,'project'),{recursive:true})||path.join(base,'project')),state=path.join(base,'state');
+  const root=fs.realpathSync.native(fs.mkdirSync(path.join(base,'project'),{recursive:true})||path.join(base,'project')),state=path.join(base,'state');
   const service=new PublishingService(state);
   assert.deepEqual(await service.status({root,slug:'trip'}),{url:null,publishedAt:null,source:null});
   fs.mkdirSync(path.join(root,'.local/deployments'),{recursive:true});fs.writeFileSync(path.join(root,'.local/deployments/trip.json'),JSON.stringify({url:'https://trip.example.workers.dev'}));
