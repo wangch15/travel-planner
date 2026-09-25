@@ -40,7 +40,8 @@ app.whenReady().then(async()=>{
   await press('在瀏覽器連接 GitHub');await until('document.querySelector("#onboarding .ob-code strong")?.textContent==="ABCD-1234"');await shot('1-github-code.png');
   auth.github=true;emitAuth({provider:'github',state:'connected'});await until('onboarding.state().view==="git"');
   // 2 Git：叫出 Apple 視窗，偵測到安裝完成才繼續
-  await press('安裝 Git');await until(`document.getElementById("onboarding").textContent.includes(${JSON.stringify(process.platform==='darwin'?'等待 Apple 的安裝完成':'正在安裝 Git for Windows')})`);assert.ok(calls.includes('install:plan-git'));
+  await press('安裝 Git');await until(`document.getElementById("onboarding").textContent.includes(${JSON.stringify(process.platform==='darwin'?'等待 Apple 的安裝完成':'正在安裝 Git for Windows')})`);// 畫面先切到等待狀態才呼叫安裝：等呼叫真的發生再檢查，慢機器上才不會搶先。
+  for(let i=0;i<100&&!calls.includes('install:plan-git');i++)await new Promise(r=>setTimeout(r,50));assert.ok(calls.includes('install:plan-git'));
   gitReady=true;await until('onboarding.state().view==="project"',300);
   // 3 私人專案：預設名稱與位置，建立後自動第一次備份
   await until('document.getElementById("ob-project-name")?.value==="travel-planner-trips"');await shot('3-project.png');
