@@ -76,6 +76,11 @@ app.whenReady().then(async()=>{
   emitAuth({provider:'github',state:'failed'});await until('document.getElementById("onboarding").textContent.includes("GitHub 授權還沒完成")');
   await press('問 AI 怎麼辦');await until('document.querySelectorAll("#onboarding .ob-help-assistant").length===2');
   assert.equal(helpInputs[0].setupContext.problem,'授權還沒完成');assert.equal(helpInputs[0].history.length,2);
+  // 2c 先按「稍後再設定」離開：設定頁出現「完成剩下的設定」，按下去回到還沒完成的 GitHub
+  await press('稍後再設定');await until('document.getElementById("onboarding").hidden');
+  await js('openSettings("projects")');await until('!document.getElementById("onboarding-resume").hidden');
+  assert.equal(await js('document.getElementById("onboarding-resume").textContent.trim()'),'完成剩下的設定');
+  await js('document.getElementById("onboarding-resume").click()');await until('!document.getElementById("onboarding").hidden && onboarding.state().view==="github" && document.getElementById("settings").hidden');
   await press('重新連接');await until('document.querySelector("#onboarding .ob-code strong")?.textContent==="ABCD-1234"');
   auth.github=true;emitAuth({provider:'github',state:'connected'});await until('onboarding.state().view==="git"');
   // 3 Git：叫出 Apple 視窗，偵測到安裝完成才繼續
@@ -99,4 +104,7 @@ app.whenReady().then(async()=>{
   assert.equal(await js('document.getElementById("new-notes").value'),'十月去東北泡溫泉');
   assert.equal(await js('document.body.dataset.onboarding'),undefined);
   const saved=(await createProjectStore(state).read()).state.onboarding;assert.deepEqual(saved,{completed:true,cloudflareSkipped:true});
+  // 7 全部做完：設定頁不再出現「完成剩下的設定」（按了只會看到重複的最後一頁）
+  await js('document.getElementById("new-dialog").close()');await js('openSettings("projects")');
+  await new Promise(r=>setTimeout(r,300));await until('document.getElementById("onboarding-resume").hidden');
 }).catch(async e=>{status=1;console.error(e);if(win&&!win.isDestroyed())console.error(await js('JSON.stringify({state:window.onboarding?.state?.(),text:document.getElementById("onboarding")?.innerText?.slice(0,600)})').catch(()=>''));}).finally(async()=>{await shutdown().catch(()=>{});app.exit(status);});

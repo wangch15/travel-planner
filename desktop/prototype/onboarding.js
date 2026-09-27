@@ -34,6 +34,7 @@
       project: Boolean(project),
     };
     facts.done = { github: facts.github, git: facts.git, project: facts.project, ai: facts.ai.length > 0, cloudflare: facts.cloudflare || saved.cloudflareSkipped };
+    syncResume();
     return facts;
   }
   const firstOpen = () => STEPS.map(([id]) => id).find(id => !facts.done[id]) || 'ready';
@@ -328,7 +329,7 @@
     const screens = { welcome, github: githubStep, git: gitStep, project: projectStep, existing: existingStep, ai: aiStep, cloudflare: cloudflareStep, ready: readyStep };
     const content = screens[view]?.() || [];
     const top = STEPS.some(([id]) => id === view) ? stepper(view) : view === 'existing' ? stepper('project') : null;
-    // 每一步都能先離開；之後缺的東西會在聊天上方提示，也能從設定頁底部「重新走一次設定」回來。
+    // 每一步都能先離開；之後缺的東西會在聊天上方提示，也能從設定頁左下角「完成剩下的設定」回來。
     const later = view !== 'welcome' && view !== 'ready' ? h('div', { class: 'ob-later' }, link('稍後再設定', later_)) : null;
     // 重畫整個畫面時，正在打字的問 AI 輸入框要保住游標。
     const typing = document.activeElement?.id === 'ob-help-input';
@@ -352,18 +353,22 @@
 
   // 專案在設定頁連接好之後，回到引導繼續下一步。
   window.onOnboardingProjectChanged = () => { if (!root.hidden || (!saved.completed && !dismissedForSession)) refresh().then(() => { if (!saved.completed && !dismissedForSession) show(); }); };
-  // 給測試與「重新顯示引導」用：切到指定步驟、讀目前狀態。
+  // 給測試與「完成剩下的設定」用：切到指定步驟、讀目前狀態。
   window.onboarding = { go: step => { show(); go(step); }, state: () => ({ view, facts, saved, hidden: root.hidden, ai: detail.ai || {}, help: detail.help || null }) };
   window.resumeOnboarding = async () => { dismissedForSession = false; await detect(); view = firstOpen(); show(); };
 
-  $('onboarding-resume').hidden = false;
+  // 設定頁的「完成剩下的設定」只在必要步驟還沒做完時出現；Cloudflare 可跳過，只差它不算（發布時會再帶去連接）。
+  // 全部做完再按只會看到重複「新增旅程」的最後一頁，所以藏起來。每次打開設定頁重新檢查實際狀態。
+  const missingRequired = () => Boolean(facts) && STEPS.some(([id]) => id !== 'cloudflare' && !facts.done[id]);
+  const syncResume = () => { $('onboarding-resume').hidden = !missingRequired(); };
+  window.onSettingsOpened = () => { if (root.hidden) detect().then(syncResume).catch(() => {}); };
   $('onboarding-resume').onclick = () => { closeSettings(); window.resumeOnboarding(); };
   (async () => {
     // 先用便宜的讀取判斷要不要引導；只有真的需要時才做完整偵測（會檢查多個工具與登入，較慢）。
     saved = await feature('onboarding-state').then(r => r.onboarding).catch(() => saved);
     if (saved.completed) { reveal(); return; }
     const workspace = await window.travelDesktop.readWorkspace?.().catch(() => null);
-    // 已經有專案的人（包括從舊版升級的人）直接視為完成，不強迫重走；需要時可從設定頁底部「重新走一次設定」打開。
+    // 已經有專案的人（包括從舊版升級的人）直接視為完成，不強迫重走；還缺 AI 等必要步驟時，聊天上方提示與設定頁「完成剩下的設定」會帶回來。
     if (workspace?.project) { reveal(); saved = { ...saved, completed: true }; await feature('onboarding-save', saved).catch(() => {}); return; }
     // 需要引導：先顯示歡迎頁（不必等完整偵測），偵測完再決定從哪一步開始。
     view = 'loading'; show();

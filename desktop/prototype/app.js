@@ -162,6 +162,7 @@ $('preview-toggle').onclick = () => setPreview(!ui.preview);
 $('preview-close').onclick = () => { setPreview(false); $('preview-toggle').focus(); };
 function openSettings(section = ui.setting) {
   if (!$('settings').hidden) { settingTab(section); return; }
+  window.onSettingsOpened?.();
   settingsReturnFocus = document.activeElement;
   $('workbench').hidden = true;
   $('settings').hidden = false;
