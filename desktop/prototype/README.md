@@ -261,8 +261,10 @@ Claude 登入結果現在會查官方 auth status，而非只看登入子程序�
 
 ```sh
 npm run desktop:setup
-npm run desktop:prototype
+npm run dev:app   # 等同 npm run desktop:prototype
 ```
+
+指令一律在 repo 根目錄執行。不要 `cd desktop/prototype` 再跑 `npm start` 或 `npm run smoke:*`：根目錄 `.npmrc` 設了 `workspaces=false`，在 workspace 資料夾裡跑 npm 會報「Cannot use --no-workspaces and --workspace at the same time」。smoke 測試請用 `node native-smoke-runner.cjs <檔名>`。
 
 全部套件共用 root lockfile。桌面依賴 Electron 44.4.3；首次啟動可能下載平台執行檔。引擎套件位於 `packages/engine/`，資料仍位於原私人 repo，匯入不會複製進公開模板。
 

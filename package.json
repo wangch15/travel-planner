@@ -20,6 +20,7 @@
     "contrib-check": "node scripts/contrib-check.js",
     "migrate": "node scripts/migrate.js",
     "desktop:prototype": "npm run start --workspaces --workspace=@travel-planner/desktop",
+    "dev:app": "npm run desktop:prototype",
     "basemap": "node tools/basemap/index.mjs",
     "photos": "node scripts/photos.js",
     "test": "node --test \"tests/**/*.test.js\" \"tests/**/*.test.mjs\"",
