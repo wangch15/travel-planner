@@ -1,12 +1,15 @@
-// 首次引導：第一次打開 App 時，一步一步帶使用者完成 GitHub → Git → 私人專案 → AI 助手 → Cloudflare（可跳過），
-// 最後直接進入第一段規劃。每一步是否完成都由實際狀態判斷（不是勾選紀錄），所以關掉 App 再開會從還沒完成的那一步繼續。
+// 首次引導：第一次打開 App 時，一步一步帶使用者完成 AI 助手 → GitHub → Git → 私人專案 → Cloudflare（可跳過），
+// 最後直接進入第一段規劃。AI 放第一步：它需要付費方案、最容易卡住，要最早知道；接好之後後面每一步卡住都能「問 AI」。
+// 每一步是否完成都由實際狀態判斷（不是勾選紀錄），所以關掉 App 再開會從還沒完成的那一步繼續。
 (() => {
   if (!window.travelDesktop) { delete document.body.dataset.onboarding; return; }
   // 引導不需要出現時才露出一般畫面。
   const reveal = () => { if (document.body.dataset.onboarding === 'pending') delete document.body.dataset.onboarding; };
   const feature = async (name, input = {}) => { const r = await window.travelDesktop.feature(name, input); if (!r.ok) throw Error(r.message || '操作未完成'); return r; };
   const root = $('onboarding');
-  const STEPS = [['github', 'GitHub'], ['git', 'Git'], ['project', '旅程資料夾'], ['ai', 'AI 助手'], ['cloudflare', 'Cloudflare']];
+  const STEPS = [['ai', 'AI 助手'], ['github', 'GitHub'], ['git', 'Git'], ['project', '旅程資料夾'], ['cloudflare', 'Cloudflare']];
+  const AI_LOGIN_WAIT_MS = 15 * 60 * 1000, AI_POLL_MS = 3000, STOP = Symbol('stop');
+  const OUTDATED = ['CLI_OUTDATED', 'CLAUDE_PLAN_UNKNOWN'], MISSING = ['CLI_MISSING', 'ENOENT'], LOGIN_FAILED = ['login-failed', 'error', 'unavailable'];
   let facts = null, saved = { completed: false, cloudflareSkipped: false }, view = null, busy = false, message = null, detail = {};
   let dismissedForSession = false, pollTimer = null, authWatch = null;
 
@@ -51,7 +54,7 @@
       return h('li', { class: 'ob-step ob-' + state, 'aria-current': i === index ? 'step' : null }, h('span', { class: 'ob-num' }, done ? '✓' : String(i + 1)), h('span', {}, label, id === 'cloudflare' ? h('small', {}, ' 可跳過') : null));
     }));
   }
-  function problem(text) { return message && message.step === view ? h('div', { class: 'ob-problem', role: 'alert' }, message.text) : null; }
+  function problem() { return message && message.step === view ? h('div', { class: 'ob-problem', role: 'alert' }, message.text, askButton()) : null; }
   function fail(step, error, fallback) { message = { step, text: (error && error.message) || fallback }; busy = false; render(); }
 
   // ---------- 各步驟 ----------
@@ -60,10 +63,10 @@
       h('h1', {}, '下一段旅程，從這裡開始。'),
       h('p', {}, '第一次使用要花大約 10–15 分鐘準備。App 會一步一步幫你做好，只有要你本人登入的地方才會停下來。')),
     card(h('ol', { class: 'ob-overview' }, [
+      ['連接 AI 助手', 'Codex（ChatGPT Plus 以上）或 Claude（Pro／Max），選一個登入。接好之後，後面哪一步卡住都能直接問它。'],
       ['連接 GitHub', '行程存在你自己的私人 GitHub，換電腦也不會不見。沒有帳號的話先免費註冊。'],
       ['準備 Git', 'Mac 沒有的話會跳出 Apple 的安裝視窗。'],
       ['建立旅程資料夾', 'App 自動建立並完成第一次備份。'],
-      ['連接 AI 助手', 'Codex（ChatGPT）或 Claude，選一個登入。'],
       ['連接 Cloudflare（可跳過）', '要把行程網頁分享給旅伴時才需要。'],
     ].map(([t, d], i) => h('li', {}, h('span', { class: 'ob-num' }, String(i + 1)), h('div', {}, h('strong', {}, t), h('span', {}, d))))),
       h('p', { class: 'ob-note' }, 'Node.js、GitHub 工具、Cloudflare 工具與行程網頁引擎都已經內建在 App 裡，不用另外安裝。')),
@@ -85,9 +88,9 @@
     if (d.stuck) body.push(stuckCard('GitHub 授權還沒完成', ['瀏覽器登入的是另一個 GitHub 帳號 → 先登出再試', '授權頁面被關掉了 → 按「重新連接」', '公司電腦擋住了 github.com → 換個網路或電腦'], connectGitHub));
     return body;
   }
-  function stuckCard(title, reasons, retry) {
-    return h('div', { class: 'ob-card ob-stuck' }, status(title, 'warn'), h('p', { class: 'ob-note' }, '沒關係，這一步可以重來，目前沒有建立或改動任何東西。'),
-      h('ul', {}, reasons.map(r => h('li', {}, r))), h('div', { class: 'ob-actions' }, button('重新連接', retry, { external: true })));
+  function stuckCard(title, reasons, retry, note = '沒關係，這一步可以重來，目前沒有建立或改動任何東西。') {
+    return h('div', { class: 'ob-card ob-stuck' }, status(title, 'warn'), h('p', { class: 'ob-note' }, note),
+      h('ul', {}, reasons.map(r => h('li', {}, r))), h('div', { class: 'ob-actions' }, button('重新連接', retry, { external: true }), askButton()));
   }
   async function connectGitHub() {
     if (busy && !detail.github?.waiting) return; busy = true; message = null; detail.github = { progress: facts.ghTool ? '正在開啟 GitHub 登入…' : '正在下載 GitHub 官方工具…' }; render();
@@ -190,32 +193,94 @@
       h('strong', {}, name), h('span', { class: 'ob-muted' }, sub),
       d.chosen === id && d.progress ? status(d.progress, 'active') : status(ready ? '已安裝' : '選它的話，App 會在背景安裝', ready ? 'ok' : 'muted'),
       button(ready ? (id === 'codex' ? '用 ChatGPT 登入' : '登入 Claude') : '安裝並登入', () => connectAI(id), { primary: d.chosen === id || !d.chosen, external: ready, disabled: busy }));
-    return [heading('選一個 AI 助手', '它會陪你規劃行程、查官網和 Google Maps。之後可以再加另一個。'),
-      h('div', { class: 'ob-choices' }, option('codex', 'Codex', '用 ChatGPT 帳號登入（Plus 以上方案）', facts.codexTool), option('claude', 'Claude', '用 Claude 帳號登入（Pro 或 Max 方案）', facts.claudeTool)),
-      human('登入會在瀏覽器完成。App 使用自己獨立的登入，不會讀取你電腦上其他 AI 工具的帳號。')];
+    const body = [heading('先選一個 AI 助手', '它會陪你規劃行程、查官網和 Google Maps；接好之後，接下來哪一步卡住都可以直接問它。之後可以再加另一個。'),
+      h('div', { class: 'ob-choices' }, option('codex', 'Codex', '用 ChatGPT 帳號登入（Plus 以上方案）', facts.codexTool), option('claude', 'Claude', '用 Claude 帳號登入（Pro 或 Max 方案）', facts.claudeTool))];
+    if (d.waiting) body.push(card(status('等待你在瀏覽器完成登入…', 'active'),
+      h('p', { class: 'ob-note' }, '登入完成後回到這裡，會自動繼續。瀏覽器沒有開、或不小心關掉了，按「重新開啟登入」。'),
+      h('div', { class: 'ob-actions' }, button('重新開啟登入', () => retryAI(d.chosen), { primary: false, external: true }), link('取消，改選另一個', cancelAI))));
+    if (d.stuck) body.push(h('div', { class: 'ob-problem', role: 'alert' }, d.reason),
+      stuckCard('AI 助手還沒連接好', ['用的是免費方案或公司方案（Team／Enterprise）→ 換成 ChatGPT Plus 以上、或 Claude Pro／Max 的個人帳號',
+        '瀏覽器登入的是另一個帳號 → 先在瀏覽器登出，再按「重新連接」', '登入頁被關掉或太久沒完成 → 按「重新連接」',
+        '公司電腦或網路擋住了登入頁 → 換個網路（例如手機熱點）再試'], () => retryAI(d.chosen), '沒關係，可以再試一次；已經裝好的部分不用重裝。也可以改選另一個 AI。'));
+    body.push(h('div', { class: 'ob-card ob-info' }, h('strong', {}, '需要付費方案'),
+      h('span', {}, 'Codex 需要 ChatGPT Plus 以上；Claude 需要 Pro 或 Max 個人方案。免費方案和公司方案目前不能用。'),
+      h('div', { class: 'ob-actions' }, link('看 ChatGPT 方案 ↗', () => open('https://chatgpt.com/pricing')), link('看 Claude 方案 ↗', () => open('https://claude.com/pricing')))),
+      human('登入會在瀏覽器完成。App 使用自己獨立的登入，不會讀取你電腦上其他 AI 工具的帳號。'));
+    return body;
   }
+  const aiAction = (id, action) => feature('provider-account-action', { id, action }).then(r => r.account);
+  async function installAI(id) { const { preparation } = await feature('tool-prepare', { id }); await feature('tool-install', { token: preparation.token, confirmed: true }); }
+  // 登入進行中兩個選項都鎖住；要換另一個得先按「取消，改選另一個」，舊的登入才會被正式取消。
   async function connectAI(id) {
-    busy = true; message = null; detail.ai = { chosen: id, progress: '準備中…' }; render();
+    if (busy) return;
+    clearTimeout(pollTimer); busy = true; message = null; detail.ai = { chosen: id, progress: '準備中…' }; render();
     try {
-      const ready = id === 'codex' ? facts.codexTool : facts.claudeTool;
-      if (!ready) {
+      if (!(id === 'codex' ? facts.codexTool : facts.claudeTool)) {
         detail.ai.progress = id === 'codex' ? '正在安裝 Codex（第一次會一併準備 Node.js），約一兩分鐘…' : '正在安裝 Claude Code，約一兩分鐘…'; render();
-        const { preparation } = await feature('tool-prepare', { id });
-        await feature('tool-install', { token: preparation.token, confirmed: true });
+        await installAI(id);
       }
-      let { account } = await feature('provider-account-action', { id, action: 'login' });
-      // 已經裝了但太舊：在背景更新 App 用的那一份，再登入一次，不叫人去開終端機。
-      if (account?.state === 'unavailable' && ['CLI_OUTDATED', 'CLAUDE_PLAN_UNKNOWN'].includes(account.code)) {
-        detail.ai.progress = '這台電腦上的版本太舊，正在更新，約一兩分鐘…'; render();
-        const { preparation } = await feature('tool-prepare', { id });
-        await feature('tool-install', { token: preparation.token, confirmed: true });
-        ({ account } = await feature('provider-account-action', { id, action: 'login' }));
+      let account = await aiAction(id, 'login');
+      // 已經裝了但太舊、或裝了卻找不到：在背景重裝 App 用的那一份，再登入一次（只重試一次），不叫人去開終端機。
+      if (account?.state === 'unavailable' && [...OUTDATED, ...MISSING].includes(account.code)) {
+        detail.ai.progress = OUTDATED.includes(account.code) ? '這台電腦上的版本太舊，正在更新，約一兩分鐘…' : '正在補裝 AI 工具，約一兩分鐘…'; render();
+        await installAI(id);
+        account = await aiAction(id, 'login');
       }
-      if (['unavailable', 'error'].includes(account?.state)) throw Error(account.message || 'AI 助手沒有準備好，請再試一次。');
-      detail.ai.progress = '已開啟瀏覽器登入，完成後會自動繼續…'; render();
-      poll(async () => { const accounts = await feature('provider-accounts').then(r => r.accounts).catch(() => []); const ok = accounts.some(a => (a.provider || a.id) === id && a.state === 'connected'); if (ok) { await feature('ai-defaults-set', { provider: id }).catch(() => {}); await feature('provider-select', { id }).catch(() => {}); restoreAIConnection(); } return ok; }, 3000, 15 * 60 * 1000, () => fail('ai', null, '登入還沒完成。可以再按一次登入，或到瀏覽器確認是否已授權。'));
-    } catch (e) { detail.ai = {}; fail('ai', e, 'AI 助手沒有準備好，請再試一次。'); }
+      if (account?.state === 'connected') { await finishAI(id); busy = false; await refresh(); return; }
+      if (LOGIN_FAILED.includes(account?.state)) { aiStuck(id, account.message); return; }
+      detail.ai = { chosen: id, waiting: true, progress: '已開啟瀏覽器登入，完成後會自動繼續…' }; render();
+      poll(() => checkAILogin(id), AI_POLL_MS, AI_LOGIN_WAIT_MS, () => aiStuck(id, '登入等太久還沒完成（超過 15 分鐘），這次先停下來。'));
+    } catch (e) { aiStuck(id, e?.message); }
   }
+  // 登入失敗要馬上告訴使用者，不要讓畫面停在「等待中」直到逾時。
+  async function checkAILogin(id) {
+    const accounts = await feature('provider-accounts').then(r => r.accounts).catch(() => []);
+    const account = accounts.find(a => (a.provider || a.id) === id);
+    if (account?.state === 'connected') { await finishAI(id); return true; }
+    if (LOGIN_FAILED.includes(account?.state)) { aiStuck(id, account.message); return STOP; }
+    return false;
+  }
+  async function finishAI(id) { detail.ai = {}; await feature('ai-defaults-set', { provider: id }).catch(() => {}); await feature('provider-select', { id }).catch(() => {}); window.restoreAIConnection?.(); }
+  function aiStuck(id, reason) { clearTimeout(pollTimer); busy = false; detail.ai = { chosen: id, stuck: true, reason: reason || '登入還沒完成，請再試一次。' }; render(); }
+  async function retryAI(id) { clearTimeout(pollTimer); await aiAction(id, 'cancel').catch(() => {}); busy = false; connectAI(id); }
+  async function cancelAI() { const id = detail.ai?.chosen; clearTimeout(pollTimer); busy = false; detail.ai = {}; render(); if (id) await aiAction(id, 'cancel').catch(() => {}); }
+
+  // ---------- 問 AI（AI 接好之後，後面每一步都能用） ----------
+  const helpAvailable = () => facts?.ai.length > 0 && !['welcome', 'ai', 'ready', 'loading'].includes(view);
+  const helpState = () => detail.help || (detail.help = { open: false, messages: [], draft: '', busy: false, error: null });
+  function askButton() { return helpAvailable() ? button('問 AI 怎麼辦', () => askHelp('我卡在這一步了，畫面上的提示如上，接下來該怎麼做？'), { primary: false }) : null; }
+  // 只送「在哪一步、做完哪些、畫面上顯示的提示」；一次性代碼、帳號等從不放進來。
+  function helpContext() {
+    const d = detail[view] || {};
+    const problemText = message?.step === view ? message.text : d.stuck ? (d.reason || '授權還沒完成') : d.progress || '';
+    return { step: view, platform: window.travelDesktop.platform, appVersion: window.travelDesktop.appVersion, done: STEPS.map(([id]) => id).filter(id => facts.done[id]), problem: problemText };
+  }
+  function helpPanel() {
+    const d = helpState();
+    if (!d.open) return h('div', { class: 'ob-help-toggle' }, link('卡住了？問 AI 助手', () => { d.open = true; render(); focusHelp(); }));
+    const input = h('textarea', { id: 'ob-help-input', rows: 2, maxlength: 2000, 'aria-label': '問 AI 助手', placeholder: '例如：瀏覽器開了，但沒有看到輸入代碼的地方',
+      oninput: e => { d.draft = e.target.value; }, onkeydown: e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); askHelp(); } } });
+    input.value = d.draft;
+    return h('section', { class: 'ob-card ob-help', 'aria-label': '問 AI 助手' },
+      h('div', { class: 'ob-help-head' }, h('strong', {}, '問 AI 助手'), link('收起', () => { d.open = false; render(); })),
+      h('p', { class: 'ob-note' }, 'AI 只會看到你在第幾步、畫面上的提示和你打的字，看不到帳號或密碼，也不會替你按按鈕或登入。請不要貼上密碼或一次性代碼。'),
+      d.messages.length ? h('div', { class: 'ob-help-log', 'aria-live': 'polite' }, d.messages.map(m => h('div', { class: 'ob-help-msg ob-help-' + m.role }, m.text))) : null,
+      d.busy ? status('AI 正在想…', 'active') : null,
+      d.error ? h('div', { class: 'ob-problem', role: 'alert' }, d.error) : null,
+      h('div', { class: 'ob-help-compose' }, input, d.busy ? button('停止', stopHelp, { primary: false }) : button('送出', () => askHelp())));
+  }
+  async function askHelp(question) {
+    const d = helpState(), text = (question ?? d.draft).trim();
+    if (!text || d.busy) return;
+    const history = d.messages;
+    d.messages = [...history, { role: 'user', text }]; if (question === undefined) d.draft = '';
+    d.open = true; d.busy = true; d.error = null; render();
+    try { const r = await feature('setup-help', { text, history, context: helpContext() }); d.messages = [...d.messages, { role: 'assistant', text: r.answer }]; }
+    catch (e) { d.error = e?.message || 'AI 這次沒有回答成功，可以再問一次。'; }
+    finally { d.busy = false; render(); focusHelp(); }
+  }
+  function stopHelp() { feature('setup-help-stop').catch(() => {}); }
+  function focusHelp() { requestAnimationFrame(() => { $('ob-help-input')?.focus(); root.querySelector('.ob-help-log')?.lastElementChild?.scrollIntoView({ block: 'nearest' }); }); }
 
   function cloudflareStep() {
     const d = detail.cloudflare || {};
@@ -253,7 +318,7 @@
   function go(step) { view = step; message = null; render(); }
   function poll(check, every, limit = 20 * 60 * 1000, onTimeout) {
     clearTimeout(pollTimer); const started = Date.now();
-    const tick = async () => { try { if (await check()) { busy = false; await refresh(); return; } } catch {} if (Date.now() - started > limit) { busy = false; onTimeout?.(); return; } pollTimer = setTimeout(tick, every); };
+    const tick = async () => { try { const done = await check(); if (done === STOP) return; if (done) { busy = false; await refresh(); return; } } catch {} if (Date.now() - started > limit) { busy = false; onTimeout?.(); return; } pollTimer = setTimeout(tick, every); };
     pollTimer = setTimeout(tick, every);
   }
   async function refresh() { clearTimeout(pollTimer); await detect(); if (view !== 'welcome') view = firstOpen(); render(); }
@@ -265,7 +330,10 @@
     const top = STEPS.some(([id]) => id === view) ? stepper(view) : view === 'existing' ? stepper('project') : null;
     // 每一步都能先離開；之後缺的東西會在聊天上方提示，也能從設定頁底部「重新走一次設定」回來。
     const later = view !== 'welcome' && view !== 'ready' ? h('div', { class: 'ob-later' }, link('稍後再設定', later_)) : null;
-    root.replaceChildren(h('div', { class: 'ob-inner' }, later, top, h('div', { class: 'ob-body' }, ...content, problem())));
+    // 重畫整個畫面時，正在打字的問 AI 輸入框要保住游標。
+    const typing = document.activeElement?.id === 'ob-help-input';
+    root.replaceChildren(h('div', { class: 'ob-inner' }, later, top, h('div', { class: 'ob-body' }, ...content, problem(), helpAvailable() ? helpPanel() : null)));
+    if (typing) $('ob-help-input')?.focus();
     const logo = `assets/brand/travel-planner-mark-on-${document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'}-v3.svg`;
     root.querySelectorAll('[data-logo]').forEach(image => { image.src = logo; });
   }
@@ -285,7 +353,7 @@
   // 專案在設定頁連接好之後，回到引導繼續下一步。
   window.onOnboardingProjectChanged = () => { if (!root.hidden || (!saved.completed && !dismissedForSession)) refresh().then(() => { if (!saved.completed && !dismissedForSession) show(); }); };
   // 給測試與「重新顯示引導」用：切到指定步驟、讀目前狀態。
-  window.onboarding = { go: step => { show(); go(step); }, state: () => ({ view, facts, saved, hidden: root.hidden }) };
+  window.onboarding = { go: step => { show(); go(step); }, state: () => ({ view, facts, saved, hidden: root.hidden, ai: detail.ai || {}, help: detail.help || null }) };
   window.resumeOnboarding = async () => { dismissedForSession = false; await detect(); view = firstOpen(); show(); };
 
   $('onboarding-resume').hidden = false;
@@ -301,7 +369,8 @@
     view = 'loading'; show();
     await detect();
     if (facts.project) { hide(); saved = { ...saved, completed: true }; await feature('onboarding-save', saved).catch(() => {}); return; }
-    view = facts.done.github ? firstOpen() : 'welcome';
+    // 已經做過任何一步（AI 或 GitHub）就直接接著做，不再從歡迎頁開始。
+    view = facts.done.ai || facts.done.github ? firstOpen() : 'welcome';
     show();
   })().catch(() => { reveal(); if (view === 'loading') hide(); });
 })();

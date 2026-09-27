@@ -5,6 +5,7 @@ const { parseLiteralModule } = require('@travel-planner/engine');
 const { decodeAnswer, RESEARCH_GUIDE, withTitle, TITLE_GUIDE } = require('../codex/editor.cjs');
 const { failure } = require('./process.cjs');
 const { claudeFlags, geminiFlags } = require('./runtime.cjs');
+const { SETUP_HELP_SCHEMA, SETUP_HELP_GUIDE, setupHelpInput, decodeSetupHelp } = require('../services/setup-help.cjs');
 
 const string = { type: 'string' };
 const schema = properties => ({ type: 'object', additionalProperties: false, properties, required: Object.keys(properties) });
@@ -79,11 +80,16 @@ class CliEditor {
   constructor(account, { timeoutMs = 180000 } = {}) { this.account = account; this.timeoutMs = timeoutMs; this.active = null; }
   async generate({ snapshot, dayId, text, mode: requestedMode, model, effort, attachments = [], history,
     thread = null, onThread = async () => {}, onTurn = async () => {}, onProgress = () => {}, onDelta = () => {},
-    lastOutcome = '尚未產生提案。', planningDraft = null, handoff = null, requestId = null, researchTools = null }) {
+    lastOutcome = '尚未產生提案。', planningDraft = null, handoff = null, requestId = null, researchTools = null, setupContext }) {
     if (this.active) throw failure('AI_BUSY');
     if (typeof text !== 'string' || !text.trim() || text.length > 12000) throw failure('INVALID_INPUT');
     const mode = requestedMode || (dayId === null ? 'discussion' : dayId === -1 ? 'edit-all' : 'edit-day');
-    if (!Object.hasOwn(SCHEMAS, mode)) throw failure('INVALID_INPUT');
+    // setup-help：首次引導的「問 AI」，沒有旅程、沒有附件、不接續對話，只回一段文字。舊 Gemini 接法不提供。
+    const help = mode === 'setup-help';
+    if (!help && !Object.hasOwn(SCHEMAS, mode)) throw failure('INVALID_INPUT');
+    if (help && this.account.provider !== 'claude') throw failure('PROVIDER_UNAVAILABLE');
+    if (help && (attachments.length || thread)) throw failure('INVALID_INPUT');
+    const helpInput = help ? setupHelpInput({ text, history, context: setupContext }) : null;
     if (effort) throw failure('EFFORT_UNAVAILABLE');
     if (!Array.isArray(attachments) || attachments.length > 12) throw failure('INVALID_INPUT');
     const imageAttachments = attachments.filter(a => a?.kind === 'image');
@@ -93,16 +99,16 @@ class CliEditor {
       if (!a || !['text', 'url'].includes(a.kind) || (a.text !== undefined && (typeof a.text !== 'string' || a.text.length > 64000))) throw failure('INVALID_INPUT');
       return { name: a.name, text: a.text, url: a.url, checkedAt: a.checkedAt };
     });
-    const previous = boundedHistory(history, thread, this.account.provider);
-    const days = parseLiteralModule(snapshot.dataSource).DAYS;
+    const previous = help ? [] : boundedHistory(history, thread, this.account.provider);
+    const days = help ? [] : parseLiteralModule(snapshot.dataSource).DAYS;
     const day = days.find(d => d.id === dayId);
     if (mode === 'edit-day' && !day) throw failure('INVALID_DAY');
     const context = mode === 'edit-day' ? [day] : days;
     const placeIds = new Set(context.flatMap(d => [...(d.stops || []).map(s => s.place), ...(d.alts || []).flatMap(a => [a.place, ...(a.places || [])])]));
-    const places = Object.fromEntries([...placeIds].filter(id => snapshot.trip.PLACES[id]).map(id => {
+    const places = help ? {} : Object.fromEntries([...placeIds].filter(id => snapshot.trip.PLACES[id]).map(id => {
       const p = snapshot.trip.PLACES[id]; return [id, { name: p.name, cat: p.cat, note: p.note }];
     }));
-    const input = JSON.stringify({ instructions: SYSTEM, outputSchema: withTitle(SCHEMAS[mode]), mode, request: text, requestId,
+    const input = help ? helpInput : JSON.stringify({ instructions: SYSTEM, outputSchema: withTitle(SCHEMAS[mode]), mode, request: text, requestId,
       hostStatus: lastOutcome, currentSnapshotIsAuthoritative: true, ...(mode === 'edit-day' ? { day } : { days }),
       places, planningDraft, handoff, references, history: previous }).replaceAll('@', '\\u0040');
     // Gemini expands @file references before model/tool policy. JSON unicode escapes
@@ -136,7 +142,7 @@ class CliEditor {
         args = [...claudeFlags(runtime, tools), '--print', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
           '--permission-mode', 'dontAsk', '--permission-prompts', 'none', '--tools', research ? 'WebSearch' : '',
           '--no-session-persistence', '--max-turns', research ? (tools ? '40' : '8') : '2', '--model', selected.id,
-          '--system-prompt', SYSTEM, '--json-schema', JSON.stringify(withTitle(SCHEMAS[mode]))];
+          '--system-prompt', help ? SETUP_HELP_GUIDE : SYSTEM, '--json-schema', JSON.stringify(help ? SETUP_HELP_SCHEMA : withTitle(SCHEMAS[mode]))];
         if (research) args.push('--allowedTools', ['WebSearch', ...mcpTools].join(','));
       } else {
         if (research) runtime.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH = runtime.researchSettings;
@@ -194,6 +200,10 @@ class CliEditor {
       if (active.controller.signal.aborted) throw failure('AI_CANCELED');
       await runtime.assertPolicy();
       if (active.controller.signal.aborted) throw failure('AI_CANCELED');
+      if (help) {
+        if (!initialized || !validate(result, SETUP_HELP_SCHEMA)) throw failure('AI_OUTPUT_INVALID');
+        return { ...decodeSetupHelp(result), threadId, turnId, model: selected.id };
+      }
       // conversationTitle 可有可無，由 decodeAnswer 檢查；其餘欄位照原 schema 驗證。
       const { conversationTitle: _title, appAction: _action, nextReply: _reply, ...rest } = result && typeof result === 'object' ? result : {};
       // 討論模式沒給 replacementDaysJson 就當作只是回話。

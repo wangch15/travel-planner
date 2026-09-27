@@ -314,3 +314,22 @@ test('stop releases the request after a grace period even if the server never co
   await started;const began=Date.now();await f.editor.stop();await stopped;
   assert.ok(Date.now()-began<2000);assert.equal(f.editor.active,null);
 });
+
+test('setup-help runs a tool-less turn with its own instructions and no trip context',async()=>{
+  const { SETUP_HELP_GUIDE, SETUP_HELP_SCHEMA } = require('../../services/setup-help.cjs');
+  const f=fixture({answer:{answer:'請按「重新連接」。'}});
+  const original=f.transport.request;let started,turn;
+  f.transport.request=async(method,params)=>{if(method==='thread/start')started=params;if(method==='turn/start')turn=params;return original(method,params);};
+  const result=await f.editor.generate({mode:'setup-help',text:'Git 裝不起來',history:[{role:'user',text:'先前'}],setupContext:{step:'git',platform:'darwin',done:['ai','github'],problem:'Git 安裝沒有開始'}});
+  assert.deepEqual({setupHelp:result.setupHelp,answer:result.answer},{setupHelp:true,answer:'請按「重新連接」。'});
+  assert.equal(started.baseInstructions,SETUP_HELP_GUIDE);assert.equal(started.developerInstructions,undefined);assert.equal(started.config.web_search,'disabled');
+  assert.deepEqual(turn.outputSchema,SETUP_HELP_SCHEMA);assert.equal(turn.input.length,1);
+  const sent=JSON.parse(turn.input[0].text);
+  assert.equal(sent.mode,'setup-help');assert.equal(sent.days,undefined);assert.equal(sent.places,undefined);
+  assert.deepEqual(sent.setupContext.completedSteps,['AI 助手','GitHub']);assert.deepEqual(sent.history,[{role:'user',text:'先前'}]);
+});
+test('setup-help refuses attachments, continuation and answers outside its schema',async()=>{
+  await assert.rejects(fixture().editor.generate({mode:'setup-help',text:'hi',attachments:[{kind:'text',text:'x'}]}),{code:'INVALID_INPUT'});
+  await assert.rejects(fixture().editor.generate({mode:'setup-help',text:'hi',thread:{id:'t'}}),{code:'INVALID_INPUT'});
+  await assert.rejects(fixture({answer:{summary:'wrong shape'}}).editor.generate({mode:'setup-help',text:'hi'}),{code:'AI_OUTPUT_INVALID'});
+});

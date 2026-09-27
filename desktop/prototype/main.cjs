@@ -637,6 +637,25 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     });conversation=displayConversation(state);}
     await activateProvider(input.id);return {provider:providerId,account:providerView(providerId),conversation};
   },{exclusive:true});
+  // 首次引導的「問 AI」：用已連接的 AI 回答設定問題；不綁旅程、不給工具、不寫任何檔案。
+  let setupHelpEditor=null;
+  const SETUP_HELP_QUOTA='AI 的使用額度暫時用完了，等一下再問；也可以先照畫面上的說明試試。';
+  const SETUP_HELP_TEXT={LOGIN_REQUIRED:'AI 助手還沒連接或需要重新登入。請先回到「AI 助手」那一步完成登入。',AI_BUSY:'AI 助手正在回答上一個問題，請稍等一下。',
+    QUOTA_UNAVAILABLE:SETUP_HELP_QUOTA,QUOTA_EXHAUSTED:SETUP_HELP_QUOTA,AI_USAGE_LIMIT:SETUP_HELP_QUOTA,
+    AI_CANCELED:'已停止這個問題。',INVALID_INPUT:'問題太長或是空的，請用一兩句話描述卡在哪裡。'};
+  const setupHelpFailure=code=>Object.assign(Error(code),{code,userMessage:SETUP_HELP_TEXT[code]||'AI 這次沒有回答成功，可以再問一次；也可以先照畫面上的說明試試。'});
+  feature('setup-help',async input=>{
+    const wanted=['codex','claude'].includes(input.provider)?[input.provider]:[aiDefaults.provider,'codex','claude'];
+    const chosen=wanted.find(id=>['codex','claude'].includes(id)&&getProvider(id).account.account.state==='connected');
+    if(!chosen)throw setupHelpFailure('LOGIN_REQUIRED');
+    const item=getProvider(chosen);
+    if(setupHelpEditor||item.editor.active)throw setupHelpFailure('AI_BUSY');
+    setupHelpEditor=item.editor;
+    try{const result=await item.editor.generate({mode:'setup-help',text:input.text,history:input.history,setupContext:input.context});return {answer:result.answer,provider:chosen};}
+    catch(error){throw setupHelpFailure(error.code||error.message);}
+    finally{setupHelpEditor=null;}
+  });
+  feature('setup-help-stop',async()=>({stopped:Boolean((await setupHelpEditor?.stop())?.requested)}));
   feature('trip-create',async input=>{if(!currentProject)throw Object.assign(Error('NO_PROJECT'),{code:'NO_PROJECT'});if(proposals.pending||materialization)throw Object.assign(Error('AI_BUSY'),{code:'AI_BUSY'});const created=await newTrips.create(currentProject.root,input);return {...await refreshProject(created.slug),draft:created.draft};},{exclusive:true});
   feature('trip-draft',async input=>({draft:await planningFor(selectedTarget(input))}));
   feature('plan-confirm',async input=>{const target=selectedTarget(input);const state=await conversations.read(target);if(!state.plan?.markdown)throw Object.assign(Error('PLAN_CONFIRMATION_REQUIRED'),{code:'PLAN_CONFIRMATION_REQUIRED'});const digest=createHash('sha256').update(state.plan.markdown).digest('hex');if(input.digest!==digest)throw Object.assign(Error('DRAFT_CHANGED'),{code:'DRAFT_CHANGED'});const updated=await conversations.update(target,s=>{s.plan.approvedDigest=digest;s.research=null;s.messages.push({role:'assistant',text:'逐日草案已由你確認，接下來可以進行來源查核。'});});return {conversation:displayConversation(updated)};},{exclusive:true});

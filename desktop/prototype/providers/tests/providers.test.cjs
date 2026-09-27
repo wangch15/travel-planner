@@ -50,6 +50,7 @@ if (args.includes('--acp')) {
       const mcpAt=args.indexOf('--mcp-config'),mcp=mcpAt>=0?JSON.parse(args[mcpAt+1]).mcpServers:{};
       const allowed=args.includes('--allowedTools')?args[args.indexOf('--allowedTools')+1].split(','):[];
       send({type:'system',subtype:'init',session_id:sid,tools:allowed.filter(t=>t.startsWith('mcp__')),mcp_servers:[...Object.keys(mcp).map(name=>({name,status:'connected'})),...(payload.request==='rogue-mcp'?[{name:'rogue',status:'connected'}]:[])],plugins:payload.request==='user-plugin'?[{name:'x',source:'x@market'}]:[{name:'telemetry',source:'telemetry@builtin'}],skills:[]});
+      if(payload.mode==='setup-help'){send({type:'result',subtype:'success',is_error:false,session_id:sid,structured_output:{answer:'setup:'+payload.question+':'+payload.history.length}});return;}
       if(payload.request.startsWith('result-error:')){send({type:'result',subtype:'success',is_error:true,result:payload.request.slice(13)});return;}
       if(payload.request.startsWith('assistant-error:')){send({type:'assistant',error:payload.request.slice(16),message:{content:[{type:'text',text:'API Error'}]}});send({type:'result',subtype:'success',is_error:true,result:'API Error'});return;}
       if(payload.request==='slow-stream'){let n=0;const timer=setInterval(()=>{send({type:'stream_event',event:{type:'content_block_delta',delta:{type:'text_delta',text:'x'}}});if(++n===6){clearInterval(timer);send({type:'result',subtype:'success',is_error:false,session_id:sid,structured_output:answer});}},60);return;}
@@ -434,4 +435,25 @@ test('claude research rejects extra MCP servers, unknown MCP tools and non-built
   for(const request of ['rogue-mcp','other-mcp-call','user-plugin'])
     await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:request,mode:'research',researchTools:RESEARCH_TOOLS}),{code:'POLICY_MISMATCH'},request);
   await assert.rejects(f.editor.generate({snapshot:f.snapshot,dayId:null,text:'mcp-call',mode:'research'}),{code:'POLICY_MISMATCH'});
+});
+
+test('claude setup-help answers without a trip, tools, attachments or continuation',async t=>{
+  const { SETUP_HELP_GUIDE, SETUP_HELP_SCHEMA } = require('../../services/setup-help.cjs');
+  const f=await fixture(t,'claude');
+  const answer=await f.editor.generate({mode:'setup-help',text:'GitHub 卡住了',history:[{role:'user',text:'前一句'},{role:'assistant',text:'回覆'}],
+    setupContext:{step:'github',platform:'win32',appVersion:'0.1.9',done:['ai'],problem:'GitHub 授權還沒完成',token:'never-sent'}});
+  assert.equal(answer.setupHelp,true);assert.equal(answer.answer,'setup:GitHub 卡住了:2');
+  const launch=f.launches.at(-1),payload=payloadOf(launch.input);
+  assert.equal(launch.args[launch.args.indexOf('--tools')+1],'');assert.ok(launch.args.includes('--safe-mode'));
+  assert.equal(launch.args[launch.args.indexOf('--system-prompt')+1],SETUP_HELP_GUIDE);
+  assert.deepEqual(JSON.parse(launch.args[launch.args.indexOf('--json-schema')+1]),SETUP_HELP_SCHEMA);
+  assert.deepEqual(payload.setupContext,{step:'GitHub',platform:'Windows',appVersion:'0.1.9',completedSteps:['AI 助手'],problemOnScreen:'GitHub 授權還沒完成'});
+  assert.equal(JSON.stringify(payload).includes('never-sent'),false);assert.equal(payload.days,undefined);
+  await assert.rejects(f.editor.generate({mode:'setup-help',text:'hi',attachments:[{kind:'text',text:'x'}]}),{code:'INVALID_INPUT'});
+  await assert.rejects(f.editor.generate({mode:'setup-help',text:'hi',thread:{id:'claude:old'}}),{code:'INVALID_INPUT'});
+});
+test('gemini legacy adapter does not offer setup-help',async t=>{
+  const f=await fixture(t,'gemini');const before=f.launches.length;
+  await assert.rejects(f.editor.generate({mode:'setup-help',text:'hi'}),{code:'PROVIDER_UNAVAILABLE'});
+  assert.equal(f.launches.length,before);
 });
