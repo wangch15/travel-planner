@@ -9,7 +9,7 @@ const SOURCE_TYPES = Object.freeze({ host: '房東提供', official: '官方資�
 const LINK_KINDS = Object.freeze({ official: '官網', map: '地圖', other: '連結' });
 const ALERT_LEVELS = new Set(['warn', 'info']);
 // 長度上限刻意偏短：指南要的是能掃讀的清單，不是把長段落換個地方放。
-const LIMITS = Object.freeze({ title: 60, intro: 160, summary: 120, step: 200, alert: 200, note: 300, tag: 20, label: 24, sourceLabel: 60, fact: 160, caption: 160 });
+const LIMITS = Object.freeze({ title: 60, intro: 160, summary: 120, step: 200, alert: 200, note: 300, tag: 20, label: 24, sourceLabel: 60, fact: 160, caption: 160, warnAlerts: 3, infoAlerts: 4 });
 
 const FIELDS = {
   guide: ['id', 'stay', 'days', 'title', 'intro', 'source', 'alerts', 'sections', 'images', 'lists'],
@@ -91,6 +91,7 @@ function checkSteps(g, c, imageIds, where, fail) {
     c.text(a.text, `alerts[${j}].text`, LIMITS.alert, true);
     if (a.level !== undefined && !ALERT_LEVELS.has(a.level)) fail(`${where} alerts[${j}].level 不合法：${a.level}`);
   });
+
   const sections = c.array(g.sections, 'sections');
   c.uniqueIds(sections, 'sections');
   sections.forEach((s, j) => {
@@ -184,6 +185,18 @@ function checkStayGuides(trip, fail) {
   });
 }
 
+// 好不好讀的規則（警示則數）：只套用在 AI 新寫或修改的指南，不擋已經存下的舊資料，
+// 否則更新引擎後舊行程會突然建不出網站。桌面 App 在產生提案時檢查，沒過就請 AI 自己精簡。
+function checkGuideReadability(guide) {
+  const problems = [];
+  if (!isObject(guide) || !Array.isArray(guide.alerts)) return problems;
+  const where = `STAY_GUIDES.${guide.id}`;
+  const warns = guide.alerts.filter((a) => isObject(a) && (a.level ?? 'warn') === 'warn').length;
+  if (warns > LIMITS.warnAlerts) problems.push(`${where} 重要警示（level:warn）有 ${warns} 則，最多 ${LIMITS.warnAlerts} 則：只留漏看會出事的，其他改成 level:info，已寫在步驟裡的就刪掉`);
+  if (guide.alerts.length - warns > LIMITS.infoAlerts) problems.push(`${where} 補充說明（level:info）最多 ${LIMITS.infoAlerts} 則：已寫在步驟或清單裡的就刪掉`);
+  return problems;
+}
+
 // 指南宣告的圖片檔名（已過檔名規則的才算），讀檔與發布只收這些。
 function guideImageFiles(guides) {
   if (!Array.isArray(guides)) return [];
@@ -211,10 +224,12 @@ const STAY_GUIDE_SPEC = Object.freeze({
   guide: { id: '穩定 ID，小寫英數與連字號，建立後不要改', stay: 'PLACES 的住宿 key（cat: stay）', days: '要顯示入口的 DAYS id 陣列', title: `選填，≤${LIMITS.title} 字`, intro: `選填，≤${LIMITS.intro} 字`, source: `選填 {type,label?(≤${LIMITS.sourceLabel}),url?,date?(YYYY-MM-DD)}`, alerts: `[{id,text(≤${LIMITS.alert}),level:warn|info}]`, sections: `[{id,kind,title?,steps:[string ≤${LIMITS.step}],images?:[imageId]}]`, images: '[{id,file,alt,caption?,source?}]', lists: '[{id,kind,title?,items:[item]}]' },
   item: { id: '穩定 ID，同一指南內不可重複', name: '店名', summary: `選填，≤${LIMITS.summary} 字的一句話`, tags: `選填，特色標籤，每個 ≤${LIMITS.tag} 字`, place: '選填，PLACES key；沒有就省略，不要捏造座標', links: '選填 [{kind:official|map|other,label,url}]，不要把網址寫進文字', source: '選填，這一項的推薦來源', facts: '選填 [{label,value,source?,checked?}]，營業時間／價格／車程各自標來源與查核日期', note: `選填，≤${LIMITS.note} 字` },
   // 每個文字欄位的字數上限（超過會被資料檢查擋下）；太長就拆成 steps、facts、tags 或 note。
-  limits: { 'guide.title': LIMITS.title, 'guide.intro': LIMITS.intro, 'source.label': LIMITS.sourceLabel, 'alerts[].text': LIMITS.alert, 'sections[].title': LIMITS.title, 'sections[].steps[]': LIMITS.step, 'images[].alt': LIMITS.caption, 'images[].caption': LIMITS.caption, 'lists[].title': LIMITS.title, 'item.name': LIMITS.title, 'item.summary': LIMITS.summary, 'item.tags[]': LIMITS.tag, 'item.note': LIMITS.note, 'links[].label': LIMITS.label, 'facts[].label': LIMITS.label, 'facts[].value': LIMITS.fact },
+  limits: { 'guide.title': LIMITS.title, 'guide.intro': LIMITS.intro, 'alerts(level:warn) 則數': LIMITS.warnAlerts, 'alerts(level:info) 則數': LIMITS.infoAlerts, 'source.label': LIMITS.sourceLabel, 'alerts[].text': LIMITS.alert, 'sections[].title': LIMITS.title, 'sections[].steps[]': LIMITS.step, 'images[].alt': LIMITS.caption, 'images[].caption': LIMITS.caption, 'lists[].title': LIMITS.title, 'item.name': LIMITS.title, 'item.summary': LIMITS.summary, 'item.tags[]': LIMITS.tag, 'item.note': LIMITS.note, 'links[].label': LIMITS.label, 'facts[].label': LIMITS.label, 'facts[].value': LIMITS.fact },
   kinds: { lists: Object.keys(LIST_KINDS), sections: Object.keys(SECTION_KINDS), sourceTypes: Object.keys(SOURCE_TYPES), linkKinds: Object.keys(LINK_KINDS) },
   images: '圖片 file 必須是 trips/<slug>/photos/ 裡已存在、guide- 開頭的 jpg／png／webp；桌面 App 可改填 attachment（本輪附加圖片的 id），由 App 複製成檔案。',
-  rules: ['房東推薦寫 source.type=host，不等於官方已查核；只有實際查到的 fact 才填 checked。', '不知道的欄位直接省略，不要捏造座標、營業時間或交通時間。', '門鎖密碼、訂房碼、電話等私人資訊只能放 privateNotes，不可寫進指南。', '把既有長段落搬進指南時，原文資訊與連結都要保留。'],
+  rules: ['alerts 的 warn 只放漏看會出事的事（最多 3 則）；補充說明用 info；步驟裡已經寫的不要再寫成警示；「推薦只是候選、未查核」頁尾已經有，不要再寫。',
+    '推薦來源跟整份指南相同時，item 不用再填 source；tags 只放介紹裡沒提到的特色，不要重複 summary 的字。',
+    '房東推薦寫 source.type=host，不等於官方已查核；只有實際查到的 fact 才填 checked。', '不知道的欄位直接省略，不要捏造座標、營業時間或交通時間。', '門鎖密碼、訂房碼、電話等私人資訊只能放 privateNotes，不可寫進指南。', '把既有長段落搬進指南時，原文資訊與連結都要保留。'],
 });
 
-module.exports = { checkStayGuides, guideImageFiles, imageType, imageBytesMatch, STAY_GUIDE_SPEC, LIST_KINDS, SECTION_KINDS, SOURCE_TYPES, LINK_KINDS, IMAGE_FILE, LIMITS, ID };
+module.exports = { checkStayGuides, checkGuideReadability, guideImageFiles, imageType, imageBytesMatch, STAY_GUIDE_SPEC, LIST_KINDS, SECTION_KINDS, SOURCE_TYPES, LINK_KINDS, IMAGE_FILE, LIMITS, ID };

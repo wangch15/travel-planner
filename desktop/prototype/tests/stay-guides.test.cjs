@@ -210,6 +210,8 @@ test('AI 契約：每輪附 schemaVersion、可編輯範圍與既有指南；解
 test('AI 自創欄位或把私人欄位塞進指南：資料檢查擋下並說出原因', async t => {
   const f = await fixture(t);
   assert.throws(() => f.store.create(f.target, f.baseline, null, { summary: 'x', stayGuides: [guide({ privateNotes: '1234' })] }), e => e.code === 'INVALID_CANDIDATE' && e.problems.some(p => /privateNotes/.test(p)));
+  const noisy = guide({ alerts: Array.from({ length: 5 }, (_, i) => ({ id: 'w' + i, text: '注意' + i })) });
+  assert.throws(() => f.store.create(f.target, f.baseline, null, { summary: 'x', stayGuides: [noisy] }), e => e.code === 'INVALID_CANDIDATE' && e.problems.some(p => /最多 3 則/.test(p)), 'AI 新寫的指南警示太多要自己精簡');
   const invented = guide(); invented.lists[0].items[0].hours = '9-21';
   assert.throws(() => f.store.create(f.target, f.baseline, null, { summary: 'x', stayGuides: [invented] }), e => e.problems.some(p => /不支援的欄位 hours/.test(p)));
 });

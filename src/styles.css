@@ -391,7 +391,7 @@ dialog.lb[open]::backdrop{animation:lbfade .34s ease}
   .map.anim .pin>*{opacity:1;transform:none}}
 
 /* 停留點的停車提醒 */
-.stop-parking{margin:8px 0 0;padding:8px 10px;border-left:2px solid var(--rule-2);background:color-mix(in srgb,var(--sunk) 55%,transparent);border-radius:0 8px 8px 0}
+.stop-parking{margin:8px 0 0;padding:8px 10px;border-left:2px solid var(--rule-2);background:color-mix(in srgb,var(--sunk) 55%,transparent);border-radius:0}
 .stop-parking .pk-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.85rem}
 .stop-parking .pk-nm{font-weight:600}
 .stop-parking .pk-fee{color:var(--ink-2)}
@@ -416,12 +416,14 @@ dialog.lb[open]::backdrop{animation:lbfade .34s ease}
 .g-src a,.gi-facts a{color:inherit}
 .g-src .ico,.gi-facts .ico{width:10px;height:10px}
 .g-alerts{display:grid;gap:6px;margin:14px 0 4px}
-/* 左側裝飾條是直的：用 border-left，只有右側兩角圓角（同停車提醒） */
-.g-alert{display:flex;gap:8px;align-items:flex-start;margin:0;padding:9px 11px;border-left:3px solid transparent;border-radius:0 10px 10px 0;font-size:13px;line-height:1.55}
+/* 左側裝飾條的框一律直角：左邊不圓，整個框就都不圓（同停車提醒） */
+.g-alert{display:flex;gap:8px;align-items:flex-start;margin:0;padding:9px 11px;border-left:3px solid transparent;border-radius:0;font-size:13px;line-height:1.55}
 .g-alert .ico{width:15px;height:15px;flex:0 0 auto;margin-top:2px}
 .g-alert.warn{background:color-mix(in srgb,#C0392B 10%,var(--card));border-left-color:#C0392B}
 .g-alert.warn .ico{color:#C0392B}
-.g-alert.info{background:var(--sunk);border-left-color:var(--rule-2)}
+.g-notes{margin:10px 0 2px;padding-left:1.2em;display:grid;gap:4px;font-size:12.5px;line-height:1.6;color:var(--ink-2)}
+.g-notes li::marker{color:var(--ink-3)}
+.g-by{font:500 11px/1.4 var(--sans);color:var(--ink-3);margin-left:8px}
 .guide details{margin-top:10px}
 .guide details>summary{min-height:44px}
 .g-h{font:700 14px/1.4 var(--serif);color:var(--ink)}
@@ -438,14 +440,16 @@ dialog.lb[open]::backdrop{animation:lbfade .34s ease}
 .g-item>.gi{grid-column:1;grid-row:1;min-width:0}
 .g-item:first-child{border-top:0}
 .guide .gi{margin:0;border:0}
-.guide .gi>summary{padding:0;display:grid;grid-template-columns:1fr auto;column-gap:8px;align-items:start}
-.gi>summary>.ico{grid-column:2;grid-row:1}
+/* 每家店兩行：店名（＋來源不同時的標記）／一句介紹接著標籤 */
+.guide .gi>summary{padding:0;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:8px;align-items:start}
+.gi>summary>.ico{grid-column:2;grid-row:1;margin-top:4px}
 .gi-static{display:grid}
+.gi-title{grid-column:1;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px}
 .gi-name{font-weight:700;font-size:14.5px;line-height:1.4;color:var(--ink)}
-.gi-by{font:500 10.5px/1.6 var(--sans);color:var(--ink-3);grid-column:1}
-.gi-sum{grid-column:1;font-size:13px;line-height:1.55;color:var(--ink-2)}
-.gi-tags{grid-column:1;display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
-.gi-tag{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--sunk);color:var(--ink-2)}
+.gi-by{font:500 10.5px/1.6 var(--sans);color:var(--ink-3)}
+.gi-meta{grid-column:1;margin-top:2px;font-size:13px;line-height:1.6;color:var(--ink-2)}
+.gi-sum{margin-right:6px}
+.gi-tag{display:inline-block;margin:2px 4px 0 0;font-size:11px;line-height:1.5;padding:0 7px;border-radius:99px;background:var(--sunk);color:var(--ink-2);vertical-align:1px}
 .gi-body{padding:6px 0 2px}
 .gi-facts{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;font-size:12.5px}
 .gi-facts dt{color:var(--ink-3)}

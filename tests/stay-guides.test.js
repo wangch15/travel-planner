@@ -76,13 +76,47 @@ test('指南內容：警示獨立、步驟條列、每家店一項、查核狀�
   for (const name of ['範例超市', '範例藥妝', '範例拉麵', '範例居酒屋', '範例湯屋']) assert.match(html, new RegExp(`<span class="gi-name">${name}</span>`));
   assert.match(html, /<span class="g-chk ok">官網・2026-09-20 查核<\/span>/, '查過的那條標查核日期');
   assert.match(html, /<span class="g-chk">房東提供・未查核<\/span>/, '同一家店沒查的那條仍是未查核');
-  assert.match(html, /<span class="gi-by">房東推薦<\/span>/);
+  assert.equal(html.includes('class="gi-by"'), false, '整份指南已寫「房東提供」，店家不逐項重複來源');
+  assert.match(html, /整份指南：<span class="g-src g-src-host">房東提供/);
   assert.equal(/已確認/.test(html), false, '不會把整家店標成已確認');
   assert.match(html, /aria-label="範例超市：官網（新分頁）"/, '官網按鈕有無障礙標籤');
   assert.match(html, /data-detail="sightA"/, '有地點說明的店可開詳細');
   assert.match(html, /aria-label="放大查看：民宿後方停車格位置圖"/);
   assert.equal(/>https?:\/\//.test(html), false, '內文不直接顯示長網址');
   assert.equal(ctxFor(trip).guideBodyHTML('missing'), '');
+  assert.match(html, /Day 1–3・10\/11–10\/13/, '連續的天數合成一個標籤');
+  const gap = makeGuideTrip({ days: [1, 3] });
+  assert.match(ctxFor(gap).guideBodyHTML('stay-a-guide'), /Day 1・10\/11[\s\S]*Day 3・10\/13/, '不連續就分開列');
+});
+
+test('好讀：警示分兩級、來源只說一次、標籤不重複介紹', () => {
+  const trip = makeGuideTrip({ source: undefined });
+  const g = trip.STAY_GUIDES[0];
+  g.alerts = [{ id: 'road', text: '避開紅線窄路。' }, { id: 'note', text: '抵達當晚以入住為優先。', level: 'info' }];
+  g.lists[2].items[0] = { id: 'onsen-a', name: '範例湯屋', summary: '露天風呂的平價湯屋', tags: ['露天風呂', '24 小時'] };
+  const html = ctxFor(trip).guideBodyHTML('stay-a-guide');
+  assert.match(html, /<p class="g-alert warn">[\s\S]*避開紅線窄路/);
+  assert.match(html, /<ul class="g-notes" aria-label="補充說明"><li>抵達當晚以入住為優先。<\/li>/, '補充說明不做成警示框');
+  assert.equal((html.match(/class="g-alert /g) || []).length, 1);
+  assert.match(html, /<span class="g-h">採買<\/span><span class="g-by">房東推薦<\/span>/, '整份沒寫來源時，在清單標題說一次');
+  assert.equal(/<span class="gi-name">範例湯屋<\/span><span class="gi-by">/.test(html), false, '沒有來源的店不標');
+  const mixed = makeGuideTrip();
+  mixed.STAY_GUIDES[0].lists[1].items[1] = { id: 'izakaya-a', name: '朋友推薦的店', source: { type: 'user', label: '朋友推薦' } };
+  const mixedHtml = ctxFor(mixed).guideBodyHTML('stay-a-guide');
+  assert.match(mixedHtml, /<span class="gi-name">範例拉麵<\/span><span class="gi-by">房東推薦<\/span>/, '同一清單來源混雜時每家各自標');
+  assert.match(mixedHtml, /<span class="gi-name">朋友推薦的店<\/span><span class="gi-by">朋友推薦<\/span>/);
+  assert.equal(html.includes('<span class="gi-tag">露天風呂</span>'), false, '介紹已經寫了的標籤不重複');
+  assert.match(html, /<span class="gi-tag">24 小時<\/span>/);
+});
+
+test('警示太多：新寫的指南會被指出來交給 AI 精簡，舊資料照樣能建網站', () => {
+  const { checkGuideReadability } = require('../packages/engine/stay-guides.cjs');
+  const warn = (n) => Array.from({ length: n }, (_, i) => ({ id: 'w' + i, text: '注意事項' + i }));
+  const trip = makeGuideTrip({ alerts: warn(3) });
+  assert.deepEqual(checkGuideReadability(trip.STAY_GUIDES[0]), []);
+  assert.match(checkGuideReadability({ ...trip.STAY_GUIDES[0], alerts: warn(4) }).join('\n'), /重要警示（level:warn）有 4 則，最多 3 則/);
+  assert.match(checkGuideReadability({ ...trip.STAY_GUIDES[0], alerts: warn(5).map((a) => ({ ...a, level: 'info' })) }).join('\n'), /補充說明（level:info）最多 4 則/);
+  assert.deepEqual(errorsWith((g) => { g.alerts = warn(6); }), [], '已經存下的舊指南不會因此驗證失敗');
 });
 
 test('指南文字一律跳脫，資料不能注入 HTML', () => {

@@ -7,7 +7,7 @@ const { promisify, isDeepStrictEqual } = require('node:util');
 const { replaceDay } = require('../../packages/engine/day-edit.cjs');
 const { changesBetween, selectChanges, lostLinks } = require('./proposal-diff.cjs');
 const { replaceStayGuides, mergeStayGuides } = require('../../packages/engine/guide-edit.cjs');
-const { IMAGE_FILE, imageType, imageBytesMatch, guideImageFiles } = require('../../packages/engine/stay-guides.cjs');
+const { IMAGE_FILE, imageType, imageBytesMatch, guideImageFiles, checkGuideReadability } = require('../../packages/engine/stay-guides.cjs');
 const { parseLiteralModule, validate } = require('@travel-planner/engine');
 const { createRenderer } = require('@travel-planner/engine/render');
 const { buildPreview } = require('./preview.cjs');
@@ -112,6 +112,8 @@ class ProposalStore {
     const newAssets=checkAssets(assets).filter(a=>referenced.has(a.file)&&!Object.hasOwn(known,a.file));
     candidate.trip.GUIDE_IMAGES={...known,...Object.fromEntries(newAssets.map(a=>[a.file,'img/'+a.file]))};
     let errors;try{errors=validate(candidate.trip);}catch{throw fail('INVALID_CANDIDATE');}
+    // 這次新增或改過的指南才套用好讀規則（回復舊版本不套用）；舊資料照原樣可用。
+    if(kind!=='restore'){const before=baseline.snapshot.trip.STAY_GUIDES||[];for(const g of candidate.trip.STAY_GUIDES)if(!before.some(b=>isDeepStrictEqual(b,g)))errors=[...errors,...checkGuideReadability(g)];}
     // 逐項原因只在本機顯示給擁有者看，讓人知道 AI 哪裡寫錯（例如指南欄位超過字數）。
     if(errors.length)throw Object.assign(fail('INVALID_CANDIDATE'),{problems:errors.slice(0,5)});
     candidate.dataSource=source;

@@ -325,12 +325,24 @@ function guideLinksHTML(it) {
   if (it.place && DETAILS[it.place]) btns.push('<button type="button" class="g-btn" data-detail="' + esc(it.place) + '" aria-label="' + esc(it.name) + '：詳細說明" title="詳細">' + guideBtnInner('i-open', '詳細', 'i-open') + '</button>');
   return btns.length ? '<div class="gi-links">' + btns.join('') + '</div>' : '';
 }
-function guideItemHTML(it, g) {
+/* 清單裡每一項的推薦來源若都同一類，就只在清單標題（或整份指南）說一次，不逐項重複 */
+const sourceType = (s) => (s ? s.type : null);
+function listSource(l, g) {
+  const types = new Set(l.items.map((it) => sourceType(it.source || g.source)));
+  if (types.size !== 1 || types.has(null)) return null;
+  const first = l.items.find((it) => it.source) || {};
+  return first.source || g.source;
+}
+function guideItemHTML(it, g, shared) {
   const src = it.source || g.source;
-  const head = '<span class="gi-name">' + esc(it.name) + '</span>'
-    + (src ? '<span class="gi-by">' + esc(sourceLabel(src)) + '</span>' : '')
-    + (it.summary ? '<span class="gi-sum">' + esc(it.summary) + '</span>' : '')
-    + ((it.tags || []).length ? '<span class="gi-tags">' + it.tags.map((t) => '<span class="gi-tag">' + esc(t) + '</span>').join('') + '</span>' : '');
+  const badge = src && !(shared && sourceType(shared) === sourceType(src));
+  // 標籤文字已經出現在介紹裡就不重複顯示
+  const tags = (it.tags || []).filter((t) => !(it.summary || '').includes(t));
+  const meta = (it.summary ? '<span class="gi-sum">' + esc(it.summary) + '</span>' : '')
+    + tags.map((t) => '<span class="gi-tag">' + esc(t) + '</span>').join('');
+  const head = '<span class="gi-title"><span class="gi-name">' + esc(it.name) + '</span>'
+    + (badge ? '<span class="gi-by">' + esc(sourceLabel(src)) + '</span>' : '') + '</span>'
+    + (meta ? '<span class="gi-meta">' + meta + '</span>' : '');
   const body = ((it.facts || []).length ? '<dl class="gi-facts">' + it.facts.map(guideFactHTML).join('') + '</dl>' : '')
     + (it.note ? '<p class="gi-note">' + esc(it.note) + '</p>' : '')
     // 來源標籤已在標題列；有網址或日期時才在展開後補一行，避免重複
@@ -347,6 +359,20 @@ function guideImageHTML(im) {
     + '<img src="' + esc(src) + '" alt="' + esc(im.alt) + '" loading="lazy" decoding="async"></button>'
     + (cap ? '<figcaption>' + cap + '</figcaption>' : '') + '</figure>';
 }
+/* 連住的天數通常連續：合成一個標籤（Day 1–3・10/11–10/13），手機上不用佔兩行 */
+function guideDaysHTML(days) {
+  const chip = (text, color) => '<span class="lb-chip day" style="--dc:' + color + '">' + ico('i-cal') + esc(text) + '</span>';
+  const consecutive = days.length > 1 && days.every((d, i) => i === 0 || d.id === days[i - 1].id + 1);
+  if (!consecutive) return days.map((dy) => chip('Day ' + dy.id + '・' + dy.date.slice(0, 5), dy.color)).join('');
+  const a = days[0], b = days[days.length - 1];
+  return chip('Day ' + a.id + '–' + b.id + '・' + a.date.slice(0, 5) + '–' + b.date.slice(0, 5), a.color);
+}
+/* 警示分兩級：漏看會出事的用醒目框；補充說明是一小段淡色條列，不做成框 */
+function guideAlertsHTML(alerts) {
+  const warns = alerts.filter((a) => a.level !== 'info'), notes = alerts.filter((a) => a.level === 'info');
+  return (warns.length ? '<div class="g-alerts" role="note" aria-label="重要提醒">' + warns.map((a) => '<p class="g-alert warn">' + ico('i-note') + '<span>' + esc(a.text) + '</span></p>').join('') + '</div>' : '')
+    + (notes.length ? '<ul class="g-notes" aria-label="補充說明">' + notes.map((a) => '<li>' + esc(a.text) + '</li>').join('') + '</ul>' : '');
+}
 function guideBodyHTML(id) {
   const g = guideById(id);
   if (!g) return '';
@@ -358,15 +384,20 @@ function guideBodyHTML(id) {
     + '<span class="n">' + s.steps.length + ' 步</span>' + ico('i-chev') + '</summary>'
     + '<ol class="g-steps">' + s.steps.map((st) => '<li>' + esc(st) + '</li>').join('') + '</ol>' + imageHTML(s.images || []) + '</details>').join('');
   const loose = images.filter((im) => !used.has(im.id));
-  const lists = (g.lists || []).map((l) => '<details class="g-list" open><summary><span class="g-h">' + esc(guideListTitle(l)) + '</span>'
-    + '<span class="n">' + l.items.length + ' 項</span>' + ico('i-chev') + '</summary>'
-    + '<ul class="g-items">' + l.items.map((it) => guideItemHTML(it, g)).join('') + '</ul></details>').join('');
+  const lists = (g.lists || []).map((l) => {
+    const shared = listSource(l, g);
+    // 整份指南已經寫了同一類來源，清單標題就不再重複
+    const label = shared && sourceType(shared) !== sourceType(g.source) ? '<span class="g-by">' + esc(sourceLabel(shared)) + '</span>' : '';
+    return '<details class="g-list" open><summary><span class="g-h">' + esc(guideListTitle(l)) + '</span>' + label
+      + '<span class="n">' + l.items.length + ' 項</span>' + ico('i-chev') + '</summary>'
+      + '<ul class="g-items">' + l.items.map((it) => guideItemHTML(it, g, shared)).join('') + '</ul></details>';
+  }).join('');
   return '<div class="guide" style="--dc:' + (days[0] ? days[0].color : 'var(--accent)') + '">'
     + '<div class="lb-head"><h2 id="lbTitle">' + esc(guideTitle(g)) + '</h2><span class="kind k-stay">住宿指南</span></div>'
-    + '<div class="lb-meta">' + days.map((dy) => '<span class="lb-chip day" style="--dc:' + dy.color + '">' + ico('i-cal') + 'Day ' + dy.id + '・' + esc(dy.date.slice(0, 5)) + '</span>').join('') + '</div>'
+    + '<div class="lb-meta">' + guideDaysHTML(days) + '</div>'
     + (g.intro ? '<p class="lb-summary">' + esc(g.intro) + '</p>' : '')
     + (g.source ? '<p class="g-srcline">整份指南：' + guideSourceHTML(g.source) + '</p>' : '')
-    + ((g.alerts || []).length ? '<div class="g-alerts" role="note" aria-label="重要提醒">' + g.alerts.map((a) => '<p class="g-alert ' + (a.level === 'info' ? 'info' : 'warn') + '">' + ico('i-note') + '<span>' + esc(a.text) + '</span></p>').join('') + '</div>' : '')
+    + guideAlertsHTML(g.alerts || [])
     + sections
     + (loose.length ? '<details class="g-sec" open><summary><span class="g-h">圖片</span><span class="n">' + loose.length + ' 張</span>' + ico('i-chev') + '</summary>' + loose.map(guideImageHTML).join('') + '</details>' : '')
     + lists
