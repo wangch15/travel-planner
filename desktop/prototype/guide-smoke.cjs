@@ -29,10 +29,12 @@ app.whenReady().then(async()=>{
   account.connect=async()=>account.account;account.refresh=account.connect;account.stop=async()=>{};account.models=async()=>[{id:'fake-model',name:'Fake model',isDefault:true}];
   win=await createWindow({stateDirectory:state,codexAccount:account,makeProposals:d=>new ProposalStore(d,{checkPrivate:async()=>{}}),
     makeProvider:id=>{const a=new EventEmitter();a.account={state:'needs-login',provider:id};a.connect=async()=>a.account;a.refresh=a.connect;a.models=async()=>[];a.stop=async()=>{};return {account:a,editor:{active:null,stop:async()=>{}}};},
-    makeEditor:()=>({active:null,stop:async()=>({requested:true}),generate:async({model,dayId,mode,text,snapshot})=>{calls.push({dayId,mode,text});
+    makeEditor:()=>({active:null,stop:async()=>({requested:true}),generate:async({model,dayId,mode,text,snapshot,thread})=>{calls.push({dayId,mode,text,thread});
       // 假 AI：照指示把長文拆成指南，並把原本那段備案拿掉；故意漏掉拉麵的網址，App 要提醒。
+      // 第一次故意把來源標籤寫太長，App 要自己把問題交回給 AI 修正，不能丟給使用者。
       const day=parseLiteralModule(snapshot.dataSource).DAYS[0];
-      return {model,threadId:'t',turnId:'u'+calls.length,summary:'已把房東資訊整理成住宿指南。',replacementDays:[{...day,alts:day.alts.filter(a=>a.title!=='房東資訊')}],stayGuides:[guide]};}})});
+      const first=calls.length===1,label=first?'房東'.repeat(40):'房東提供';
+      return {model,threadId:'t',turnId:'u'+calls.length,summary:first?'整理好了。':'已把房東資訊整理成住宿指南。',replacementDays:[{...day,alts:day.alts.filter(a=>a.title!=='房東資訊')}],stayGuides:[{...guide,source:{type:'host',label}}]};}})});
   await until('document.documentElement.dataset.ready==="true" && !document.getElementById("guide-suggestion").hidden');
   assert.match(await js('document.getElementById("guide-suggestion-text").textContent'),/第 1 天.*「房東資訊」.*住宿指南/);
   const shots=path.resolve(__dirname,'../../.local/desktop-prototype');await fs.mkdir(shots,{recursive:true});
@@ -40,7 +42,9 @@ app.whenReady().then(async()=>{
   await fs.writeFile(path.join(shots,'guide-suggestion.png'),(await win.webContents.capturePage()).toPNG());
   await js('document.getElementById("guide-suggestion-run").click()');
   await until('!document.getElementById("proposal-review").hidden && document.getElementById("guide-suggestion").hidden');
-  assert.equal(calls.length,1);assert.equal(calls[0].dayId,null);assert.match(calls[0].text,/第 1 天備案「房東資訊」.*保留/);
+  assert.equal(calls.length,2,'第一次沒過資料檢查，App 自動請 AI 修正一次');assert.equal(calls[0].dayId,null);assert.match(calls[0].text,/第 1 天備案「房東資訊」.*保留/);
+  assert.match(calls[1].text,/沒有通過 App 的資料檢查[\s\S]*source\.label 超過 60 字/);assert.deepEqual(calls[1].thread,{id:'t',accountKey:calls[1].thread.accountKey,lastTurnId:'u1'},'修正在同一段對話裡進行');
+  assert.equal(await js('document.getElementById("messages").textContent.includes("資料檢查")'),false,'使用者不會看到格式錯誤');
   assert.equal(await js('document.getElementById("proposal-heading").textContent'),'搬移到住宿指南 · 尚未保存');
   assert.match(await js('document.getElementById("proposal-note").textContent'),/少了 1 個連結：https:\/\/example\.invalid\/ramen/);
   assert.equal(await fs.readFile(data,'utf8'),seeded,'搬移提案不能自動保存');
@@ -57,6 +61,6 @@ app.whenReady().then(async()=>{
   // 重新載入預覽後，長文已經搬走，提議卡不會再出現。
   await until('realPreview?.status==="ready"');
   assert.equal(await js('document.getElementById("guide-suggestion").hidden'),true);
-  console.log(JSON.stringify({passed:true,suggestionShown:true,migrationHeldForPreview:true,lostLinkWarned:true,noResearchGateForTextMove:true,savedAfterPreview:true,timelineUnchanged:true,suggestionClearedAfterSave:true}));
+  console.log(JSON.stringify({passed:true,selfRepairedInvalidAnswer:true,suggestionShown:true,migrationHeldForPreview:true,lostLinkWarned:true,noResearchGateForTextMove:true,savedAfterPreview:true,timelineUnchanged:true,suggestionClearedAfterSave:true}));
 }).catch(async e=>{status=1;console.error(e);if(win&&!win.isDestroyed())console.error(await js('JSON.stringify({note:document.getElementById("notification")?.textContent,proposal:document.getElementById("proposal-note")?.textContent,last:[...document.querySelectorAll(".message")].slice(-2).map(m=>m.textContent.slice(0,300))})').catch(()=>''));})
   .finally(async()=>{await shutdown().catch(()=>{});app.exit(status);});

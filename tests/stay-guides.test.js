@@ -34,6 +34,9 @@ test('驗證：住宿、天數、id、分類與長度', () => {
   assert.match(errorsWith((g) => { g.lists[1].items[0].id = 'super-a'; }).join('\n'), /id 重複：super-a/);
   assert.match(errorsWith((g) => { g.lists[0].items[0].summary = '長'.repeat(121); }).join('\n'), /超過 120 字/);
   assert.match(errorsWith((g) => { g.sections[0].steps = []; }).join('\n'), /至少要有一個步驟/);
+  // 來源標籤可以寫得具體一點（例如「房東 LINE 訊息，重複訊息已合併」），上限 60 字
+  assert.deepEqual(errorsWith((g) => { g.source.label = '房東 LINE 訊息（2026/09/20 傳來，重複的內容已合併整理）'; }), []);
+  assert.match(errorsWith((g) => { g.source.label = '長'.repeat(61); }).join('\n'), /source.label 超過 60 字/);
 });
 
 test('驗證：不捏造也不偷塞——未知欄位、私人欄位、壞連結、壞日期、圖片缺檔都擋', () => {

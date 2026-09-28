@@ -215,15 +215,21 @@ test('AI 自創欄位或把私人欄位塞進指南：資料檢查擋下並說�
 });
 
 test('一鍵搬移的提議：只挑像房東資訊的長備案，雨天備案與沒有住宿的行程不提', () => {
-  const { guideSuggestions } = require('../services/guide-suggestions.cjs');
+  const { guideSuggestions, guideSuggestion } = require('../services/guide-suggestions.cjs');
   const host = '房東說：15:00 後入住，停車在後方。' + '附近超市與溫泉資訊。'.repeat(12);
   const rain = '下雨的話改去室內的博物館，館內有常設展與特展可以看，逛完再到附近咖啡店休息。'.repeat(3);
   const trip = { PLACES: { innA: { cat: 'stay' } }, STAYS: [{ place: 'innA' }],
     DAYS: [{ id: 1, date: '10/11（日）', alts: [{ title: '下雨版', body: rain }, { title: '房東資訊', body: host }, { title: '短的', body: '房東說停後面' }] }, { id: 2, date: '10/12（一）', alts: [] }] };
   const found = guideSuggestions(trip);
   assert.deepEqual(found.map(s => [s.dayId, s.date, s.title]), [[1, '10/11', '房東資訊']]);
-  assert.match(found[0].request, /第 1 天備案「房東資訊」.*每一項資訊與連結都要保留.*不要改動其他天或時間/);
+  assert.match(guideSuggestion(trip).request, /第 1 天備案「房東資訊」.*每一項資訊與連結都要保留.*不要改動其他天或時間/);
   assert.deepEqual(guideSuggestions({ ...trip, STAYS: [] }), []);
+  assert.equal(guideSuggestion({ ...trip, STAYS: [] }), null);
+  // 好幾段一次送：同一份請求列出每一段，並要求同一間住宿合併成一份
+  const two = { ...trip, DAYS: [{ ...trip.DAYS[0], alts: [...trip.DAYS[0].alts, { title: '晚餐推薦', body: '房東推薦的餐廳：' + '步行可到的店。'.repeat(20) }] }] };
+  const combined = guideSuggestion(two);
+  assert.equal(combined.items.length, 2);
+  assert.match(combined.request, /第 1 天備案「房東資訊」、第 1 天備案「晚餐推薦」.*同一間住宿的放在同一份.*這幾段備案/);
 });
 
 test('預覽摘要帶著搬移提議，App 不必自己讀檔判斷', async t => {
@@ -232,6 +238,6 @@ test('預覽摘要帶著搬移提議，App 不必自己讀檔判斷', async t =>
   const { replaceDay } = require('../../../packages/engine/day-edit.cjs');
   await fs.writeFile(f.sourceFile, replaceDay(f.baseline.snapshot.dataSource, 2, { ...day, alts: [...(day.alts || []), { title: '民宿資訊', body: '入住後'.repeat(50) }] }).source);
   const preview = await buildPreview(f.root, 'sample');
-  assert.deepEqual(preview.summary.guideSuggestions.map(s => [s.dayId, s.title]), [[2, '民宿資訊']]);
-  assert.deepEqual(f.baseline.summary.guideSuggestions, [], '_example 本身不會被誤判');
+  assert.deepEqual(preview.summary.guideSuggestion.items.map(s => [s.dayId, s.title]), [[2, '民宿資訊']]);
+  assert.equal(f.baseline.summary.guideSuggestion, null, '_example 本身不會被誤判');
 });

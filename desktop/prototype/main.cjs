@@ -19,6 +19,9 @@ const {createResearchTools}=require('./services/research-tools.cjs');
 const {findPrivateData,appendPrivateNotes,privateMarkers}=require('./services/private-guard.cjs');
 const {resolveGuideAttachments}=require('./services/guide-assets.cjs');
 const {capabilityGapText}=require('./codex/capabilities.cjs');
+// AI 的修改沒過資料檢查時，自動請它修正的次數上限；都不行才告訴使用者。
+const SELF_REPAIR_ATTEMPTS=2;
+const selfRepairRequest=problems=>'你上一輪的修改沒有通過 App 的資料檢查，行程沒有被修改。請直接修正下列問題後，重新回覆完整的修改（同樣填 stayGuidesJson／replacementDaysJson 等欄位），其他內容維持你上一輪的版本；欄位格式與字數上限見 capabilities.stayGuideSpec。這是你要處理的事，不要請使用者修改或重新整理：\n'+problems.map(p=>'- '+String(p).slice(0,300)).join('\n');
 const {AuthTools}=require('./services/auth-tools.cjs');
 const {LocalArchiveService}=require('./services/local-archive.cjs');
 const {ToolSupport}=require('./services/tool-support.cjs');
@@ -309,7 +312,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       GUIDE_IMAGE_ID_COLLISION:'住宿指南裡有兩張不同的圖片用了幾乎相同的名稱，為了不讓其中一張被蓋掉，這次沒有修改。請 AI 替每張圖取不同的 id 再試。',
     };
     // AI 的修改沒過資料檢查時，把前幾個原因一起講，使用者可以直接轉述給 AI 修正。
-    if(error.code==='INVALID_CANDIDATE'&&Array.isArray(error.problems)&&error.problems.length)return {ok:false,code:'INVALID_CANDIDATE',message:messages.INVALID_CANDIDATE+'原因：'+error.problems.map(p=>String(p).slice(0,200)).join('；')};
+    if(error.code==='INVALID_CANDIDATE'&&Array.isArray(error.problems)&&error.problems.length)return {ok:false,code:'INVALID_CANDIDATE',message:(error.repairAttempts?`AI 整理的內容不符合行程格式，已請它自動修正 ${error.repairAttempts} 次仍未通過，行程沒有被修改。可以按「重送這則」再試一次。`:messages.INVALID_CANDIDATE)+'（檢查結果：'+error.problems.map(p=>String(p).slice(0,200)).join('；')+'）'};
     // 沒收進對照表的錯誤：先用服務附的中文說明，最後才用預設訊息（只附可回報的代碼，不顯示程式內部訊息）。
     const code=error.code||error.message;
     return { ok:false, code, message:messages[error.code] || messages[error.message] || userFacingMessage(error) || unexpectedFailureMessage(error) };
@@ -423,12 +426,14 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       checkCanceled();
       const researchTools=['research','materialize'].includes(mode)?await researchKit.endpoint().catch(()=>null):null;
       editorStarted=true;
-      const answer=await editor.generate({researchTools,snapshot:sourceSnapshot,dayId:input.dayId??null,text:input.text,model:input.model,effort:input.effort||undefined,mode,attachments:refs,planningDraft:planningContext,handoff:conversation.handoff,history:conversation.thread?conversation.messages:[],requestId:job.id,thread:conversation.thread,lastOutcome:conversation.lastOutcome,
+      const progress=message=>{if(!win.isDestroyed())win.webContents.send('ai:progress',{projectId:target.projectId,slug:target.slug,message});};
+      const generateAnswer=(text,thread,history)=>editor.generate({researchTools,snapshot:sourceSnapshot,dayId:input.dayId??null,text,model:input.model,effort:input.effort||undefined,mode,attachments:refs,planningDraft:planningContext,handoff:conversation.handoff,history,requestId:job.id,thread,lastOutcome:conversation.lastOutcome,
         onThread:async id=>{await conversations.update(target,s=>{s.thread={id,accountKey:binding,lastTurnId:conversation.thread?.lastTurnId||null};});await jobs.checkpoint(target,job.id,id);},
         onTurn:(threadId,turnId)=>jobs.checkpoint(target,job.id,threadId,turnId),
-        onProgress:message=>{if(!win.isDestroyed())win.webContents.send('ai:progress',{projectId:target.projectId,slug:target.slug,message});},
-        onDelta:progress=>{if(!win.isDestroyed())win.webContents.send('ai:progress',{projectId:target.projectId,slug:target.slug,...progress});}
+        onProgress:progress,
+        onDelta:delta=>{if(!win.isDestroyed())win.webContents.send('ai:progress',{projectId:target.projectId,slug:target.slug,...delta});}
       });
+      let answer=await generateAnswer(input.text,conversation.thread,conversation.thread?conversation.messages:[]);
       completedAnswer=answer;checkCanceled();
       let proposal={changed:false,summary:answer.summary},research=null,notesSaved=false;
       if(answer.research)research=await checkResearch(answer,boundSource,proposals.pending?.id,checkCanceled);
@@ -436,8 +441,23 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
         await assertNoPrivateData(target,Object.values(answer.files));const preparation=await newTrips.prepareMaterialization(target.root,target.slug,{files:answer.files});
         let candidate;try{candidate=await buildPreview(preparation.root,preparation.slug);checkCanceled();}catch(e){await newTrips.discardMaterialization(preparation.token);throw e;}materialization={...preparation,target,artifact:candidate,planDigest:conversation.plan.approvedDigest,seen:false};artifact=candidate;previewSeenURL=null;previewAttempt++;
         proposal={changed:false,summary:answer.summary,materialization:true,previewUrl:candidate.url,previewSummary:candidate.summary};
-      }else if(!answer.planning){const prepared=await prepareEditAnswer(target,answer,refs);notesSaved=prepared.notesSaved;
-        if(!answer.discussion){proposal=proposals.create(target,baseline,input.dayId,prepared.answer,{assets:prepared.assets});
+      }else if(!answer.planning){
+        // AI 的修改沒過資料檢查（例如某個欄位太長）：把問題交回同一段對話讓它自己修正，不叫使用者處理。
+        let prepared;const history=[...(conversation.thread?conversation.messages:[]),{role:'user',text:input.text}];
+        for(let attempt=0;;attempt++){
+          prepared=await prepareEditAnswer(target,answer,refs);notesSaved||=prepared.notesSaved;
+          if(answer.discussion)break;
+          try{proposal=proposals.create(target,baseline,input.dayId,prepared.answer,{assets:prepared.assets});break;}
+          catch(e){
+            if(e.code!=='INVALID_CANDIDATE'||!e.problems?.length||attempt>=SELF_REPAIR_ATTEMPTS)throw Object.assign(e,{repairAttempts:attempt});
+            progress(`AI 整理的內容有 ${e.problems.length} 處不符合格式，正在請它自己修正（第 ${attempt+1} 次）…`);
+            history.push({role:'assistant',text:answer.summary});
+            const request=selfRepairRequest(e.problems);
+            answer=await generateAnswer(request,{id:answer.threadId,accountKey:binding,lastTurnId:answer.turnId},history);
+            history.push({role:'user',text:request});completedAnswer=answer;checkCanceled();
+          }
+        }
+        if(!answer.discussion){
         // 把日程長文搬進住宿指南：先留成提案給人看預覽，確認後才保存。
         if(proposal.changed&&proposal.migration){await assertPendingClean(target);candidateCreated=true;await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}
         else if(proposal.changed){

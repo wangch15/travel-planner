@@ -566,16 +566,19 @@ function appendRealMessage(trip, message) {
   if (selected?.trip === trip) { addMessage(message); $('chat-scroll').scrollTop = $('chat-scroll').scrollHeight; }
 }
 // 偵測到「房東資訊塞在備案長文」時，主動提議整理成住宿指南（由 AI 整理，結果先留成提案給人預覽）。
-const guideSuggestionKey=s=>`${project?.projectId}:${selected?.trip?.slug}:${s.dayId}:${s.title}`;
+const guideSuggestionKey=s=>`${project?.projectId}:${selected?.trip?.slug}:${s.items.map(i=>i.dayId+'/'+i.title).join('|')}`;
 function currentGuideSuggestion(){
   if(!selected||selected.demo||realPreview?.status!=='ready'||pendingProposal||aiBusy||accountState.state!=='connected')return null;
   if(conversationLoading||conversationError||selected.trip.needsRestart)return null;
-  return (realPreview.summary?.guideSuggestions||[]).find(s=>!dismissedGuideSuggestions.has(guideSuggestionKey(s)))||null;
+  const suggestion=realPreview.summary?.guideSuggestion;
+  return suggestion?.items?.length&&!dismissedGuideSuggestions.has(guideSuggestionKey(suggestion))?suggestion:null;
 }
 function renderGuideSuggestion(){
   const suggestion=currentGuideSuggestion();
   $('guide-suggestion').hidden=!suggestion;
-  if(suggestion)$('guide-suggestion-text').textContent=`第 ${suggestion.dayId} 天（${suggestion.date}）的「${suggestion.title}」是一大段住宿資訊（約 ${suggestion.chars} 字）。要請 AI 整理成住宿指南嗎？整理好會先給你看預覽，確認才保存；附加的圖片（例如停車圖）也會一起放進去。`;
+  if(!suggestion)return;
+  const where=suggestion.items.map(s=>`第 ${s.dayId} 天（${s.date}）的「${s.title}」`).join('、');
+  $('guide-suggestion-text').textContent=`${where}${suggestion.items.length>1?`，共 ${suggestion.items.length} 段`:''}看起來是住宿資訊的長段落。要請 AI 一次整理成住宿指南嗎？整理好會先給你看預覽，確認才保存；附加的圖片（例如停車圖）也會一起放進去。`;
 }
 $('guide-suggestion-later').onclick=()=>{const s=currentGuideSuggestion();if(s)dismissedGuideSuggestions.add(guideSuggestionKey(s));renderGuideSuggestion();};
 $('guide-suggestion-run').onclick=async()=>{
