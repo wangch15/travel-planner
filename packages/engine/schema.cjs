@@ -1,4 +1,5 @@
 // 行程資料的驗證規則。回傳錯誤字串陣列，空陣列代表通過。
+const { checkStayGuides } = require('./stay-guides.cjs');
 const SCHEMA_VERSION = 1;
 const KINDS = new Set(['main', 'suggest', 'optional', 'stay', 'transit', 'alt']);
 const MODES = new Set(['drive', 'transit', 'walk', 'taxi', 'ferry']);
@@ -142,6 +143,7 @@ function validate(trip) {
   checkPlaces(trip, fail);
   checkDays(trip, fail);
   checkRefsAndLists(trip, fail);
+  checkStayGuides(trip, fail);
   if (trip.config.sections.mapLists) checkMapLists(trip, fail);
   checkPhotosAndBasemap(trip, fail);
   checkDeploy(trip, fail);

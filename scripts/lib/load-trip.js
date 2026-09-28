@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { tripDir } = require('./paths.js');
 const { validate } = require('./schema.js');
+const { guideImageFiles } = require('../../packages/engine/stay-guides.cjs');
 
 const readJSON = (p, fallback) => (fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : fallback);
 // 測試會重複寫入同一路徑，require 快取必須清掉才會拿到新內容。
@@ -50,6 +51,7 @@ function loadTrip(slug, opts = {}) {
     ADDONS: data.ADDONS || [],
     CHECKLIST: [...(data.CHECKLIST || [])],
     STAYS: data.STAYS || [],
+    STAY_GUIDES: data.STAY_GUIDES || [],
     OVERVIEW: data.OVERVIEW || {},
     DETAILS: readJS(path.join(dir, 'details.js'), {}),
     DINING, MAP_LISTS,
@@ -64,6 +66,10 @@ function loadTrip(slug, opts = {}) {
     d.mapList = MAP_LISTS[d.id] || null;
   });
   trip.CHECKLIST.push(...(DINING.checklist || []));
+  // 住宿指南宣告的圖片：只記實際存在的檔案，缺檔由 validate 報出來。
+  trip.GUIDE_IMAGES = Object.fromEntries(guideImageFiles(trip.STAY_GUIDES)
+    .filter((f) => fs.existsSync(path.join(dir, 'photos', f)))
+    .map((f) => [f, 'img/' + f]));
 
   if (opts.validate !== false) {
     const errs = validate(trip);

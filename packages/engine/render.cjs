@@ -1,7 +1,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const DATA_KEYS = ['PLACES', 'DAYS', 'OVERVIEW_ROUTE', 'ADDONS', 'CHECKLIST', 'STAYS', 'OVERVIEW', 'DETAILS', 'DINING', 'MAP_LISTS'];
+const DATA_KEYS = ['PLACES', 'DAYS', 'OVERVIEW_ROUTE', 'ADDONS', 'CHECKLIST', 'STAYS', 'STAY_GUIDES', 'GUIDE_IMAGES', 'OVERVIEW', 'DETAILS', 'DINING', 'MAP_LISTS'];
 
+// 舊資料或舊呼叫端沒有這兩個鍵時，頁面仍拿到可用的空值。
+const DATA_DEFAULTS = { STAY_GUIDES: [], GUIDE_IMAGES: {} };
 // 資料裡的連結或文字可能含 </script，不轉義會提前關掉 script 區塊
 const json = (v) => JSON.stringify(v).replace(/<\/script/gi, '<\\/script');
 
@@ -37,7 +39,7 @@ ${body}
 function createRenderer(assetsRoot) {
   const readEngine = (...parts) => fs.readFileSync(path.join(assetsRoot, ...parts), 'utf8');
 function inline(trip, {theme = '', extra = { sections: [] }, photos = {}}) {
-  const data = DATA_KEYS.map((k) => `const ${k} = ${json(trip[k])};`).join('\n')
+  const data = DATA_KEYS.map((k) => `const ${k} = ${json(trip[k] ?? DATA_DEFAULTS[k] ?? null)};`).join('\n')
     + `\nconst EXTRA = ${json(extra)};`;
   return readEngine('index.html')
     .replace('/*__TITLE__*/', trip.config.title)

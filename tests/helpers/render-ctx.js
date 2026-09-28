@@ -5,13 +5,13 @@ const vm = require('node:vm');
 // 原始碼接成一段執行，最後再把要用的名字逐一掛上 globalThis（沒宣告的用 try 略過）。
 const EXPORTS = ['esc', 'ico', 'md', 'money', 'KIND', 'll', 'mapsUrl', 'routeUrl',
   'legHTML', 'stopHTML', 'mealsHTML', 'dayHTML', 'overviewHTML', 'roleOf', 'detailBodyHTML', 'extraHTML', 'stopParkingHTML',
-  'lightboxSliderHTML'];
+  'lightboxSliderHTML', 'guideEntryHTML', 'guideBodyHTML', 'guidesForDay', 'guideDigest'];
 
 function renderContext(trip, sources) {
   const ctx = {
     CONFIG: trip.config,
     PLACES: trip.PLACES, DAYS: trip.DAYS, DETAILS: trip.DETAILS, DINING: trip.DINING,
-    PHOTOS: trip.PHOTOS, STAYS: trip.STAYS, ADDONS: trip.ADDONS, CHECKLIST: trip.CHECKLIST,
+    PHOTOS: trip.PHOTOS, STAYS: trip.STAYS, STAY_GUIDES: trip.STAY_GUIDES || [], GUIDE_IMAGES: trip.GUIDE_IMAGES || {}, ADDONS: trip.ADDONS, CHECKLIST: trip.CHECKLIST,
     OVERVIEW: trip.OVERVIEW, OVERVIEW_ROUTE: trip.OVERVIEW_ROUTE, MAP_LISTS: trip.MAP_LISTS,
     EXTRA: trip.EXTRA || { sections: [] },
     console,

@@ -66,7 +66,9 @@ function serializeProposal(value, depth = 0) {
 
 // The literal parser already established the full grammar and reference order.
 // Walk only expression values: object keys and const bindings are not usages.
-function editableDayExpression(source, index) {
+// Returns the export object node plus a resolver that follows const references
+// only when each binding is used exactly once (so an edit cannot leak elsewhere).
+function exportObjectNode(source) {
   const ast = acorn.parse(source, { ecmaVersion: 2022, sourceType: 'script' });
   const constants = new Map();
   const references = new Map();
@@ -103,6 +105,11 @@ function editableDayExpression(source, index) {
   }
   const exportObject = resolveExclusive(exported);
   if (exportObject.type !== 'ObjectExpression') throw invalidEdit();
+  return { ast, exportObject, resolveExclusive, constants };
+}
+
+function editableDayExpression(source, index) {
+  const { exportObject, resolveExclusive } = exportObjectNode(source);
   const property = exportObject.properties.find((entry) => (entry.key.name ?? entry.key.value) === 'DAYS');
   if (!property) throw invalidEdit();
   const days = resolveExclusive(property.value);
@@ -144,4 +151,4 @@ function replaceDay(source, dayId, replacementDay) {
   return { source: candidate, before, after, changed: true };
 }
 
-module.exports = { replaceDay };
+module.exports = { replaceDay, copyProposal, serializeProposal, exportObjectNode, invalidEdit };

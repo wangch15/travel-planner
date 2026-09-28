@@ -44,6 +44,8 @@ if (args.includes('--acp')) {
     if(payload.mode==='materialize')answer.filesJson=JSON.stringify({'data.js':'export const DAYS = [];'});
     if(payload.mode==='research')Object.assign(answer,{sources:[{url:'https://example.invalid/official',title:'Official fixture',evidence:'Fixture evidence'}],unresolved:[],feasibility:'待人工核對',privateNotes:''});
     if(payload.request==='invalid-answer')answer.extra='unrequested';
+    // 真的模型會照 outputSchema 把每個欄位都填上（含 needsResearch 與住宿指南等欄位）。
+    if(payload.request==='full-schema')Object.assign(answer,{conversationTitle:'住宿指南',appAction:'none',nextReply:'',needsResearch:true,stayGuidesJson:payload.capabilities?.editable?.includes('stayGuides')&&Array.isArray(payload.stayGuides)?JSON.stringify([{id:'g',stay:'s',days:[1]}]):'',privateNotes:'',missingCapability:'',handoffPrompt:''});
     if(images.length)answer.summary='圖片:'+images.map(b=>b.source.type+'/'+b.source.media_type+'/'+Buffer.from(b.source.data,'base64').length).join(',');
     const sid='11111111-1111-4111-8111-111111111111';
     if(provider==='claude') {
@@ -115,6 +117,13 @@ for(const provider of ['claude','gemini']) {
       assert.notEqual(launch.config.cwd,process.cwd());
       for(const key of ['ANTHROPIC_API_KEY','GEMINI_API_KEY','GOOGLE_API_KEY','NODE_OPTIONS','CLAUDE_CODE_OAUTH_TOKEN'])assert.equal(launch.config.env[key],undefined);
     }
+  });
+  test(`${provider}: a complete schema answer (needsResearch, stay guides) decodes instead of failing`,async t=>{
+    const f=await fixture(t,provider);
+    const answer=await f.editor.generate({snapshot:f.snapshot,dayId:1,text:'full-schema',mode:'edit-day'});
+    assert.equal(answer.needsResearch,true);
+    assert.equal(answer.conversationTitle,'住宿指南');
+    assert.deepEqual(answer.stayGuides,[{id:'g',stay:'s',days:[1]}],'每輪都帶 capabilities 與既有指南');
   });
   test(`${provider}: continuation requires provider identity and bounded host history`,async t=>{
     const f=await fixture(t,provider);

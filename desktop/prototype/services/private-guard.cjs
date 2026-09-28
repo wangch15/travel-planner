@@ -35,7 +35,7 @@ function findPrivateData(texts, { codes = [], hosts = [] }) {
 
 async function realDirectory(dir) { const stat = await fs.lstat(dir); if (!stat.isDirectory() || stat.isSymbolicLink()) throw fail('UNSAFE_PRIVATE_NOTES'); }
 
-async function appendPrivateNotes(tripDir, notes, { now = () => new Date() } = {}) {
+async function appendPrivateNotes(tripDir, notes, { now = () => new Date(), heading = '研究查核' } = {}) {
   const text = String(notes || '').trim();
   if (!text) return false;
   await realDirectory(tripDir);
@@ -44,7 +44,7 @@ async function appendPrivateNotes(tripDir, notes, { now = () => new Date() } = {
   const file = path.join(docs, NOTES);
   let exists = true;
   try { const stat = await fs.lstat(file); if (!stat.isFile() || stat.isSymbolicLink()) throw fail('UNSAFE_PRIVATE_NOTES'); } catch (error) { if (error.code !== 'ENOENT') throw error; exists = false; }
-  await fs.appendFile(file, (exists ? '' : HEADER) + `## ${now().toISOString().slice(0, 10)} 研究查核（App 自動記錄）\n\n${text.slice(0, 8000)}\n\n`, { mode: 0o600 });
+  await fs.appendFile(file, (exists ? '' : HEADER) + `## ${now().toISOString().slice(0, 10)} ${heading}（App 自動記錄）\n\n${text.slice(0, 8000)}\n\n`, { mode: 0o600 });
   return true;
 }
 

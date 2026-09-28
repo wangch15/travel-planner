@@ -5,6 +5,7 @@ const { createHash } = require('node:crypto');
 const { TextDecoder } = require('node:util');
 const { parseLiteralModule, copyLiteral, dataError, MAX_TEXT_BYTES } = require('./literal-data.cjs');
 const { validate } = require('./schema.cjs');
+const { guideImageFiles, imageType, imageBytesMatch } = require('./stay-guides.cjs');
 
 const MAX_TOTAL_TEXT = 16 * 1024 * 1024;
 const MAX_PHOTO = 16 * 1024 * 1024;
@@ -28,7 +29,8 @@ async function readTripSnapshot(tripDirectory, { slug, includePhotoBytes = false
     const directories = new Map([[dir, { stat: root, canonical }]]);
     const digest = createHash('sha256');
     const contextDigest = createHash('sha256');
-    function record(relative, value) { digest.update(value); if(relative !== 'data.js')contextDigest.update(value); }
+    // 脈絡雜湊不含 data.js 與住宿指南圖片：兩者都跟著 App 的版本紀錄走（圖片只由 data.js 的指南引用）。
+    function record(relative, value, context = true) { digest.update(value); if(context && relative !== 'data.js')contextDigest.update(value); }
     digest.update(JSON.stringify({ slug }));
     let textBytes = 0;
     let photoBytes = 0;
@@ -47,14 +49,14 @@ async function readTripSnapshot(tripDirectory, { slug, includePhotoBytes = false
       }
     }
 
-    async function readFile(relative, { photo = false, required = false } = {}) {
+    async function readFile(relative, { photo = false, required = false, context = true } = {}) {
       await parentsUnchanged();
       const filename = path.join(dir, relative);
       if (photo && !directories.has(path.join(dir, 'photos'))) {
         const photoDirectory = path.join(dir, 'photos');
         let parent;
         try { parent = await fs.lstat(photoDirectory); }
-        catch (e) { if (e.code === 'ENOENT') { record(relative,JSON.stringify([relative, null])); return null; } throw e; }
+        catch (e) { if (e.code === 'ENOENT') { record(relative,JSON.stringify([relative, null]), context); return null; } throw e; }
         if (!parent.isDirectory() || parent.isSymbolicLink() || await fs.realpath(photoDirectory) !== path.join(canonical, 'photos')) throw dataError('UNSAFE_PATH');
         directories.set(photoDirectory, { stat: parent, canonical: path.join(canonical, 'photos') });
         await parentsUnchanged();
@@ -62,7 +64,7 @@ async function readTripSnapshot(tripDirectory, { slug, includePhotoBytes = false
       let before;
       try { before = await fs.lstat(filename); }
       catch (e) {
-        if (e.code === 'ENOENT' && !required) { record(relative,JSON.stringify([relative, null])); return null; }
+        if (e.code === 'ENOENT' && !required) { record(relative,JSON.stringify([relative, null]), context); return null; }
         throw e;
       }
       if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1) throw dataError('UNSAFE_PATH');
@@ -89,7 +91,7 @@ async function readTripSnapshot(tripDirectory, { slug, includePhotoBytes = false
       const after = await fs.lstat(filename);
       if (after.nlink !== 1 || after.isSymbolicLink() || !unchanged(before, after)) throw dataError('SOURCE_CHANGED');
       await parentsUnchanged();
-      record(relative,JSON.stringify([relative, bytes.length, hash(bytes)]));
+      record(relative,JSON.stringify([relative, bytes.length, hash(bytes)]), context);
       return bytes;
     }
 
@@ -118,7 +120,8 @@ async function readTripSnapshot(tripDirectory, { slug, includePhotoBytes = false
     const dataSource = await text('data.js');
     let data = {};
     if (dataSource !== null) { try { data = parseLiteralModule(dataSource); } catch (e) { throw inFile('data.js', e); } }
-    const {DAYS:_days,...nonDayData}=data;
+    // DAYS 與 STAY_GUIDES 由 App 的版本紀錄管理（改它們會留版本、可回復），其餘內容才算「脈絡」。
+    const {DAYS:_days,STAY_GUIDES:_guides,...nonDayData}=data;
     contextDigest.update(JSON.stringify(nonDayData));
     const DETAILS = await js('details.js', {});
     const DINING = await js('dining.js', { checked: '', places: {}, venues: {}, days: {} });
@@ -153,13 +156,22 @@ async function readTripSnapshot(tripDirectory, { slug, includePhotoBytes = false
       }
       if (kept.length) photos[key] = kept;
     }
+    // 住宿指南的圖片：只讀指南宣告、檔名合規的檔案，檔頭要和副檔名一致。
+    const guideImages = {};
+    for (const file of guideImageFiles(data.STAY_GUIDES)) {
+      const bytes = await readFile('photos/' + file, { photo: true, context: false });
+      if (bytes === null) continue;
+      if (!imageBytesMatch(file, bytes)) throw inFile('photos/' + file, dataError('UNSAFE_PATH'));
+      guideImages[file] = 'img/' + file;
+      photoFiles.push({ source: 'photos/' + file, target: 'img/' + file, type: imageType(file), size: bytes.length, sha256: hash(bytes), ...(includePhotoBytes ? { bytes } : {}) });
+    }
     let trip;
     let problems;
     try {
       trip = {
         slug, config, PLACES: { ...data.PLACES }, DAYS: (data.DAYS || []).map((d) => ({ ...d })),
         OVERVIEW_ROUTE: data.OVERVIEW_ROUTE || [], ADDONS: data.ADDONS || [], CHECKLIST: [...(data.CHECKLIST || [])],
-        STAYS: data.STAYS || [], OVERVIEW: data.OVERVIEW || {}, DETAILS, DINING, MAP_LISTS, PHOTOS, basemap,
+        STAYS: data.STAYS || [], STAY_GUIDES: data.STAY_GUIDES || [], GUIDE_IMAGES: guideImages, OVERVIEW: data.OVERVIEW || {}, DETAILS, DINING, MAP_LISTS, PHOTOS, basemap,
       };
       for (const [key, place] of Object.entries(DINING.places || {})) trip.PLACES[key] = { approximate: true, ...place };
       for (const day of trip.DAYS) { day.meals = (DINING.days || {})[day.id] || []; day.mapList = MAP_LISTS[day.id] || null; }

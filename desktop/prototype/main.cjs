@@ -17,6 +17,8 @@ const {NewTripService}=require('./services/new-trip.cjs');
 const {AttachmentStore,fetchPublicReference}=require('./services/attachments.cjs');
 const {createResearchTools}=require('./services/research-tools.cjs');
 const {findPrivateData,appendPrivateNotes,privateMarkers}=require('./services/private-guard.cjs');
+const {resolveGuideAttachments}=require('./services/guide-assets.cjs');
+const {capabilityGapText}=require('./codex/capabilities.cjs');
 const {AuthTools}=require('./services/auth-tools.cjs');
 const {LocalArchiveService}=require('./services/local-archive.cjs');
 const {ToolSupport}=require('./services/tool-support.cjs');
@@ -299,7 +301,15 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       PREVIEW_REQUIRED:'請先開啟這份提案的預覽，再確認保存。', RESEARCH_REQUIRED:'停留或交通有變動，需要先完成來源與可行性查核。',
       STALE_PROPOSAL:'這份提案已失效，請重新產生。', INVALID_CANDIDATE:'AI 的修改沒有通過行程資料檢查，行程沒有被修改。',
       UNSUPPORTED_DAY_CHANGE:'AI 改到了這次不能改的欄位，行程沒有被修改。', MODEL_UNAVAILABLE:'目前沒有可用模型，請重新確認帳號連接。',
+      GUIDE_IMAGE_ATTACHMENT_MISSING:'AI 想放進住宿指南的圖片不是這次附加的圖片，行程沒有被修改。請把圖片附在同一則訊息再說一次。',
+      GUIDE_IMAGE_INVALID:'住宿指南的圖片名稱或格式不支援（只收 PNG、JPG、WebP），行程沒有被修改。',
+      INVALID_ASSET:'住宿指南的圖片內容和格式對不上，行程沒有被修改。請換一張圖片再試。',
+      ASSET_CONFLICT:'行程資料夾裡已經有同名但內容不同的指南圖片，為了不蓋掉它，這次沒有保存。請 AI 換一個圖片 id 再試。',
+      ATTACHMENT_CHANGED:'附加的圖片在處理途中被改動了，行程沒有被修改。請重新附加圖片再試。',
+      GUIDE_IMAGE_ID_COLLISION:'住宿指南裡有兩張不同的圖片用了幾乎相同的名稱，為了不讓其中一張被蓋掉，這次沒有修改。請 AI 替每張圖取不同的 id 再試。',
     };
+    // AI 的修改沒過資料檢查時，把前幾個原因一起講，使用者可以直接轉述給 AI 修正。
+    if(error.code==='INVALID_CANDIDATE'&&Array.isArray(error.problems)&&error.problems.length)return {ok:false,code:'INVALID_CANDIDATE',message:messages.INVALID_CANDIDATE+'原因：'+error.problems.map(p=>String(p).slice(0,200)).join('；')};
     // 沒收進對照表的錯誤：先用服務附的中文說明，最後才用預設訊息（只附可回報的代碼，不顯示程式內部訊息）。
     const code=error.code||error.message;
     return { ok:false, code, message:messages[error.code] || messages[error.message] || userFacingMessage(error) || unexpectedFailureMessage(error) };
@@ -354,6 +364,16 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       return {versionId:result.version?.id||null,number:result.version?.number||null,previousId:previous?.id||null,previousNumber:previous?.number||null,labels,research};
     }catch(error){if(proposals.pending===pending){pending.seen=false;pending.requiresResearch=required;}throw error;}
   }
+  // 編輯回覆的共用前處理：私人資訊先寫進私人筆記（之後的私人資料檢查就會擋住同樣的字串進入指南），
+  // 再把指南引用的附件圖片換成專案檔名。回傳要給 proposals.create 的回覆與圖片。
+  async function prepareEditAnswer(target,answer,refs){
+    let notesSaved=false;
+    if(!answer.research&&answer.privateNotes)notesSaved=await appendPrivateNotes(path.join(target.root,'trips',target.slug),answer.privateNotes,{heading:'AI 整理的私人資訊'});
+    if(!answer.stayGuides)return {answer,assets:[],notesSaved};
+    const resolved=await resolveGuideAttachments(answer.stayGuides,refs);
+    return {answer:{...answer,stayGuides:resolved.guides},assets:resolved.assets,notesSaved};
+  }
+  const replyText=(answer,notesSaved)=>answer.summary+capabilityGapText(answer.capabilityGap)+(notesSaved?'\n\n私人資訊（密碼、訂房碼、聯絡方式等）已另存到這趟的私人筆記，不會出現在網站上。':'');
   async function assertPendingClean(target){if(!proposals.pending)return;try{await assertNoPrivateData(target,[proposals.pending.fullSource||proposals.pending.source||'']);}catch(error){proposals.discard();throw error;}}
   async function checkResearch(answer,sourceHash,proposalId,checkCanceled=()=>{}){
     const sources=[];const unresolved=[...answer.unresolved];let renders=0;
@@ -397,7 +417,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       const boundSource=researchBinding(target,baseline,mode==='research'?proposals.pending:null);
       let planningContext=planning?{...planning,slug:target.slug,planMarkdown:conversation.plan?.markdown,research:conversation.research}:null;
       if(mode==='materialize'){
-        const docs=await Promise.all(['trip-config','data','details','dining','map-lists','photos'].map(async name=>[name,(await fs.readFile(path.resolve(__dirname,'../../docs/schema',name+'.md'),'utf8')).slice(0,25000)]));
+        const docs=await Promise.all(['trip-config','data','stay-guides','details','dining','map-lists','photos'].map(async name=>[name,(await fs.readFile(path.resolve(__dirname,'../../docs/schema',name+'.md'),'utf8')).slice(0,25000)]));
         planningContext={...planningContext,schema:Object.fromEntries(docs),requiredDeployName:target.slug};
       }
       checkCanceled();
@@ -410,20 +430,23 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
         onDelta:progress=>{if(!win.isDestroyed())win.webContents.send('ai:progress',{projectId:target.projectId,slug:target.slug,...progress});}
       });
       completedAnswer=answer;checkCanceled();
-      let proposal={changed:false,summary:answer.summary},research=null;
+      let proposal={changed:false,summary:answer.summary},research=null,notesSaved=false;
       if(answer.research)research=await checkResearch(answer,boundSource,proposals.pending?.id,checkCanceled);
       else if(answer.materialize){
         await assertNoPrivateData(target,Object.values(answer.files));const preparation=await newTrips.prepareMaterialization(target.root,target.slug,{files:answer.files});
         let candidate;try{candidate=await buildPreview(preparation.root,preparation.slug);checkCanceled();}catch(e){await newTrips.discardMaterialization(preparation.token);throw e;}materialization={...preparation,target,artifact:candidate,planDigest:conversation.plan.approvedDigest,seen:false};artifact=candidate;previewSeenURL=null;previewAttempt++;
         proposal={changed:false,summary:answer.summary,materialization:true,previewUrl:candidate.url,previewSummary:candidate.summary};
-      }else if(!answer.discussion&&!answer.planning){proposal=proposals.create(target,baseline,input.dayId,answer);
-        if(proposal.changed){
+      }else if(!answer.planning){const prepared=await prepareEditAnswer(target,answer,refs);notesSaved=prepared.notesSaved;
+        if(!answer.discussion){proposal=proposals.create(target,baseline,input.dayId,prepared.answer,{assets:prepared.assets});
+        // 把日程長文搬進住宿指南：先留成提案給人看預覽，確認後才保存。
+        if(proposal.changed&&proposal.migration){await assertPendingClean(target);candidateCreated=true;await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}
+        else if(proposal.changed){
           // 直接套用；寫入失敗（例如檔案剛被別的程式改過）才退回舊的提案確認流程。
           try{applied=await applyPendingNow(target,{needsResearch:answer.needsResearch===true});proposal={changed:false,applied:true,summary:answer.summary,...applied};}
           catch(e){if(!proposals.pending)throw e;if(e.code!=='CONTENT_CHANGED'){proposals.discard();throw e;}await assertPendingClean(target);candidateCreated=true;await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}
-        }}
+        }}}
       checkCanceled();
-      const updated=await conversations.update(target,s=>{applySuggestedTitle(s,answer);s.messages.push({role:'assistant',text:answer.summary+(answer.planning?'\n\n'+answer.planMarkdown:''),...(answer.appAction?{action:answer.appAction}:applied?.research?{action:'research'}:{}),...(applied?{applied}:{}),generation:{provider:providerId,model:answer.model||input.model||'',effort:input.effort||'',...(!input.effort&&answer.resolvedEffort?{resolvedEffort:answer.resolvedEffort}:{})}});s.run={id:job.id,status:'complete'};s.thread={id:answer.threadId,accountKey:binding,lastTurnId:answer.turnId};s.model=answer.model;s.pendingProposal=Boolean(proposals.pending);s.lastOutcome=proposals.pending?'提案尚未保存。':applied?`上一輪的修改已直接保存到本機檔案（V${applied.number||'?'}），尚未備份到 GitHub。`:'上一輪沒有修改原檔。';if(answer.planning)s.plan={markdown:answer.planMarkdown,approvedDigest:null};if(research)s.research=research;});
+      const updated=await conversations.update(target,s=>{applySuggestedTitle(s,answer);s.messages.push({role:'assistant',text:replyText(answer,notesSaved)+(answer.planning?'\n\n'+answer.planMarkdown:''),...(answer.appAction?{action:answer.appAction}:applied?.research?{action:'research'}:{}),...(applied?{applied}:{}),generation:{provider:providerId,model:answer.model||input.model||'',effort:input.effort||'',...(!input.effort&&answer.resolvedEffort?{resolvedEffort:answer.resolvedEffort}:{})}});s.run={id:job.id,status:'complete'};s.thread={id:answer.threadId,accountKey:binding,lastTurnId:answer.turnId};s.model=answer.model;s.pendingProposal=Boolean(proposals.pending);s.lastOutcome=proposals.pending?'提案尚未保存。':applied?`上一輪的修改已直接保存到本機檔案（V${applied.number||'?'}），尚未備份到 GitHub。`:'上一輪沒有修改原檔。';if(answer.planning)s.plan={markdown:answer.planMarkdown,approvedDigest:null};if(research)s.research=research;});
       await jobs.finish(target,job.id);return {ok:true,proposal,research,planning:Boolean(planning),model:answer.model,...(answer.suggestion?{suggestion:answer.suggestion}:{}),conversation:displayConversation({...updated,job:{...job,status:'completed',autoResume:false}})};
     }catch(e){
       if(candidateCreated){proposals.discard();artifact=null;previewAttempt++;await versions.saveDraft(target,null).catch(()=>{});}
@@ -726,8 +749,10 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       if(proposals.pending&&!sameTarget(proposals.pending.target,target))throw Object.assign(Error('STALE_PROPOSAL'),{code:'STALE_PROPOSAL'});
       if(answer.research){const bound=researchBinding(target,baseline,proposals.pending);if(bound!==job.input.researchSourceHash)throw Object.assign(Error('CONTENT_CHANGED'),{code:'CONTENT_CHANGED'});recoveredResearch=await checkResearch(answer,bound,proposals.pending?.id);}
       if(answer.materialize){if(!planning||!state.plan?.approvedDigest||!state.research?.confirmed)throw Object.assign(Error('PLAN_CONFIRMATION_REQUIRED'),{code:'PLAN_CONFIRMATION_REQUIRED'});await assertNoPrivateData(target,Object.values(answer.files));const prep=await newTrips.prepareMaterialization(target.root,target.slug,{files:answer.files});let candidate;try{candidate=await buildPreview(prep.root,prep.slug);}catch(e){await newTrips.discardMaterialization(prep.token);throw e;}materialization={...prep,target,artifact:candidate,planDigest:state.plan.approvedDigest};artifact=candidate;previewSeenURL=null;proposal={...proposal,materialization:true,previewUrl:candidate.url,previewSummary:candidate.summary};}
-      if(answer.replacementDay||answer.replacementDays){proposal=proposals.create(target,baseline,job.input.dayId,answer);if(proposal.changed)await assertPendingClean(target);if(proposal.changed){await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}}
-      const updated=await conversations.update(target,s=>{applySuggestedTitle(s,answer);s.run={id:job.id,status:'complete'};s.thread={id:answer.threadId,lastTurnId:answer.turnId,accountKey:job.accountKey};s.messages.push({role:'assistant',text:'已核對上次完成的回覆，沒有重送。\n\n'+answer.summary,generation:{provider:providerId,model:answer.model||job.input.model||'',effort:job.input.effort||''}});if(answer.planning)s.plan={markdown:answer.planMarkdown,approvedDigest:null};if(recoveredResearch)s.research=recoveredResearch;});await jobs.finish(target,job.id);return {status:'completed',proposal,research:recoveredResearch,conversation:displayConversation(await conversations.read(target))};
+      let notesSaved=false;
+      if(answer.replacementDay||answer.replacementDays||answer.stayGuides||answer.privateNotes){const refs=answer.stayGuides?await referenceInputs(target,job.input.attachmentIds||[]).catch(()=>[]):[];const prepared=await prepareEditAnswer(target,answer,refs);notesSaved=prepared.notesSaved;
+        if(answer.replacementDay||answer.replacementDays||answer.stayGuides){proposal=proposals.create(target,baseline,job.input.dayId,prepared.answer,{assets:prepared.assets});if(proposal.changed)await assertPendingClean(target);if(proposal.changed){await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}}}
+      const updated=await conversations.update(target,s=>{applySuggestedTitle(s,answer);s.run={id:job.id,status:'complete'};s.thread={id:answer.threadId,lastTurnId:answer.turnId,accountKey:job.accountKey};s.messages.push({role:'assistant',text:'已核對上次完成的回覆，沒有重送。\n\n'+replyText(answer,notesSaved),generation:{provider:providerId,model:answer.model||job.input.model||'',effort:job.input.effort||''}});if(answer.planning)s.plan={markdown:answer.planMarkdown,approvedDigest:null};if(recoveredResearch)s.research=recoveredResearch;});await jobs.finish(target,job.id);return {status:'completed',proposal,research:recoveredResearch,conversation:displayConversation(await conversations.read(target))};
     }
     if(['interrupted','failed'].includes(result.status)){const updated=await conversations.update(target,s=>{s.run={id:job.id,status:'failed'};if(s.thread)s.thread.lastTurnId=result.turnId;s.messages.push({role:'assistant',text:'已確認上一輪停止。可以在原對話送出新的要求，沒有自動重送。'});});await jobs.patch(target,job.id,{status:'paused',autoResume:false,claimId:null,reason:'terminal-confirmed'});return {status:result.status,conversation:displayConversation(await conversations.read(target))};}
     return {status:result.status,message:'尚未確認完整結果，沒有重送。可稍後再次核對，或交接到新的 AI 對話。'};

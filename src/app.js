@@ -404,10 +404,52 @@ function openDetail(key, opener) {
   try { if (location.hash !== '#p=' + key) history.replaceState(null, '', '#p=' + key); } catch (e) {}
   lb.focus();
 }
+/* 住宿指南：共用同一個燈箱，沒有照片輪播 */
+function openGuide(id, opener) {
+  const html = guideBodyHTML(id);
+  if (!html) return;
+  lbOpener = opener || document.activeElement;
+  lbTrack.closest('.lb-slider').hidden = true;
+  lbTrack.innerHTML = ''; lbDots.innerHTML = '';
+  lbBody.innerHTML = html;
+  if (!lb.open) lb.showModal();
+  fab.classList.remove('show');
+  lbBody.scrollTop = 0;
+  try { if (location.hash !== '#g=' + id) history.replaceState(null, '', '#g=' + id); } catch (e) {}
+  lb.focus();
+}
+/* 燈箱內的按鈕：指南裡的「詳細」與圖片放大 */
+lbBody.addEventListener('click', (e) => {
+  const detail = e.target.closest('[data-detail]');
+  if (detail) { openDetail(detail.dataset.detail, lbOpener); return; }
+  const zoom = e.target.closest('[data-zoom]');
+  if (zoom) openZoom(zoom);
+});
+
+/* 圖片放大：疊在燈箱上的第二層 dialog，Esc／背景／關閉鈕都能關，關掉後焦點回到縮圖 */
+const zoomDlg = $('#zoomdlg'), zoomImg = $('#zoomImg'), zoomCap = $('#zoomCap');
+let zoomOpener = null;
+function openZoom(btn) {
+  zoomOpener = btn;
+  zoomImg.src = btn.dataset.zoom;
+  zoomImg.alt = btn.dataset.alt || '';
+  zoomCap.textContent = btn.dataset.caption || btn.dataset.alt || '';
+  zoomDlg.showModal();
+  $('#zoomClose').focus();
+}
+function afterZoomClose() {
+  zoomImg.removeAttribute('src');
+  if (zoomOpener && document.contains(zoomOpener)) zoomOpener.focus();
+  zoomOpener = null;
+}
+zoomDlg.addEventListener('close', afterZoomClose);
+zoomDlg.addEventListener('click', (e) => { if (e.target === zoomDlg) zoomDlg.close(); });
+$('#zoomClose').onclick = () => zoomDlg.close();
+
 /* 關閉後的收尾。可重複呼叫；不依賴 dialog 的 close 事件 */
 function afterDetailClose() {
   updateFab();
-  try { if (/^#p=/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  try { if (/^#[pg]=/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
   lbTrack.innerHTML = '';
   if (lbOpener && lbOpener.focus && document.contains(lbOpener)) lbOpener.focus();
   lbOpener = null;
@@ -439,8 +481,10 @@ lb.addEventListener('keydown', (e) => {
 /* 網址 #p=地點 直接開燈箱，家人可以分享單一景點 */
 function openFromHash() {
   const m = location.hash.match(/^#p=([A-Za-z0-9_]+)$/);
+  const g = location.hash.match(/^#g=([a-z0-9-]+)$/);
   if (m && DETAILS[m[1]]) openDetail(m[1], null);
-  else if (!m) closeDetail();
+  else if (g && guideById(g[1])) openGuide(g[1], null);
+  else if (!m && !g) closeDetail();
 }
 addEventListener('hashchange', openFromHash);
 
@@ -494,6 +538,7 @@ function show(id) {
   renderMap(day);
   if (!day) restoreChecks();
   panel.querySelectorAll('[data-detail]').forEach((n) => { n.onclick = () => openDetail(n.dataset.detail, n); });
+  panel.querySelectorAll('[data-guide]').forEach((n) => { n.onclick = () => openGuide(n.dataset.guide, n); });
   panel.querySelectorAll('[data-day]').forEach((n) => { n.onclick = () => { show(+n.dataset.day); toTop(); }; });
   panel.querySelectorAll('.stop').forEach((n) => {
     n.addEventListener('click', (e) => { if (e.target.closest('a,button')) return; focusPlace(n.dataset.place, {}); });

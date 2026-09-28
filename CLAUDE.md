@@ -437,7 +437,7 @@ gh issue create -R wangch15/travel-planner
 | 你要改的檔案 | 先讀 |
 |---|---|
 | `trip.config.json` | `docs/schema/trip-config.md` |
-| `data.js` | `docs/schema/data.md` |
+| `data.js` | `docs/schema/data.md`（`STAY_GUIDES` 另見 `docs/schema/stay-guides.md`） |
 | `details.js` | `docs/schema/details.md` |
 | `dining.js` | `docs/schema/dining.md` |
 | `map-lists.js` | `docs/schema/map-lists.md` |

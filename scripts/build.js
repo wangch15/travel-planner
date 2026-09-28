@@ -52,6 +52,15 @@ function buildTrip(slug) {
     photoCount += 1;
   });
 
+  // 住宿指南的圖片（房東的停車圖等）：照原檔名放在 img/。
+  Object.keys(trip.GUIDE_IMAGES || {}).forEach((file) => {
+    fs.mkdirSync(imgDir, { recursive: true });
+    const from = path.join(dir, 'photos', file);
+    fs.copyFileSync(from, path.join(imgDir, file));
+    photoBytes += fs.statSync(from).size;
+    photoCount += 1;
+  });
+
   const statics = fs.readdirSync(path.join(ROOT, 'public'));
   statics.forEach((f) => fs.copyFileSync(path.join(ROOT, 'public', f), path.join(site, f)));
 

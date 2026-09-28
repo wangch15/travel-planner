@@ -397,3 +397,70 @@ dialog.lb[open]::backdrop{animation:lbfade .34s ease}
 .stop-parking .pk-fee{color:var(--ink-2)}
 .stop-parking .pk-note{margin:4px 0 0;font-size:.82rem;color:var(--ink-3)}
 .stop-parking .glink{margin-top:6px;font-size:.82rem}
+
+/* ── 住宿指南 ── 入口卡在每日頁頂，內容在燈箱；手機優先的緊湊清單 */
+.guide-entry{display:grid;gap:8px;margin:14px 0 4px}
+.guide-open{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:10px 12px;text-align:left;border-radius:12px;
+  background:color-mix(in srgb,var(--dc,var(--accent)) 8%,var(--card));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dc,var(--accent)) 30%,var(--rule));color:var(--ink);cursor:pointer}
+.guide-open>.ico{width:18px;height:18px;flex:0 0 auto;color:var(--dct,var(--accent-t))}
+.guide-open>.ico:last-child{width:14px;height:14px;color:var(--ink-3)}
+.guide-open:hover{background:color-mix(in srgb,var(--dc,var(--accent)) 14%,var(--card))}
+.guide-open:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.ge-main{display:flex;flex-direction:column;min-width:0;flex:1 1 auto}
+.ge-k{font:500 10.5px/1.4 var(--sans);letter-spacing:.06em;color:var(--ink-3)}
+.ge-t{font-weight:700;font-size:14px;line-height:1.35}
+.ge-s{font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.guide-open.compact{margin-top:8px;min-height:44px;padding:8px 10px}
+.guide .g-srcline{font-size:12px;color:var(--ink-3);margin:6px 0 0}
+.g-src{display:inline-flex;align-items:center;gap:3px;flex-wrap:wrap}
+.g-src a,.gi-facts a{color:inherit}
+.g-src .ico,.gi-facts .ico{width:10px;height:10px}
+.g-alerts{display:grid;gap:6px;margin:14px 0 4px}
+.g-alert{display:flex;gap:8px;align-items:flex-start;margin:0;padding:9px 11px;border-radius:10px;font-size:13px;line-height:1.55}
+.g-alert .ico{width:15px;height:15px;flex:0 0 auto;margin-top:2px}
+.g-alert.warn{background:color-mix(in srgb,#C0392B 10%,var(--card));box-shadow:inset 3px 0 0 #C0392B}
+.g-alert.warn .ico{color:#C0392B}
+.g-alert.info{background:var(--sunk);box-shadow:inset 3px 0 0 var(--rule-2)}
+.guide details{margin-top:10px}
+.guide details>summary{min-height:44px}
+.g-h{font:700 14px/1.4 var(--serif);color:var(--ink)}
+.g-steps{margin:0 0 8px;padding-left:1.4em;display:grid;gap:6px;font-size:13.5px;line-height:1.6}
+.g-steps li::marker{font:500 12px var(--mono);color:var(--dct,var(--accent-t))}
+.g-fig{margin:8px 0 12px}
+.g-zoom{display:block;width:100%;padding:0;border:0;border-radius:10px;overflow:hidden;background:var(--sunk);cursor:zoom-in}
+.g-zoom img{display:block;width:100%;max-height:260px;object-fit:contain}
+.g-zoom:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.g-fig figcaption{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+.g-items{list-style:none;margin:0;padding:0}
+.g-item{padding:10px 0;border-top:1px solid var(--rule)}
+.g-item:first-child{border-top:0}
+.guide .gi{margin:0;border:0}
+.guide .gi>summary{padding:0;display:grid;grid-template-columns:1fr auto;column-gap:8px;align-items:start}
+.gi>summary>.ico{grid-column:2;grid-row:1}
+.gi-static{display:grid}
+.gi-name{font-weight:700;font-size:14.5px;line-height:1.4;color:var(--ink)}
+.gi-by{font:500 10.5px/1.6 var(--sans);color:var(--ink-3);grid-column:1}
+.gi-sum{grid-column:1;font-size:13px;line-height:1.55;color:var(--ink-2)}
+.gi-tags{grid-column:1;display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.gi-tag{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--sunk);color:var(--ink-2)}
+.gi-body{padding:6px 0 2px}
+.gi-facts{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;font-size:12.5px}
+.gi-facts dt{color:var(--ink-3)}
+.gi-facts dd{margin:0}
+.g-chk{font-size:11px;padding:0 6px;border-radius:99px;background:var(--sunk);color:var(--ink-3);white-space:nowrap}
+.g-chk.ok{background:color-mix(in srgb,#3E7B4E 14%,var(--card));color:#3E7B4E}
+.gi-note{font-size:12.5px;color:var(--ink-2);margin:6px 0 0}
+.gi-srcline{font-size:11.5px;color:var(--ink-3);margin:6px 0 0}
+.gi-links{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.g-btn{display:inline-flex;align-items:center;gap:4px;min-height:36px;padding:6px 12px;border-radius:99px;font-size:12.5px;font-weight:500;
+  color:var(--ink);background:var(--sunk);text-decoration:none;border:0;cursor:pointer}
+.g-btn .ico{width:11px;height:11px;color:var(--ink-3)}
+.g-btn:hover{background:color-mix(in srgb,var(--dc,var(--accent)) 14%,var(--sunk))}
+.g-btn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .g-chk.ok{color:#8FCB9C}}
+:root[data-theme="dark"] .g-chk.ok{color:#8FCB9C}
+dialog.zoomdlg{border:0;padding:0;margin:0;width:100%;height:100%;max-width:none;max-height:none;background:transparent}
+dialog.zoomdlg::backdrop{background:rgba(10,8,5,.86)}
+.zoom-fig{margin:0;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:52px 12px 16px;box-sizing:border-box}
+.zoom-fig img{max-width:100%;max-height:calc(100% - 40px);object-fit:contain;touch-action:pinch-zoom}
+.zoom-fig figcaption{color:#FFF3E2;font-size:13px;margin-top:10px;text-align:center}

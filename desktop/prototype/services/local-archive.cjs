@@ -6,6 +6,7 @@ const { parse } = require('acorn');
 const { createHash, randomUUID } = require('node:crypto');
 const { readTripSnapshot } = require('../../../packages/engine/snapshot.cjs');
 const { parseLiteralModule } = require('../../../packages/engine/literal-data.cjs');
+const { IMAGE_FILE } = require('../../../packages/engine/stay-guides.cjs');
 const { verifyPrivateProject } = require('../proposals.cjs');
 const MAX_FILE = 16 * 1024 * 1024, MAX_TOTAL = 160 * 1024 * 1024, MAX_COUNT = 5000;
 const MAX_ARCHIVE = Math.ceil(MAX_TOTAL * 4 / 3) + 5 * 1024 * 1024;
@@ -21,7 +22,8 @@ function allowed(relative) {
   const parts = relative.split('/');
   if (parts.some(p => !p || p.startsWith('.') || p.length > 200 || /[\x00-\x1f\x7f<>:"|?*]/.test(p) || /[.\s]$/.test(p) || /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i.test(p))) return false;
   if (parts.length === 1) return ROOT_FILES.has(relative);
-  if (parts[0] === 'photos') return parts.length === 2 && /^[a-zA-Z0-9_-]{1,100}-\d+\.jpg$/.test(parts[1]);
+  // 地點照片 <key>-<n>.jpg，以及住宿指南的圖片 guide-*.jpg／png／webp。
+  if (parts[0] === 'photos') return parts.length === 2 && (/^[a-zA-Z0-9_-]{1,100}-\d+\.jpg$/.test(parts[1]) || IMAGE_FILE.test(parts[1]));
   return parts[0] === 'docs' && DOC_EXTENSIONS.has(path.posix.extname(relative).toLowerCase());
 }
 async function anchor(directory) {

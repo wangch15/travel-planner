@@ -14,7 +14,7 @@ const { buildTrip } = require('./build.js');
 
 const PORT = 4173;
 const LAN_WATCH_MS = 3000;
-const TYPES = { '.html':'text/html; charset=utf-8', '.jpg':'image/jpeg', '.png':'image/png', '.txt':'text/plain; charset=utf-8' };
+const TYPES = { '.html':'text/html; charset=utf-8', '.jpg':'image/jpeg', '.png':'image/png', '.webp':'image/webp', '.txt':'text/plain; charset=utf-8' };
 
 // cloudflared 把網址印在 stderr 的一個框框裡，只有這一段是我們要的。
 const TUNNEL_URL = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;

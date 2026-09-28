@@ -41,6 +41,8 @@ description: 把確認過的逐日草案查核成五個資料檔。閘門一通�
 3. **停車**（`parking.md`）→ 自駕行程才需要，填 `PLACES[key].parking`。
 4. **餐飲**（`dining.md`）→ 填 `dining.js`。
 5. **備案**（`alternatives.md`）→ 填 `day.alts` 與 `ADDONS`。
+   房東給的入住方式、停車圖、周邊採買／餐飲／泡湯推薦**不是備案**，放 `STAY_GUIDES`（`docs/schema/stay-guides.md`）：
+   一份指南、相關每天都有入口，不塞進 `alts.body`。房東推薦不等於查核過，只有實際查到的事實才標 `checked`；門鎖密碼等私人資訊只能進 `docs/`。
 6. **照片**（`photos.md`）→ 填 `photos.json`，然後交給 `tp-photos`。
 
 每做完一段就跑 `npm run check -- <slug>`，不要等到最後才一次面對幾十個錯誤。

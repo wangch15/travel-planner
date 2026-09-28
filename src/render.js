@@ -100,6 +100,7 @@ function dayHTML(day) {
     + '<p class="lead">' + esc(day.lead) + '</p>'
     + (hasMeals ? '<a class="meal-jump" href="#meals-' + day.id + '">查看今天的餐食・價位・訂位建議 ↓</a>' : '')
     + '</div>';
+  h += guideEntryHTML(day);
   h += '<ol class="stops">' + day.stops.map((st, i) => stopHTML(st, i, day.stops)).join('') + '</ol>';
   if (hasMeals) h += mealsHTML(day);
   if (day.alts && day.alts.length) {
@@ -157,7 +158,8 @@ function ovStaysHTML() {
         + '<div class="nm"><span class="sw"></span><h4><button type="button" data-detail="' + esc(s.place) + '">' + esc(p.name) + '</button></h4>'
         + '<span class="nights">' + s.nights + ' 晚</span></div>'
         + '<div class="det"><p class="facts"><span>' + esc(s.meals) + '</span><span>' + esc(s.role) + '</span></p>'
-        + '<p class="when">' + esc(s.check) + '</p></div></div>';
+        + '<p class="when">' + esc(s.check) + '</p>'
+        + guidesForStay(s.place).map((g) => guideButtonHTML(g, 'guide-open compact')).join('') + '</div></div>';
     }).join('') + '</div></section>';
 }
 
@@ -259,5 +261,112 @@ function detailBodyHTML(key) {
     + '<div class="lb-foot"><a class="glink" href="' + esc(mapsUrl(p)) + '" target="_blank" rel="noopener">在 Google Maps 開啟' + ico('i-ext') + '</a>'
     + (p.note ? '<span class="lb-note" style="margin:0">' + esc(p.note) + '</span>' : '') + '</div>'
     + '<p class="lb-note">' + checked + ' 照片來源標於各張下方。</p>'
+    + '</div>';
+}
+
+/* ── 住宿指南 ──
+   同一份 STAY_GUIDES 只存一次；各相關日期只放一張入口卡，內容在燈箱裡展開，不進時間軸。
+   來源與查核狀態逐項顯示：房東推薦不等於官方查核，查核過的只有那一條事實。 */
+const GUIDE_LIST_TITLE = { shopping:'採買', dining:'餐飲', onsen:'泡湯' };
+const GUIDE_SECTION_TITLE = { checkin:'入住方式', parking:'停車', checkout:'退房' };
+const GUIDE_SOURCE = { host:'房東提供', official:'官方資料', agent:'AI 整理', user:'使用者提供', other:'其他來源' };
+const guideList = () => (typeof STAY_GUIDES !== 'undefined' && Array.isArray(STAY_GUIDES) ? STAY_GUIDES : []);
+const guideById = (id) => guideList().find((g) => g.id === id) || null;
+const guidesForDay = (dayId) => guideList().filter((g) => (g.days || []).includes(dayId));
+const guidesForStay = (key) => guideList().filter((g) => g.stay === key);
+const guideTitle = (g) => g.title || ((PLACES[g.stay] ? PLACES[g.stay].name : '住宿') + ' 住宿指南');
+const guideListTitle = (l) => l.title || GUIDE_LIST_TITLE[l.kind] || '推薦';
+const guideSectionTitle = (s) => s.title || GUIDE_SECTION_TITLE[s.kind] || '說明';
+const sourceLabel = (s) => (s ? s.label || GUIDE_SOURCE[s.type] || '' : '');
+
+/* 入口卡上的一行摘要：入住・停車・採買 4・餐飲 3 */
+function guideDigest(g) {
+  return [
+    ...(g.sections || []).map(guideSectionTitle),
+    ...(g.lists || []).map((l) => guideListTitle(l) + ' ' + l.items.length),
+  ].join('・');
+}
+function guideButtonHTML(g, cls) {
+  const digest = guideDigest(g);
+  return '<button type="button" class="' + cls + '" data-guide="' + esc(g.id) + '" aria-label="開啟' + esc(guideTitle(g)) + (digest ? '：' + esc(digest) : '') + '">'
+    + ico('i-bed') + '<span class="ge-main"><span class="ge-k">住宿指南</span><span class="ge-t">' + esc(guideTitle(g)) + '</span>'
+    + (digest ? '<span class="ge-s">' + esc(digest) + '</span>' : '') + '</span>' + ico('i-open') + '</button>';
+}
+function guideEntryHTML(day) {
+  const list = guidesForDay(day.id);
+  if (!list.length) return '';
+  return '<div class="guide-entry">' + list.map((g) => guideButtonHTML(g, 'guide-open')).join('') + '</div>';
+}
+
+function guideSourceHTML(s, prefix) {
+  if (!s) return '';
+  const label = sourceLabel(s);
+  return '<span class="g-src g-src-' + esc(s.type) + '">' + esc((prefix || '') + label) + (s.date ? '・' + esc(s.date) : '')
+    + (s.url ? '・<a href="' + esc(s.url) + '" target="_blank" rel="noopener" aria-label="' + esc(label) + ' 來源（新分頁）">來源' + ico('i-ext') + '</a>' : '') + '</span>';
+}
+/* 單一事實的查核狀態：只有這條有 checked 才算查核過 */
+function guideFactHTML(f) {
+  const label = sourceLabel(f.source);
+  const status = f.checked
+    ? '<span class="g-chk ok">' + esc((label ? label + '・' : '') + f.checked + ' 查核') + '</span>'
+    : '<span class="g-chk">' + esc((label ? label + '・' : '') + '未查核') + '</span>';
+  const link = f.source && f.source.url ? ' <a href="' + esc(f.source.url) + '" target="_blank" rel="noopener" aria-label="' + esc(f.label) + ' 的來源（新分頁）">來源' + ico('i-ext') + '</a>' : '';
+  return '<dt>' + esc(f.label) + '</dt><dd>' + esc(f.value) + ' ' + status + link + '</dd>';
+}
+function guideLinksHTML(it) {
+  const links = (it.links || []).slice();
+  const p = it.place && PLACES[it.place];
+  if (p && !links.some((l) => l.kind === 'map')) links.push({ kind: 'map', label: '地圖', url: mapsUrl(p) });
+  const btns = links.map((l) => '<a class="g-btn g-btn-' + esc(l.kind) + '" href="' + esc(l.url) + '" target="_blank" rel="noopener" aria-label="' + esc(it.name) + '：' + esc(l.label) + '（新分頁）">'
+    + esc(l.label) + ico('i-ext') + '</a>');
+  if (it.place && DETAILS[it.place]) btns.push('<button type="button" class="g-btn" data-detail="' + esc(it.place) + '" aria-label="' + esc(it.name) + '：詳細說明">詳細' + ico('i-open') + '</button>');
+  return btns.length ? '<div class="gi-links">' + btns.join('') + '</div>' : '';
+}
+function guideItemHTML(it, g) {
+  const src = it.source || g.source;
+  const head = '<span class="gi-name">' + esc(it.name) + '</span>'
+    + (src ? '<span class="gi-by">' + esc(sourceLabel(src)) + '</span>' : '')
+    + (it.summary ? '<span class="gi-sum">' + esc(it.summary) + '</span>' : '')
+    + ((it.tags || []).length ? '<span class="gi-tags">' + it.tags.map((t) => '<span class="gi-tag">' + esc(t) + '</span>').join('') + '</span>' : '');
+  const body = ((it.facts || []).length ? '<dl class="gi-facts">' + it.facts.map(guideFactHTML).join('') + '</dl>' : '')
+    + (it.note ? '<p class="gi-note">' + esc(it.note) + '</p>' : '')
+    // 來源標籤已在標題列；有網址或日期時才在展開後補一行，避免重複
+    + (it.source && (it.source.url || it.source.date) ? '<p class="gi-srcline">推薦來源：' + guideSourceHTML(it.source) + '</p>' : '');
+  return '<li class="g-item" id="gi-' + esc(g.id) + '-' + esc(it.id) + '">'
+    + (body ? '<details class="gi"><summary>' + head + ico('i-chev') + '</summary><div class="gi-body">' + body + '</div></details>' : '<div class="gi gi-static">' + head + '</div>')
+    + guideLinksHTML(it) + '</li>';
+}
+function guideImageHTML(im) {
+  const src = (typeof GUIDE_IMAGES !== 'undefined' && GUIDE_IMAGES || {})[im.file];
+  if (!src) return '';
+  const cap = [im.caption ? esc(im.caption) : '', im.source ? guideSourceHTML(im.source) : ''].filter(Boolean).join('・');
+  return '<figure class="g-fig"><button type="button" class="g-zoom" data-zoom="' + esc(src) + '" data-alt="' + esc(im.alt) + '" data-caption="' + esc(im.caption || '') + '" aria-label="放大查看：' + esc(im.alt) + '">'
+    + '<img src="' + esc(src) + '" alt="' + esc(im.alt) + '" loading="lazy" decoding="async"></button>'
+    + (cap ? '<figcaption>' + cap + '</figcaption>' : '') + '</figure>';
+}
+function guideBodyHTML(id) {
+  const g = guideById(id);
+  if (!g) return '';
+  const days = DAYS.filter((d) => (g.days || []).includes(d.id));
+  const images = g.images || [];
+  const used = new Set((g.sections || []).flatMap((s) => s.images || []));
+  const imageHTML = (ids) => ids.map((i) => images.find((im) => im.id === i)).filter(Boolean).map(guideImageHTML).join('');
+  const sections = (g.sections || []).map((s) => '<details class="g-sec" open><summary><span class="g-h">' + esc(guideSectionTitle(s)) + '</span>'
+    + '<span class="n">' + s.steps.length + ' 步</span>' + ico('i-chev') + '</summary>'
+    + '<ol class="g-steps">' + s.steps.map((st) => '<li>' + esc(st) + '</li>').join('') + '</ol>' + imageHTML(s.images || []) + '</details>').join('');
+  const loose = images.filter((im) => !used.has(im.id));
+  const lists = (g.lists || []).map((l) => '<details class="g-list" open><summary><span class="g-h">' + esc(guideListTitle(l)) + '</span>'
+    + '<span class="n">' + l.items.length + ' 項</span>' + ico('i-chev') + '</summary>'
+    + '<ul class="g-items">' + l.items.map((it) => guideItemHTML(it, g)).join('') + '</ul></details>').join('');
+  return '<div class="guide" style="--dc:' + (days[0] ? days[0].color : 'var(--accent)') + '">'
+    + '<div class="lb-head"><h2 id="lbTitle">' + esc(guideTitle(g)) + '</h2><span class="kind k-stay">住宿指南</span></div>'
+    + '<div class="lb-meta">' + days.map((dy) => '<span class="lb-chip day" style="--dc:' + dy.color + '">' + ico('i-cal') + 'Day ' + dy.id + '・' + esc(dy.date.slice(0, 5)) + '</span>').join('') + '</div>'
+    + (g.intro ? '<p class="lb-summary">' + esc(g.intro) + '</p>' : '')
+    + (g.source ? '<p class="g-srcline">整份指南：' + guideSourceHTML(g.source) + '</p>' : '')
+    + ((g.alerts || []).length ? '<div class="g-alerts" role="note" aria-label="重要提醒">' + g.alerts.map((a) => '<p class="g-alert ' + (a.level === 'info' ? 'info' : 'warn') + '">' + ico('i-note') + '<span>' + esc(a.text) + '</span></p>').join('') + '</div>' : '')
+    + sections
+    + (loose.length ? '<details class="g-sec" open><summary><span class="g-h">圖片</span><span class="n">' + loose.length + ' 張</span>' + ico('i-chev') + '</summary>' + loose.map(guideImageHTML).join('') + '</details>' : '')
+    + lists
+    + '<p class="lb-note">推薦清單是候選，不會自動排進每日行程。標「未查核」的資訊出發前請再確認。</p>'
     + '</div>';
 }

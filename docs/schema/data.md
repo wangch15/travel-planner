@@ -8,6 +8,8 @@
 
 匯出：`module.exports = { PLACES, DAYS, OVERVIEW_ROUTE, ADDONS, CHECKLIST, STAYS, OVERVIEW };`
 
+選填的 `STAY_GUIDES`（住宿指南／共用清單）也放在這個檔，欄位見 [`stay-guides.md`](stay-guides.md)。
+
 ## 欄位表
 
 ### `PLACES[key]`
@@ -70,6 +72,8 @@
 | `range` | ✔ | 顯示用的日期區間。 |
 | `nights` | ✔ | 晚數，決定色條寬度。 |
 | `meals` / `check` / `role` | ✔ | 餐食、入住退房、這個落腳處的定位。 |
+
+房東提供的入住方式、停車圖、周邊推薦不要寫進 `role` 或某一天的 `alts.body`，用 [`STAY_GUIDES`](stay-guides.md)：資料只存一份，相關的每一天都有入口。
 
 ### `OVERVIEW_ROUTE`、`ADDONS`、`CHECKLIST`
 

@@ -637,11 +637,15 @@ function updateComposer() {
 function renderProposal() {
   $('proposal-review').hidden=!pendingProposal;
   if(!pendingProposal){if($('changes-dialog').open)$('changes-dialog').close();updateComposer();return;}
-  $('proposal-heading').textContent=pendingProposal.kind==='restore'?'版本回復提案 · 尚未保存':'修改提案 · 尚未保存';
+  $('proposal-heading').textContent=pendingProposal.kind==='restore'?'版本回復提案 · 尚未保存':pendingProposal.migration?'搬移到住宿指南 · 尚未保存':'修改提案 · 尚未保存';
   $('proposal-changes').textContent=`已選 ${pendingProposal.selectedKeys?.length||0}／${pendingProposal.changes?.length||0} 項修改`;
   // 需要查核時，主要按鈕直接開始查核，不讓人對著停用的按鈕不知道下一步。
   const research=pendingProposal.requiresResearch;
-  $('proposal-note').textContent=research?'這次改到停留或交通，保存前要先查核來源與可行性。按「先查核，再保存」開始；也可以在「查看修改對照」取消這些項目。':pendingProposal.previewLoaded?'請檢查候選預覽，確認後建立新的本機版本。':'請先查看右側候選預覽，再確認保存。';
+  const base=research?'這次改到停留或交通，保存前要先查核來源與可行性。按「先查核，再保存」開始；也可以在「查看修改對照」取消這些項目。':pendingProposal.previewLoaded?'請檢查候選預覽，確認後建立新的本機版本。':'請先查看右側候選預覽，再確認保存。';
+  // 把日程長文搬進住宿指南時，先提醒要核對；修改後消失的連結直接列出來，避免搬漏。
+  const migration=pendingProposal.migration?'這次把日程裡的內容搬進住宿指南，請在預覽確認資訊都還在；保存後也能從「版本紀錄」回到修改前。':'';
+  const lost=(pendingProposal.lostLinks||[]).length?`注意：修改後少了 ${pendingProposal.lostLinks.length} 個連結：${pendingProposal.lostLinks.join('、')}`:'';
+  $('proposal-note').textContent=[migration,lost,base].filter(Boolean).join('\n');
   $('save-proposal').textContent=research?'先查核，再保存':'確認保存到你的行程';
   $('save-proposal').disabled=research?aiBusy:!pendingProposal.previewLoaded||aiBusy||!pendingProposal.selectedKeys?.length;
   $('discard-proposal').disabled=aiBusy;$('review-changes').disabled=aiBusy;
