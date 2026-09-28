@@ -416,11 +416,12 @@ dialog.lb[open]::backdrop{animation:lbfade .34s ease}
 .g-src a,.gi-facts a{color:inherit}
 .g-src .ico,.gi-facts .ico{width:10px;height:10px}
 .g-alerts{display:grid;gap:6px;margin:14px 0 4px}
-.g-alert{display:flex;gap:8px;align-items:flex-start;margin:0;padding:9px 11px;border-radius:10px;font-size:13px;line-height:1.55}
+/* 左側裝飾條是直的：用 border-left，只有右側兩角圓角（同停車提醒） */
+.g-alert{display:flex;gap:8px;align-items:flex-start;margin:0;padding:9px 11px;border-left:3px solid transparent;border-radius:0 10px 10px 0;font-size:13px;line-height:1.55}
 .g-alert .ico{width:15px;height:15px;flex:0 0 auto;margin-top:2px}
-.g-alert.warn{background:color-mix(in srgb,#C0392B 10%,var(--card));box-shadow:inset 3px 0 0 #C0392B}
+.g-alert.warn{background:color-mix(in srgb,#C0392B 10%,var(--card));border-left-color:#C0392B}
 .g-alert.warn .ico{color:#C0392B}
-.g-alert.info{background:var(--sunk);box-shadow:inset 3px 0 0 var(--rule-2)}
+.g-alert.info{background:var(--sunk);border-left-color:var(--rule-2)}
 .guide details{margin-top:10px}
 .guide details>summary{min-height:44px}
 .g-h{font:700 14px/1.4 var(--serif);color:var(--ink)}
@@ -432,7 +433,9 @@ dialog.lb[open]::backdrop{animation:lbfade .34s ease}
 .g-zoom:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .g-fig figcaption{font-size:11.5px;color:var(--ink-3);margin-top:4px}
 .g-items{list-style:none;margin:0;padding:0}
-.g-item{padding:10px 0;border-top:1px solid var(--rule)}
+/* 店名一列：左邊名稱與介紹，右邊官網／地圖按鈕（對齊標題列） */
+.g-item{padding:10px 0;border-top:1px solid var(--rule);display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:start}
+.g-item>.gi{grid-column:1;grid-row:1;min-width:0}
 .g-item:first-child{border-top:0}
 .guide .gi{margin:0;border:0}
 .guide .gi>summary{padding:0;display:grid;grid-template-columns:1fr auto;column-gap:8px;align-items:start}
@@ -451,10 +454,18 @@ dialog.lb[open]::backdrop{animation:lbfade .34s ease}
 .g-chk.ok{background:color-mix(in srgb,#3E7B4E 14%,var(--card));color:#3E7B4E}
 .gi-note{font-size:12.5px;color:var(--ink-2);margin:6px 0 0}
 .gi-srcline{font-size:11.5px;color:var(--ink-3);margin:6px 0 0}
-.gi-links{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.gi-links{grid-column:2;grid-row:1;display:flex;flex-wrap:nowrap;justify-content:flex-end;gap:6px}
 .g-btn{display:inline-flex;align-items:center;gap:4px;min-height:36px;padding:6px 12px;border-radius:99px;font-size:12.5px;font-weight:500;
   color:var(--ink);background:var(--sunk);text-decoration:none;border:0;cursor:pointer}
 .g-btn .ico{width:11px;height:11px;color:var(--ink-3)}
+.g-btn .g-btn-i{display:none}
+@media (max-width:639px){
+  /* 手機：只留圖示的圓形按鈕，名稱由 aria-label／title 提供 */
+  .g-btn{width:40px;height:40px;min-height:40px;padding:0;justify-content:center;border-radius:50%}
+  .g-btn .g-btn-t,.g-btn .g-btn-x{display:none}
+  .g-btn .g-btn-i{display:block;width:17px;height:17px;color:var(--ink-2)}
+  .gi-links{margin-top:-9px}
+}
 .g-btn:hover{background:color-mix(in srgb,var(--dc,var(--accent)) 14%,var(--sunk))}
 .g-btn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .g-chk.ok{color:#8FCB9C}}

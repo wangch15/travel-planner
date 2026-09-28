@@ -278,6 +278,9 @@ const guideTitle = (g) => g.title || ((PLACES[g.stay] ? PLACES[g.stay].name : '�
 const guideListTitle = (l) => l.title || GUIDE_LIST_TITLE[l.kind] || '推薦';
 const guideSectionTitle = (s) => s.title || GUIDE_SECTION_TITLE[s.kind] || '說明';
 const sourceLabel = (s) => (s ? s.label || GUIDE_SOURCE[s.type] || '' : '');
+const GUIDE_LINK_ICON = { official:'i-globe', map:'i-map', other:'i-ext' };
+/* 連結按鈕：桌面顯示文字，手機只顯示圖示（名稱在 aria-label） */
+const guideBtnInner = (icon, label, trail) => ico(icon, 'g-btn-i') + '<span class="g-btn-t">' + esc(label) + '</span>' + ico(trail, 'g-btn-x');
 
 /* 入口卡上的一行摘要：入住・停車・採買 4・餐飲 3 */
 function guideDigest(g) {
@@ -317,9 +320,9 @@ function guideLinksHTML(it) {
   const links = (it.links || []).slice();
   const p = it.place && PLACES[it.place];
   if (p && !links.some((l) => l.kind === 'map')) links.push({ kind: 'map', label: '地圖', url: mapsUrl(p) });
-  const btns = links.map((l) => '<a class="g-btn g-btn-' + esc(l.kind) + '" href="' + esc(l.url) + '" target="_blank" rel="noopener" aria-label="' + esc(it.name) + '：' + esc(l.label) + '（新分頁）">'
-    + esc(l.label) + ico('i-ext') + '</a>');
-  if (it.place && DETAILS[it.place]) btns.push('<button type="button" class="g-btn" data-detail="' + esc(it.place) + '" aria-label="' + esc(it.name) + '：詳細說明">詳細' + ico('i-open') + '</button>');
+  const btns = links.map((l) => '<a class="g-btn g-btn-' + esc(l.kind) + '" href="' + esc(l.url) + '" target="_blank" rel="noopener" aria-label="' + esc(it.name) + '：' + esc(l.label) + '（新分頁）" title="' + esc(l.label) + '">'
+    + guideBtnInner(GUIDE_LINK_ICON[l.kind] || 'i-ext', l.label, 'i-ext') + '</a>');
+  if (it.place && DETAILS[it.place]) btns.push('<button type="button" class="g-btn" data-detail="' + esc(it.place) + '" aria-label="' + esc(it.name) + '：詳細說明" title="詳細">' + guideBtnInner('i-open', '詳細', 'i-open') + '</button>');
   return btns.length ? '<div class="gi-links">' + btns.join('') + '</div>' : '';
 }
 function guideItemHTML(it, g) {
