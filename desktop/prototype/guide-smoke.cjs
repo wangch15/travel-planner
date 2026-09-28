@@ -5,7 +5,7 @@ if(!process.env.TRAVEL_PLANNER_TEST_ROOT)throw Error('Run guide smoke through th
 const root=require('node:fs').realpathSync(process.env.TRAVEL_PLANNER_TEST_ROOT);
 const {createWindow,shutdown}=require('./main.cjs'),{createProjectStore}=require('./project-store.cjs'),{parseLiteralModule}=require('@travel-planner/engine'),{ProposalStore}=require('./proposals.cjs');
 const {replaceDay}=require('../../packages/engine/day-edit.cjs');
-app.on('window-all-closed',()=>{});let win,status=0;const calls=[];
+app.on('window-all-closed',()=>{});let win,status=0;const calls=[],submitted=[];
 const js=s=>win.webContents.executeJavaScript(s);
 async function until(s,tries=300){for(let i=0;i<tries;i++){if(await js(s))return;await new Promise(r=>setTimeout(r,50));}throw Error('Guide condition: '+s);}
 const HOST_TEXT='房東說：15:00 後入住，鑰匙在玄關鑰匙盒。停車在建物後方第 2 格，從縣道右轉進小路。附近的範例超市 https://example.invalid/super 走路 5 分鐘，生鮮熟食都有；晚餐可以去範例拉麵 https://example.invalid/ramen ，泡湯推薦範例湯屋，露天風呂很舒服。';
@@ -29,7 +29,10 @@ app.whenReady().then(async()=>{
   account.connect=async()=>account.account;account.refresh=account.connect;account.stop=async()=>{};account.models=async()=>[{id:'fake-model',name:'Fake model',isDefault:true}];
   win=await createWindow({stateDirectory:state,codexAccount:account,makeProposals:d=>new ProposalStore(d,{checkPrivate:async()=>{}}),
     makeProvider:id=>{const a=new EventEmitter();a.account={state:'needs-login',provider:id};a.connect=async()=>a.account;a.refresh=a.connect;a.models=async()=>[];a.stop=async()=>{};return {account:a,editor:{active:null,stop:async()=>{}}};},
+    makeIssueReporter:()=>{const {IssueReportService}=require('./services/issue-report.cjs');return new IssueReportService({run:async(bin,args)=>{submitted.push(args);return {stdout:'https://github.com/wangch15/travel-planner/issues/77\n'};}});},
     makeEditor:()=>({active:null,stop:async()=>({requested:true}),generate:async({model,dayId,mode,text,snapshot,thread})=>{calls.push({dayId,mode,text,thread});
+      // 使用者要回報：AI 回 appAction=report 與內容；故意把行程裡的地名寫進去，App 要去識別化。
+      if(text.startsWith('我想回報給 App 開發者'))return {model,threadId:'t',turnId:'r'+calls.length,summary:'我整理好了，可以按下方的按鈕回報。',discussion:true,appAction:'report',capabilityGap:{missing:'希望 AI 能直接修改全程總覽與行前清單。',handoffPrompt:'在範例民宿 A 這趟 10/11 的行程裡發現的；請開放 OVERVIEW／CHECKLIST 的編輯。'}};
       // 假 AI：照指示把長文拆成指南，並把原本那段備案拿掉；故意漏掉拉麵的網址，App 要提醒。
       // 第一次故意把來源標籤寫太長，App 要自己把問題交回給 AI 修正，不能丟給使用者。
       const day=parseLiteralModule(snapshot.dataSource).DAYS[0];
@@ -61,6 +64,20 @@ app.whenReady().then(async()=>{
   // 重新載入預覽後，長文已經搬走，提議卡不會再出現。
   await until('realPreview?.status==="ready"');
   assert.equal(await js('document.getElementById("guide-suggestion").hidden'),true);
-  console.log(JSON.stringify({passed:true,selfRepairedInvalidAnswer:true,suggestionShown:true,migrationHeldForPreview:true,lostLinkWarned:true,noResearchGateForTextMove:true,savedAfterPreview:true,timelineUnchanged:true,suggestionClearedAfterSave:true}));
+  // 回報問題或建議：從對話選單帶入開頭，AI 整理後回覆下方出現卡片；視窗裡是去識別化的完整內容，按送出才開 issue。
+  await js(`document.getElementById('message').value='我想回報給 App 開發者：總覽不能改';document.getElementById('message').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+  await until('[...document.querySelectorAll(".action-card")].some(c=>c.textContent.includes("回報給開發者"))');
+  await js('[...document.querySelectorAll(".action-card button")].find(b=>b.textContent==="檢查回報內容").click()');
+  await until('document.getElementById("report-dialog").open');
+  const preview=await js('document.getElementById("report-preview").textContent');
+  assert.match(preview,/^\[App 建議\] 希望 AI 能直接修改全程總覽與行前清單/);
+  assert.equal(preview.includes('範例民宿 A'),false,'地名要去掉');assert.equal(preview.includes('10/11'),false,'日期要去掉');
+  assert.equal(submitted.length,0,'打開視窗不會送出');
+  await js('document.getElementById("submit-report").click()');
+  await until('!document.getElementById("view-report").hidden');
+  assert.equal(submitted.length,1);assert.deepEqual(submitted[0].slice(0,3),['issue','create','-R']);assert.equal(submitted[0][3],'wangch15/travel-planner');
+  assert.equal(submitted[0].includes('範例民宿 A'),false);
+  await js('document.getElementById("report-dialog").close()');
+  console.log(JSON.stringify({passed:true,reportFromChat:true,reportDeidentified:true,reportSentOnlyAfterConfirm:true,selfRepairedInvalidAnswer:true,suggestionShown:true,migrationHeldForPreview:true,lostLinkWarned:true,noResearchGateForTextMove:true,savedAfterPreview:true,timelineUnchanged:true,suggestionClearedAfterSave:true}));
 }).catch(async e=>{status=1;console.error(e);if(win&&!win.isDestroyed())console.error(await js('JSON.stringify({note:document.getElementById("notification")?.textContent,proposal:document.getElementById("proposal-note")?.textContent,last:[...document.querySelectorAll(".message")].slice(-2).map(m=>m.textContent.slice(0,300))})').catch(()=>''));})
   .finally(async()=>{await shutdown().catch(()=>{});app.exit(status);});

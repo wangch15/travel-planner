@@ -69,6 +69,14 @@
     return c.card;
   }
 
-  const builders = { backup: backupCard, publish: publishCard, 'project-update': projectUpdateCard, research: researchCard };
-  window.actionCard = action => builders[action]?.() || null;
+  // 回報給開發者：內容是 App 存下的去識別化草稿，按下先打開回報視窗給人看完整內容，確認才送。
+  function reportCard(message) {
+    if (!message?.report?.id) return null;
+    const c = shell('回報給開發者', '把這件事整理成一則公開的 GitHub 回報，送到 Travel Planner 原專案。已去掉行程名稱、地點、日期與私人資訊，送出前會先給你看完整內容。');
+    c.set(c.btn('檢查回報內容', async () => { await window.openReportDialog(message.report.id); }, true, '準備中…'));
+    return c.card;
+  }
+
+  const builders = { backup: backupCard, publish: publishCard, 'project-update': projectUpdateCard, research: researchCard, report: reportCard };
+  window.actionCard = (action, message) => builders[action]?.(message) || null;
 })();

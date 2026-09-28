@@ -243,3 +243,30 @@ test('預覽摘要帶著搬移提議，App 不必自己讀檔判斷', async t =>
   assert.deepEqual(preview.summary.guideSuggestion.items.map(s => [s.dayId, s.title]), [[2, '民宿資訊']]);
   assert.equal(f.baseline.summary.guideSuggestion, null, '_example 本身不會被誤判');
 });
+
+test('回報給開發者：AI 整理的建議先去掉行程名稱、地點、日期、網址與私人資訊', () => {
+  const { aiIssueReport } = require('../services/ai-issue.cjs');
+  const trip = { config: { title: '仙台山形手帳', deploy: { name: 'sendai-trip' } }, PLACES: { pf: { name: 'PF GUEST HOUSE', local: 'ピーエフ' } },
+    DAYS: [{ title: '松島一整天' }], STAY_GUIDES: [{ title: 'PF 住宿指南', lists: [{ items: [{ name: '旬菜酒場 虎龍' }] }] }] };
+  const report = aiIssueReport({
+    gap: { missing: '住宿指南在 PF GUEST HOUSE 的描述太長時會爆版。', handoffPrompt: '10/11 入住時看到；旬菜酒場 虎龍那一項也一樣。參考 https://secret.example.com/booking?id=1 與 https://github.com/wangch15/travel-planner/issues/1。聯絡 owner@example.com，門鎖 4821，專案在 /Users/someone/trips。' },
+    trip, slug: 'sendai-trip', codes: ['4821'], appVersion: '0.1.12', engineVersion: '1.2.1', platform: 'darwin arm64' });
+  assert.match(report.id, /^[0-9a-f-]{36}$/);
+  assert.equal(report.title, '[App 建議] 住宿指南在 〔地點或名稱〕 的描述太長時會爆版');
+  for (const secret of ['PF GUEST HOUSE', '旬菜酒場', 'secret.example.com', 'owner@example.com', '4821', '/Users/someone', '10/11']) assert.equal(report.body.includes(secret), false, secret);
+  assert.match(report.body, /https:\/\/github\.com\/wangch15\/travel-planner\/issues\/1/, '原專案的網址保留');
+  assert.match(report.body, /App 版本：0\.1\.12[\s\S]*網站引擎（旅程資料夾）：1\.2\.1/);
+  assert.equal(aiIssueReport({ gap: null, trip }), null);
+});
+
+test('對話紀錄接受回報動作與草稿，格式不對就拒絕', async t => {
+  const { ConversationStore } = require('../conversation-store.cjs');
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'travel-report-chat-')));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const store = new ConversationStore(root), target = { root: '/sample/project', slug: 'coast' };
+  const report = { id: '11111111-1111-4111-8111-111111111111', title: '[App 建議] 標題', body: '內容' };
+  await store.update(target, s => { s.messages.push({ role: 'assistant', text: '可以回報', action: 'report', report }); });
+  assert.deepEqual((await new ConversationStore(root).read(target)).messages[0].report, report);
+  await assert.rejects(store.update(target, s => { s.messages.push({ role: 'user', text: 'x', report }); }), { code: 'CONVERSATION_STORE_INVALID' });
+  await assert.rejects(store.update(target, s => { s.messages.push({ role: 'assistant', text: 'x', report: { ...report, title: '' } }); }), { code: 'CONVERSATION_STORE_INVALID' });
+});

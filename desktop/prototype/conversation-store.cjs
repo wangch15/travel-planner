@@ -21,11 +21,13 @@ function applySuggestedTitle(state,answer){if(answer?.conversationTitle&&state.c
 function validMessageAttachments(m){return m.attachments===undefined||(m.role==='user'&&Array.isArray(m.attachments)&&m.attachments.length<=12&&m.attachments.every(a=>a&&string(a.id,200)&&string(a.name,200)&&['image','file'].includes(a.kind)));}
 // AI 直接套用的修改：記下版本與前一版，聊天裡才能「查看修改對照」「回到修改前」。
 const optionalString=(v,max)=>v===null||string(v,max),optionalNumber=v=>v===null||Number.isSafeInteger(v);
+// 回報給開發者的草稿（已去識別化）：送出時只用這份，不收畫面傳來的文字。
+function validReport(m){const r=m.report;return r===undefined||(m.role==='assistant'&&r&&typeof r==='object'&&string(r.id,64)&&r.id.length>0&&string(r.title,200)&&r.title.trim().length>0&&string(r.body,20000));}
 function validApplied(m){const a=m.applied;return a===undefined||(m.role==='assistant'&&a&&typeof a==='object'&&optionalString(a.versionId,200)&&optionalNumber(a.number)&&optionalString(a.previousId,200)&&optionalNumber(a.previousNumber)&&Array.isArray(a.labels)&&a.labels.length<=30&&a.labels.every(l=>string(l,200))&&typeof a.research==='boolean');}
 function valid(s) {
   return s?.version===1 && (s.started===undefined||typeof s.started==='boolean') && (s.provider===undefined||['codex','claude','gemini'].includes(s.provider)) && validConversations(s)&&validPlan(s.plan)&&validResearch(s.research)&&validJob(s.job) && (s.effort===undefined||string(s.effort,40)) && (s.handoff===undefined||s.handoff===null||string(s.handoff,16000)) && string(s.draft,2000) && string(s.model,200) && (s.dayId===null || Number.isSafeInteger(s.dayId))
     && typeof s.pendingProposal==='boolean' && string(s.lastOutcome,1000)
-    && Array.isArray(s.messages) && s.messages.length<=2000 && s.messages.every(m=>m && ['user','assistant'].includes(m.role) && string(m.text,64000)&&validGeneration(m.generation)&&(m.action===undefined||(m.role==='assistant'&&['backup','publish','project-update','research'].includes(m.action)))&&validMessageAttachments(m)&&validApplied(m))
+    && Array.isArray(s.messages) && s.messages.length<=2000 && s.messages.every(m=>m && ['user','assistant'].includes(m.role) && string(m.text,64000)&&validGeneration(m.generation)&&(m.action===undefined||(m.role==='assistant'&&['backup','publish','project-update','research','report'].includes(m.action)))&&validMessageAttachments(m)&&validApplied(m)&&validReport(m))
     && (s.thread===null || (string(s.thread.id,200) && string(s.thread.accountKey,200) && (s.thread.lastTurnId===null || string(s.thread.lastTurnId,200))))
     && (s.run===null || (string(s.run.id,100) && ['pending','complete','failed','unknown','stopped'].includes(s.run.status)
       && (s.run.stopRequested===undefined||typeof s.run.stopRequested==='boolean')

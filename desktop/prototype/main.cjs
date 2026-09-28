@@ -18,6 +18,7 @@ const {AttachmentStore,fetchPublicReference}=require('./services/attachments.cjs
 const {createResearchTools}=require('./services/research-tools.cjs');
 const {findPrivateData,appendPrivateNotes,privateMarkers}=require('./services/private-guard.cjs');
 const {resolveGuideAttachments}=require('./services/guide-assets.cjs');
+const {aiIssueReport}=require('./services/ai-issue.cjs');
 const {capabilityGapText}=require('./codex/capabilities.cjs');
 // AI 的修改沒過資料檢查時，自動請它修正的次數上限；都不行才告訴使用者。
 const SELF_REPAIR_ATTEMPTS=2;
@@ -376,6 +377,13 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     const resolved=await resolveGuideAttachments(answer.stayGuides,refs);
     return {answer:{...answer,stayGuides:resolved.guides},assets:resolved.assets,notesSaved};
   }
+  // AI 說做不到或使用者要回報時，先在這裡做成去識別化的回報草稿，存進該則回覆；送出時只用這份。
+  async function reportFor(target,answer,trip){
+    if(!answer.capabilityGap||(answer.appAction&&answer.appAction!=='report'))return null;
+    let codes=[];try{codes=(await privateMarkers(path.join(target.root,'trips',target.slug),researchKit.sources.list().map(s=>s.host))).codes;}catch{}
+    return aiIssueReport({gap:answer.capabilityGap,trip,slug:target.slug,codes,appVersion:app.isPackaged?app.getVersion():require('./package.json').version,engineVersion:buildInfo.engineVersion,platform:`${process.platform} ${process.arch}`});
+  }
+  const messageAction=(answer,report,applied)=>report?{action:'report',report}:answer.appAction&&answer.appAction!=='report'?{action:answer.appAction}:applied?.research?{action:'research'}:{};
   const replyText=(answer,notesSaved)=>answer.summary+capabilityGapText(answer.capabilityGap)+(notesSaved?'\n\n私人資訊（密碼、訂房碼、聯絡方式等）已另存到這趟的私人筆記，不會出現在網站上。':'');
   async function assertPendingClean(target){if(!proposals.pending)return;try{await assertNoPrivateData(target,[proposals.pending.fullSource||proposals.pending.source||'']);}catch(error){proposals.discard();throw error;}}
   async function checkResearch(answer,sourceHash,proposalId,checkCanceled=()=>{}){
@@ -466,7 +474,8 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
           catch(e){if(!proposals.pending)throw e;if(e.code!=='CONTENT_CHANGED'){proposals.discard();throw e;}await assertPendingClean(target);candidateCreated=true;await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}
         }}}
       checkCanceled();
-      const updated=await conversations.update(target,s=>{applySuggestedTitle(s,answer);s.messages.push({role:'assistant',text:replyText(answer,notesSaved)+(answer.planning?'\n\n'+answer.planMarkdown:''),...(answer.appAction?{action:answer.appAction}:applied?.research?{action:'research'}:{}),...(applied?{applied}:{}),generation:{provider:providerId,model:answer.model||input.model||'',effort:input.effort||'',...(!input.effort&&answer.resolvedEffort?{resolvedEffort:answer.resolvedEffort}:{})}});s.run={id:job.id,status:'complete'};s.thread={id:answer.threadId,accountKey:binding,lastTurnId:answer.turnId};s.model=answer.model;s.pendingProposal=Boolean(proposals.pending);s.lastOutcome=proposals.pending?'提案尚未保存。':applied?`上一輪的修改已直接保存到本機檔案（V${applied.number||'?'}），尚未備份到 GitHub。`:'上一輪沒有修改原檔。';if(answer.planning)s.plan={markdown:answer.planMarkdown,approvedDigest:null};if(research)s.research=research;});
+      const report=await reportFor(target,answer,baseline.snapshot.trip);
+      const updated=await conversations.update(target,s=>{applySuggestedTitle(s,answer);s.messages.push({role:'assistant',text:replyText(answer,notesSaved)+(answer.planning?'\n\n'+answer.planMarkdown:''),...messageAction(answer,report,applied),...(applied?{applied}:{}),generation:{provider:providerId,model:answer.model||input.model||'',effort:input.effort||'',...(!input.effort&&answer.resolvedEffort?{resolvedEffort:answer.resolvedEffort}:{})}});s.run={id:job.id,status:'complete'};s.thread={id:answer.threadId,accountKey:binding,lastTurnId:answer.turnId};s.model=answer.model;s.pendingProposal=Boolean(proposals.pending);s.lastOutcome=proposals.pending?'提案尚未保存。':applied?`上一輪的修改已直接保存到本機檔案（V${applied.number||'?'}），尚未備份到 GitHub。`:'上一輪沒有修改原檔。';if(answer.planning)s.plan={markdown:answer.planMarkdown,approvedDigest:null};if(research)s.research=research;});
       await jobs.finish(target,job.id);return {ok:true,proposal,research,planning:Boolean(planning),model:answer.model,...(answer.suggestion?{suggestion:answer.suggestion}:{}),conversation:displayConversation({...updated,job:{...job,status:'completed',autoResume:false}})};
     }catch(e){
       if(candidateCreated){proposals.discard();artifact=null;previewAttempt++;await versions.saveDraft(target,null).catch(()=>{});}
@@ -772,7 +781,8 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
       let notesSaved=false;
       if(answer.replacementDay||answer.replacementDays||answer.stayGuides||answer.privateNotes){const refs=answer.stayGuides?await referenceInputs(target,job.input.attachmentIds||[]).catch(()=>[]):[];const prepared=await prepareEditAnswer(target,answer,refs);notesSaved=prepared.notesSaved;
         if(answer.replacementDay||answer.replacementDays||answer.stayGuides){proposal=proposals.create(target,baseline,job.input.dayId,prepared.answer,{assets:prepared.assets});if(proposal.changed)await assertPendingClean(target);if(proposal.changed){await versions.saveDraft(target,proposals.draft());artifact=proposals.pending.artifact;previewAttempt++;}}}
-      const updated=await conversations.update(target,s=>{applySuggestedTitle(s,answer);s.run={id:job.id,status:'complete'};s.thread={id:answer.threadId,lastTurnId:answer.turnId,accountKey:job.accountKey};s.messages.push({role:'assistant',text:'已核對上次完成的回覆，沒有重送。\n\n'+replyText(answer,notesSaved),generation:{provider:providerId,model:answer.model||job.input.model||'',effort:job.input.effort||''}});if(answer.planning)s.plan={markdown:answer.planMarkdown,approvedDigest:null};if(recoveredResearch)s.research=recoveredResearch;});await jobs.finish(target,job.id);return {status:'completed',proposal,research:recoveredResearch,conversation:displayConversation(await conversations.read(target))};
+      const report=await reportFor(target,answer,baseline.snapshot.trip);
+      const updated=await conversations.update(target,s=>{applySuggestedTitle(s,answer);s.run={id:job.id,status:'complete'};s.thread={id:answer.threadId,lastTurnId:answer.turnId,accountKey:job.accountKey};s.messages.push({role:'assistant',text:'已核對上次完成的回覆，沒有重送。\n\n'+replyText(answer,notesSaved),...messageAction(answer,report,null),generation:{provider:providerId,model:answer.model||job.input.model||'',effort:job.input.effort||''}});if(answer.planning)s.plan={markdown:answer.planMarkdown,approvedDigest:null};if(recoveredResearch)s.research=recoveredResearch;});await jobs.finish(target,job.id);return {status:'completed',proposal,research:recoveredResearch,conversation:displayConversation(await conversations.read(target))};
     }
     if(['interrupted','failed'].includes(result.status)){const updated=await conversations.update(target,s=>{s.run={id:job.id,status:'failed'};if(s.thread)s.thread.lastTurnId=result.turnId;s.messages.push({role:'assistant',text:'已確認上一輪停止。可以在原對話送出新的要求，沒有自動重送。'});});await jobs.patch(target,job.id,{status:'paused',autoResume:false,claimId:null,reason:'terminal-confirmed'});return {status:result.status,conversation:displayConversation(await conversations.read(target))};}
     return {status:result.status,message:'尚未確認完整結果，沒有重送。可稍後再次核對，或交接到新的 AI 對話。'};
@@ -952,14 +962,17 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
     }finally{versionBusy=false;}
   });
   // 回報給開發者：內容只用 main 剛產生的去識別化回報，不收畫面傳來的文字。畫面先顯示完整內容與公開目的地，人按確認才送。
-  const currentReport=input=>{const target=selectedTarget(input);if(previewReport?.key!==`${target.projectId}\0${target.slug}`)throw Object.assign(Error('REPORT_STALE'),{userMessage:'請先按「重新檢查」，再回報。'});return previewReport.issue;};
+  // 回報有兩個來源：預覽診斷（previewReport），或對話裡某則 AI 回覆存下的草稿（用 reportId 找，內容仍是 main 存的）。
+  const currentReport=async input=>{const target=selectedTarget(input);
+    if(input.reportId!==undefined){if(typeof input.reportId!=='string')throw Error('INVALID_INPUT');const state=await conversations.read(target);const found=state.messages.find(m=>m.report?.id===input.reportId)?.report;if(!found)throw Object.assign(Error('REPORT_STALE'),{userMessage:'找不到這則回報，可能是對話已經換過。請在對話裡再說一次要回報的內容。'});return {title:found.title,body:found.body};}
+    if(previewReport?.key!==`${target.projectId}\0${target.slug}`)throw Object.assign(Error('REPORT_STALE'),{userMessage:'請先按「重新檢查」，再回報。'});return previewReport.issue;};
   let issueReporter=null;
-  feature('preview-report-prepare',async input=>({issue:currentReport(input),repo:REPORT_REPO}));
-  feature('preview-report-submit',async input=>{const issue=currentReport(input);issueReporter??=makeIssueReporter();
+  feature('preview-report-prepare',async input=>({issue:await currentReport(input),repo:REPORT_REPO}));
+  feature('preview-report-submit',async input=>{const issue=await currentReport(input);issueReporter??=makeIssueReporter();
     try{return await issueReporter.submit(issue);}
     catch(error){if(error.code==='GITHUB_LOGIN_REQUIRED')throw Object.assign(Error('GITHUB_LOGIN_REQUIRED'),{userMessage:'App 還沒登入 GitHub，所以沒有送出。可以改按「在瀏覽器開啟回報頁」，或先到「設定 → 帳號連線」登入 GitHub。'});throw Object.assign(Error('REPORT_FAILED'),{userMessage:'回報沒有送出（可能是網路不通）。可以改按「在瀏覽器開啟回報頁」。'});}});
-  feature('preview-report-open',async input=>{const issue=currentReport(input);issueReporter??=makeIssueReporter();await openReportURL(issueReporter.newIssueURL(issue));return {opened:true};});
-  feature('preview-report-copy',async input=>{const issue=currentReport(input);clipboard.writeText(`${issue.title}\n\n${issue.body}`);return {copied:true};});
+  feature('preview-report-open',async input=>{const issue=await currentReport(input);issueReporter??=makeIssueReporter();await openReportURL(issueReporter.newIssueURL(issue));return {opened:true};});
+  feature('preview-report-copy',async input=>{const issue=await currentReport(input);clipboard.writeText(`${issue.title}\n\n${issue.body}`);return {copied:true};});
   handle('versions:list',async(event,input)=>{
     assertSender(event);const target=selectedTarget(input);
     if(generating||proposals.saving||!await versionIdle()||generating||proposals.saving)return workflowFailure({code:'AI_BUSY'});

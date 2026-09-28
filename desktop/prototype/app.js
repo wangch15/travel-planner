@@ -313,7 +313,7 @@ function addMessage(message) {
     // 改好的內容只在本機；在這裡就能備份，不用找頁首或設定。
     const backupButton=el('button','備份到 GitHub…');backupButton.type='button';backupButton.dataset.action='backup';backupButton.onclick=()=>window.openSyncFlow?.({kind:'backup',scope:'trip'});actions.append(backupButton);
     item.append(actions);}
-  if(message.role==='assistant'&&message.action){const card=window.actionCard?.(message.action);if(card)item.append(card);}
+  if(message.role==='assistant'&&message.action){const card=window.actionCard?.(message.action,message);if(card)item.append(card);}
   if(message.generation){const g=message.generation;item.title=`回覆設定：${g.provider} · ${g.model||'服務預設模型'} · ${g.effort||(g.resolvedEffort?'預設思考級別（'+g.resolvedEffort+'）':'預設思考級別')}`;item.dataset.provider=g.provider;item.dataset.model=g.model;item.dataset.effort=g.effort;}
   $('messages').append(item);
   return item;
@@ -458,10 +458,13 @@ const previewRepairActions = {
   'report': ['回報給開發者…', () => openReportDialog()],
 };
 // 回報給開發者：先顯示 App 產生的完整內容與公開目的地，人按「送出回報」才在 GitHub 開 issue；送不出去可改在瀏覽器開啟已填好的回報頁。
-let reportIssueURL = null;
+let reportIssueURL = null, reportId;
 function reportSay(text, tone = '') { $('report-result').hidden = !text; $('report-result').textContent = text || ''; $('report-result').dataset.tone = tone; }
-async function openReportDialog() {
-  const r = await window.travelDesktop.feature('preview-report-prepare', conversationTarget());
+// reportId：對話裡某則 AI 回覆存下的回報草稿；沒有就是預覽診斷的回報。
+const reportTarget = () => ({ ...conversationTarget(), ...(reportId ? { reportId } : {}) });
+async function openReportDialog(id) {
+  reportId = typeof id === 'string' ? id : undefined;
+  const r = await window.travelDesktop.feature('preview-report-prepare', reportTarget());
   if (!r.ok) { notify(r.message); return; }
   reportIssueURL = null; reportSay('');
   $('report-repo').textContent = r.repo;
@@ -472,10 +475,11 @@ async function openReportDialog() {
 }
 async function reportAction(button, name, busyLabel, done) {
   return withBusy(button, busyLabel, async () => {
-    try { const r = await window.travelDesktop.feature(name, conversationTarget()); if (r.ok) done(r); else reportSay(r.message, 'warn'); }
+    try { const r = await window.travelDesktop.feature(name, reportTarget()); if (r.ok) done(r); else reportSay(r.message, 'warn'); }
     catch { reportSay('這個動作沒有完成，請再試一次。', 'warn'); }
   });
 }
+window.openReportDialog = openReportDialog;
 $('cancel-report').onclick = () => $('report-dialog').close();
 $('submit-report').onclick = () => reportAction($('submit-report'), 'preview-report-submit', '送出中…', r => {
   reportIssueURL = r.url; reportSay('已送出。開發者會在 GitHub 看到這則回報，之後的回覆也會出現在那裡。');

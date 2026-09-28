@@ -99,7 +99,8 @@
     {separator:true},
     {label:'命名對話',icon:'chat',disabled:aiBusy,action:()=>$('conversation-rename').click()},
     {label:'複製對話',icon:'chat',disabled:aiBusy,action:copyCurrentConversation},
-    {separator:true},{label:'交接到新對話…',icon:'chat',disabled:aiBusy||Boolean(pendingProposal),action:()=>$('handoff-open').click()},
+    {separator:true},{label:'回報問題或建議給開發者…',icon:'chat',disabled:aiBusy,action:()=>{const m=$('message');m.value='我想回報給 App 開發者：';m.dispatchEvent(new Event('input'));m.focus();m.setSelectionRange(m.value.length,m.value.length);}},
+    {label:'交接到新對話…',icon:'chat',disabled:aiBusy||Boolean(pendingProposal),action:()=>$('handoff-open').click()},
     {label:'重新開始（保留紀錄）',icon:'chat',disabled:$('restart-conversation').disabled,action:()=>$('restart-conversation').click()},
     {separator:true},{label:pendingProposal||materializedCandidate?'封存對話（請先處理提案）':'封存對話',icon:'folder',disabled:aiBusy||Boolean(pendingProposal)||materializedCandidate,title:pendingProposal||materializedCandidate?'請先確認或放棄目前提案，再封存對話':'',action:()=>changeConversation('conversation-archive',{id:currentConversation})}
   ]);
