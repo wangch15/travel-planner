@@ -27,7 +27,8 @@
     "smoke:session-settings": "node native-smoke-runner.cjs session-settings-smoke.cjs",
     "smoke:composer": "node native-smoke-runner.cjs composer-smoke.cjs",
     "smoke:recovery": "node native-smoke-runner.cjs chat-recovery-smoke.cjs",
-    "smoke:preview-repair": "node native-smoke-runner.cjs preview-repair-smoke.cjs"
+    "smoke:preview-repair": "node native-smoke-runner.cjs preview-repair-smoke.cjs",
+    "smoke:guide": "node native-smoke-runner.cjs guide-smoke.cjs"
   },
   "devDependencies": {
     "electron": "44.4.3"

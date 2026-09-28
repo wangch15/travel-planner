@@ -2,6 +2,7 @@ const { parentPort, workerData } = require('node:worker_threads');
 const path = require('node:path');
 const { readTripSnapshot } = require('@travel-planner/engine');
 const { createRenderer } = require('@travel-planner/engine/render');
+const { guideSuggestions } = require('./services/guide-suggestions.cjs');
 
 (async () => {
   const snapshot = await readTripSnapshot(path.join(workerData.projectRoot, 'trips', workerData.slug), {
@@ -14,7 +15,9 @@ const { createRenderer } = require('@travel-planner/engine/render');
     snapshot: { trip: snapshot.trip, theme: snapshot.theme, extra: snapshot.extra, photos: snapshot.photos, dataSource: snapshot.dataSource, contextDigest:snapshot.contextDigest, digest: snapshot.digest },
     photos: snapshot.photoFiles.map(photo => ({ name: photo.target, bytes: photo.bytes })),
     summary: { days: snapshot.trip.DAYS.length, places: Object.keys(snapshot.trip.PLACES).length, photos: snapshot.photoFiles.length,
-      dayOptions: snapshot.trip.DAYS.map(day => ({ id: day.id, title: day.title, date: day.date })) },
+      dayOptions: snapshot.trip.DAYS.map(day => ({ id: day.id, title: day.title, date: day.date })),
+      // 看起來是房東資訊的長段落備案：App 會提議整理成住宿指南
+      guideSuggestions: guideSuggestions(snapshot.trip) },
   });
 })().catch(error => parentPort.postMessage({ ok: false, code: error.code || 'preview-invalid',
   message: String(error.message || '資料無法安全載入').slice(0, 1200),

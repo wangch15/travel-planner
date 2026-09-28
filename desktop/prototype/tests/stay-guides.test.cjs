@@ -99,9 +99,15 @@ test('把第一天長文搬進指南：標成搬移提案、列出不見的連�
   const baseline = await buildPreview(f.root, 'sample');
   const migrated = f.store.create(f.target, baseline, null, { summary: '搬進指南', replacementDays: [days[0]], stayGuides: [guide()] });
   assert.equal(migrated.migration, true, '同時改日程與指南＝搬移，先預覽再保存');
+  assert.equal(migrated.requiresResearch, false, '只搬備案文字、停留點沒變，不用先查核');
+  const movedStops = structuredClone(days[0]); movedStops.stops[0].time = '12:30';
+  f.store.discard();
+  assert.equal(f.store.create(f.target, baseline, null, { summary: '搬移並改時間', replacementDays: [movedStops], stayGuides: [guide()] }).requiresResearch, true, '停留點變了仍要查核');
+  f.store.discard();
+  const migratedId = f.store.create(f.target, baseline, null, { summary: '搬進指南', replacementDays: [days[0]], stayGuides: [guide()] }).id;
   assert.deepEqual(migrated.lostLinks, ['https://example.invalid/ramen'], '拉麵連結沒有搬過去，要提醒');
   assert.deepEqual(new Set(migrated.changes.map(c => c.key)), new Set(['1:route', 'guide:inn-a-guide']));
-  const onlyGuide = f.store.select(migrated.id, ['guide:inn-a-guide']);
+  const onlyGuide = f.store.select(migratedId, ['guide:inn-a-guide']);
   assert.equal(onlyGuide.migration, false);
   const partial = parseLiteralModule(f.store.pending.source);
   assert.equal(partial.DAYS[0].alts.at(-1).body, longText, '沒勾的日程保留原文');
@@ -206,4 +212,26 @@ test('AI 自創欄位或把私人欄位塞進指南：資料檢查擋下並說�
   assert.throws(() => f.store.create(f.target, f.baseline, null, { summary: 'x', stayGuides: [guide({ privateNotes: '1234' })] }), e => e.code === 'INVALID_CANDIDATE' && e.problems.some(p => /privateNotes/.test(p)));
   const invented = guide(); invented.lists[0].items[0].hours = '9-21';
   assert.throws(() => f.store.create(f.target, f.baseline, null, { summary: 'x', stayGuides: [invented] }), e => e.problems.some(p => /不支援的欄位 hours/.test(p)));
+});
+
+test('一鍵搬移的提議：只挑像房東資訊的長備案，雨天備案與沒有住宿的行程不提', () => {
+  const { guideSuggestions } = require('../services/guide-suggestions.cjs');
+  const host = '房東說：15:00 後入住，停車在後方。' + '附近超市與溫泉資訊。'.repeat(12);
+  const rain = '下雨的話改去室內的博物館，館內有常設展與特展可以看，逛完再到附近咖啡店休息。'.repeat(3);
+  const trip = { PLACES: { innA: { cat: 'stay' } }, STAYS: [{ place: 'innA' }],
+    DAYS: [{ id: 1, date: '10/11（日）', alts: [{ title: '下雨版', body: rain }, { title: '房東資訊', body: host }, { title: '短的', body: '房東說停後面' }] }, { id: 2, date: '10/12（一）', alts: [] }] };
+  const found = guideSuggestions(trip);
+  assert.deepEqual(found.map(s => [s.dayId, s.date, s.title]), [[1, '10/11', '房東資訊']]);
+  assert.match(found[0].request, /第 1 天備案「房東資訊」.*每一項資訊與連結都要保留.*不要改動其他天或時間/);
+  assert.deepEqual(guideSuggestions({ ...trip, STAYS: [] }), []);
+});
+
+test('預覽摘要帶著搬移提議，App 不必自己讀檔判斷', async t => {
+  const f = await fixture(t);
+  const day = parseLiteralModule(f.baseline.snapshot.dataSource).DAYS[1];
+  const { replaceDay } = require('../../../packages/engine/day-edit.cjs');
+  await fs.writeFile(f.sourceFile, replaceDay(f.baseline.snapshot.dataSource, 2, { ...day, alts: [...(day.alts || []), { title: '民宿資訊', body: '入住後'.repeat(50) }] }).source);
+  const preview = await buildPreview(f.root, 'sample');
+  assert.deepEqual(preview.summary.guideSuggestions.map(s => [s.dayId, s.title]), [[2, '民宿資訊']]);
+  assert.deepEqual(f.baseline.summary.guideSuggestions, [], '_example 本身不會被誤判');
 });

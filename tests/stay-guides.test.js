@@ -114,8 +114,13 @@ test('CLI：check 會擋缺圖，build 把指南圖片放進 img/ 並內嵌指�
   assert.match(built.html, /id="zoomdlg"/);
 });
 
-test('_example 沒有指南也照常 build（舊資料相容）', () => {
-  const built = buildTrip('_example');
-  assert.match(built.html, /const STAY_GUIDES = \[\];/);
-  assert.match(built.html, /const GUIDE_IMAGES = \{\};/);
+test('_example 沒有指南也照常產生頁面（舊資料相容）', () => {
+  // 只在記憶體裡渲染：不寫 dist/_example，避免和 build.test.js 同時改同一個資料夾。
+  const { createRenderer } = require('../packages/engine/render.cjs');
+  const html = createRenderer(path.join(ROOT, 'src'))({ trip: loadTrip('_example') });
+  assert.match(html, /const STAY_GUIDES = \[\];/);
+  assert.match(html, /const GUIDE_IMAGES = \{\};/);
+  const legacy = loadTrip('_example');
+  delete legacy.STAY_GUIDES; delete legacy.GUIDE_IMAGES;
+  assert.match(createRenderer(path.join(ROOT, 'src'))({ trip: legacy }), /const STAY_GUIDES = \[\];/, '舊呼叫端沒給這兩個鍵也有預設值');
 });

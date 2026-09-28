@@ -192,6 +192,8 @@ body.resizing iframe { pointer-events:none; }
 select { font:inherit; color:var(--text); background:var(--surface); border:1px solid var(--line); border-radius:7px; padding:7px 10px; min-width:0; max-width:100%; }
 #edit-day { flex:1; }
 .proposal-review { border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:12px; background:var(--panel); }
+.guide-suggestion { border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:12px; background:var(--panel); }
+.guide-suggestion p { font-size:12px; color:var(--muted); margin:0 0 8px; }
 .proposal-review h3 { font-size:13px; margin:0 0 8px; }
 .proposal-review p { font-size:12px; color:var(--muted); margin:5px 0; }
 #proposal-note { white-space:pre-line; overflow-wrap:anywhere; }

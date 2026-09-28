@@ -118,14 +118,18 @@ class ProposalStore {
     const html=createRenderer(path.resolve(__dirname,'../../src'))(candidate).replace(/<link\b[^>]*href="https:\/\/fonts\.(?:googleapis|gstatic)\.com[^>]*>/g,'');
     const id=randomUUID(),token=randomUUID().replaceAll('-','');
     const active=changes.filter(c=>selectedKeys.includes(c.key));
+    // 同一次同時改指南與日程＝把日程裡的長文搬進住宿指南：先給人看預覽再保存，不自動套用。
+    const migration=kind!=='restore'&&active.some(c=>c.field==='guide')&&active.some(c=>c.field!=='guide');
+    // 搬移只動備案文字時不需要查核；停留點本身變了才需要。
+    const originalDays=parseLiteralModule(baseline.snapshot.dataSource).DAYS;
+    const stopsChanged=parsed.DAYS.some(day=>!isDeepStrictEqual(day.stops,originalDays.find(d=>d.id===day.id)?.stops));
+    const requiresResearch=kind!=='restore'&&active.some(c=>c.field==='structure'||(c.field==='route'&&(!migration||stopsChanged)));
     const artifact={token,url:`travel-preview://${token}/index.html`,digest:hash(html),snapshot:candidate,summary:baseline.summary,
       read:key=>{if(key==='/index.html')return {body:html,type:'text/html; charset=utf-8'};const asset=newAssets.find(a=>'/img/'+a.file===key);return asset?{body:asset.bytes,type:imageType(asset.file)}:baseline.read(key);}};
     this.pending={id,target:{...target},baselineDigest:baseline.digest,source,fullSource,originalSource:baseline.snapshot.dataSource,
       contextDigest:baseline.snapshot.contextDigest,artifact,baseline,seen:false,createdAt:Date.now(),kind,label:String(label).slice(0,1000),
-      changes,selectedKeys:[...selectedKeys],requiresResearch:kind!=='restore'&&active.some(c=>['route','structure'].includes(c.field)),dayId:active[0]?.dayId,
-      assets:newAssets,allAssets:checkAssets(assets),lostLinks:lostLinks(baseline.snapshot.dataSource,source),
-      // 同一次同時改指南與日程＝把日程裡的長文搬進指南：先給人看預覽再保存，不自動套用。
-      migration:kind!=='restore'&&active.some(c=>c.field==='guide')&&active.some(c=>c.field!=='guide')};
+      changes,selectedKeys:[...selectedKeys],requiresResearch,dayId:active[0]?.dayId,
+      assets:newAssets,allAssets:checkAssets(assets),lostLinks:lostLinks(baseline.snapshot.dataSource,source),migration};
     return this.view();
   }
   view(){

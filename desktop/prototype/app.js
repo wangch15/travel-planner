@@ -31,6 +31,7 @@ let draftTimer;
 let preferenceWrite = Promise.resolve(true);
 let conversationLoading = false;
 let conversationError = false;
+const dismissedGuideSuggestions=new Set();
 let tripGroupOpen = true;
 try { const stored = localStorage.getItem('travel-planner.theme'); if (['system', 'light', 'dark'].includes(stored)) ui.theme = stored; } catch { /* Preference storage is optional. */ }
 const issues = {
@@ -564,7 +565,27 @@ function appendRealMessage(trip, message) {
   trip.conversation ||= []; trip.conversation.push(message);
   if (selected?.trip === trip) { addMessage(message); $('chat-scroll').scrollTop = $('chat-scroll').scrollHeight; }
 }
+// 偵測到「房東資訊塞在備案長文」時，主動提議整理成住宿指南（由 AI 整理，結果先留成提案給人預覽）。
+const guideSuggestionKey=s=>`${project?.projectId}:${selected?.trip?.slug}:${s.dayId}:${s.title}`;
+function currentGuideSuggestion(){
+  if(!selected||selected.demo||realPreview?.status!=='ready'||pendingProposal||aiBusy||accountState.state!=='connected')return null;
+  if(conversationLoading||conversationError||selected.trip.needsRestart)return null;
+  return (realPreview.summary?.guideSuggestions||[]).find(s=>!dismissedGuideSuggestions.has(guideSuggestionKey(s)))||null;
+}
+function renderGuideSuggestion(){
+  const suggestion=currentGuideSuggestion();
+  $('guide-suggestion').hidden=!suggestion;
+  if(suggestion)$('guide-suggestion-text').textContent=`第 ${suggestion.dayId} 天（${suggestion.date}）的「${suggestion.title}」是一大段住宿資訊（約 ${suggestion.chars} 字）。要請 AI 整理成住宿指南嗎？整理好會先給你看預覽，確認才保存；附加的圖片（例如停車圖）也會一起放進去。`;
+}
+$('guide-suggestion-later').onclick=()=>{const s=currentGuideSuggestion();if(s)dismissedGuideSuggestions.add(guideSuggestionKey(s));renderGuideSuggestion();};
+$('guide-suggestion-run').onclick=async()=>{
+  const s=currentGuideSuggestion();if(!s)return;
+  dismissedGuideSuggestions.add(guideSuggestionKey(s));
+  // 整趟行程模式送出；輸入框裡已附加的圖片一起帶上，打到一半的草稿保留不動。
+  await sendRealMessage(selected.trip,s.request,{dayId:null,attachments:window.takeComposerAttachments?.()||[]});
+};
 function updateComposer() {
+  renderGuideSuggestion();
   $('conversation-header').hidden=!selected;
   $('conversation-title').textContent=selected?.demo?'示範對話':selected?.trip.featureState?.conversationTitle||'旅程討論';
   $('conversation-title').title=$('conversation-title').textContent;
