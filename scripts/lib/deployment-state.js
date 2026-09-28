@@ -68,6 +68,20 @@ function readState(file) {
   }
 }
 
+// wrangler 失敗時真正的原因：取錯誤行（[ERROR]、✘ 或含 error 的行）最後幾行，去掉 Email、帳號代碼、金鑰與本機路徑。
+// 只拿來顯示給使用者看、讓人知道發生什麼；不是整份輸出。
+function wranglerDetail(r) {
+  const lines = output(r).split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    .filter((l) => /\[ERROR\]|✘|\berror\b|失敗|failed/i.test(l) && !/update available/i.test(l));
+  const picked = (lines.length ? lines : output(r).split(/\r?\n/).map((l) => l.trim()).filter(Boolean)).slice(-3);
+  return picked.map((l) => l
+    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '<email>')
+    .replace(/\b[a-f0-9]{32}\b/gi, '<account>')
+    .replace(/\b[A-Za-z0-9_-]{40,}\b/g, '<token>')
+    .replace(/(?:\/Users|\/home)\/[^\s/]+/g, '<HOME>').replace(/[A-Za-z]:\\Users\\[^\s\\]+/g, '<HOME>')
+    .replace(/^[✘X▲]\s*/, '').slice(0, 240)).join('\n');
+}
+
 // 新的 Cloudflare 帳號還沒有 workers.dev 網址名稱時，非互動的 wrangler deploy 會直接拒絕，沒有上線任何內容。
 const SUBDOMAIN_REQUIRED = /register a workers\.dev subdomain|workers\.dev subdomain.*(?:required|not (?:yet )?registered)|need to register.*workers\.dev/i;
 function failure(r, phase) {
@@ -84,7 +98,12 @@ function failure(r, phase) {
   if (r.error || NETWORK_FAILURE.test(text)) {
     return new Error(`${phase}失敗：網路、程序啟動或逾時問題，停止；恢復連線後重新查核。`);
   }
-  if (phase === '部署') return new Error(`部署失敗（退出碼 ${r.status ?? '未知'}）；遠端可能已部分更新，請查核後再決定，不直接重試，成功紀錄未更新。`);
+  if (phase === '部署') {
+    const detail = wranglerDetail(r);
+    const reason = `部署失敗（退出碼 ${r.status ?? '未知'}）${detail ? `：${detail}` : ''}`;
+    // CLI 沒有自動再查遠端，所以保留「不要直接重試」；桌面 App 會自己重新查核，只顯示 reason。
+    return Object.assign(new Error(`${reason}\n遠端可能已部分更新，請查核後再決定，不直接重試，成功紀錄未更新。`), { code: 'DEPLOY_FAILED', detail, reason });
+  }
   return new Error(`${phase}失敗（退出碼 ${r.status ?? '未知'}），不能判定目標不存在；停止，請檢查 wrangler 的錯誤。`);
 }
 
@@ -205,4 +224,4 @@ function deployBuiltTrip({ slug, config, outDir }, {
   return state;
 }
 
-module.exports = { deployBuiltTrip, runWrangler, inspectWorker, STATE_DIR, statePath, readState };
+module.exports = { deployBuiltTrip, runWrangler, inspectWorker, wranglerDetail, STATE_DIR, statePath, readState };
