@@ -11,6 +11,7 @@ const { inspectWorker, deployBuiltTrip, readState } = require('../../../scripts/
 const hash = value => createHash('sha256').update(value).digest('hex');
 const fail = (code, message) => Object.assign(new Error(message || code), { code });
 const NAME = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const QUERY_TIMEOUT_MS = 2 * 60 * 1000, DEPLOY_TIMEOUT_MS = 10 * 60 * 1000;
 
 // Execute the installed, trusted Wrangler asynchronously so Electron's main loop stays responsive.
 async function runWrangler(args, { cwd, env = {} } = {}) {
@@ -21,7 +22,8 @@ async function runWrangler(args, { cwd, env = {} } = {}) {
   const inherited = Object.fromEntries(Object.entries({ ...process.env, ...env }).filter(([key]) => !/^(NODE_OPTIONS|NODE_PATH|LD_|DYLD_)/.test(key)));
   return new Promise(resolve => {
     const child = execFile(process.execPath, wranglerArgs(binary, args), { cwd, env: { ...inherited, ELECTRON_RUN_AS_NODE: '1', CI: 'true', NO_COLOR: '1', FORCE_COLOR: '0', WRANGLER_SEND_METRICS: 'false' },
-      encoding: 'utf8', timeout: 120000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => resolve({
+      // 上傳部署要傳整個網站（含照片），網路慢時 2 分鐘不夠；其他查詢維持 2 分鐘。
+      encoding: 'utf8', timeout: args[0] === 'deploy' ? DEPLOY_TIMEOUT_MS : QUERY_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => resolve({
       status: error ? (typeof error.code === 'number' ? error.code : null) : 0, stdout, stderr, ...(error && typeof error.code !== 'number' ? { error } : {}),
     }));
     child.stdin?.end();
