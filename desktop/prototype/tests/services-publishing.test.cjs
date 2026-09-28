@@ -69,8 +69,28 @@ test('adoption refuses remote changes and publication failure does not claim suc
   await assert.rejects(() => f.service.confirmAdoption(a.token), { code: 'REMOTE_CHANGED' });
   f.state.latest = null; const p = await f.service.prepare(f.input); f.state.failDeploy = true;
   const result = await f.service.confirm(p.token, f.input); assert.equal(result.published, false);
-  assert.equal(f.state.calls.filter(args => args[0] === 'deploy').length, 1);
-  assert.match(result.message, /不要直接重試/);
+  assert.equal(f.state.calls.filter(args => args[0] === 'deploy').length, 1, 'App 不會自己重送');
+  // 失敗原因照實顯示；App 自己重新查核遠端，確認沒有新版本才說可以再發布，不叫人去 Cloudflare 查。
+  assert.match(result.message, /網路、程序啟動或逾時/);
+  assert.match(result.message, /Cloudflare 上沒有新版本，網站還是上一版/);
+  assert.equal(result.outcome, 'not-deployed');
+  assert.doesNotMatch(result.message, /請先核對 Cloudflare 狀態/);
+});
+test('publication failure after the remote changed stays uncertain and does not offer a retry', async t => {
+  const f = await fixture(t); f.state.latest = null;
+  const p = await f.service.prepare(f.input); f.state.failDeploy = true;
+  const run = f.service.run;
+  // 部署指令失敗，但重新查核時遠端已經出現新版本（例如部分上傳）。
+  f.service.run = async (args, options) => { const r = await run(args, options); if (args[0] === 'deploy') f.state.latest = remote(); return r; };
+  const result = await f.service.confirm(p.token, f.input);
+  assert.equal(result.published, false); assert.equal(result.outcome, 'unknown');
+  assert.match(result.message, /已經有新版本，但沒辦法確定/);
+});
+test('deploy failures carry the tool\'s real reason without secrets', () => {
+  const { wranglerDetail } = require('../../../scripts/lib/deployment-state.js');
+  const detail = wranglerDetail({ status: 1, stdout: ' ⛅️ wrangler 4.135.0 (update available 4.143.0)\nUploading…', stderr: '✘ [ERROR] A request to the Cloudflare API (/accounts/0123456789abcdef0123456789abcdef/workers/scripts/x) failed.\n  Asset too large: /Users/someone/site/img/a.png for owner@example.com' });
+  assert.match(detail, /\[ERROR\] A request to the Cloudflare API \(\/accounts\/<account>\/workers/);
+  assert.doesNotMatch(detail, /0123456789abcdef0123456789abcdef|owner@example\.com|\/Users\/someone|update available/);
 });
 test('symlink receipt directories are rejected before publication', async t => {
   const f = await fixture(t);

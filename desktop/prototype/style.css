@@ -764,3 +764,6 @@ button.primary[aria-busy="true"] { opacity:.88; }
 .inline-auth { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
 .inline-auth .inline-need-status { font-size:12px; color:var(--muted); max-width:28em; text-align:right; }
 @media(max-width:940px) { .acquire-options { grid-template-columns:1fr; } .account-line { flex-wrap:wrap; } }
+
+/* 發布／備份結果：保留換行，錯誤原因與下一步分行顯示 */
+.flow-result-text { white-space:pre-line; overflow-wrap:anywhere; }

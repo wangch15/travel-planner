@@ -76,7 +76,8 @@
     if (!flow) return;
     steps(names, names.length - 1);
     const heading = el('h3', head, 'flow-result'); heading.dataset.tone = tone;
-    body(heading, text ? el('p', text) : null); say('');
+    const paragraph = text ? el('p', text, 'flow-result-text') : null;
+    body(heading, paragraph); say('');
     flow.outcome = outcome; footer([], [...extra, closeButton('完成', 'done', 'primary')]);
   }
 
@@ -155,6 +156,8 @@
     const extra = [];
     if (result.url) extra.push(button('開啟網站 ↗', 'open-site', () => api('open-link', { url: result.url }).catch(e => say(e.message, 'warn'))));
     if (result.code === 'WORKERS_SUBDOMAIN_REQUIRED') extra.push(button('打開 Cloudflare 設定 ↗', 'open-cloudflare', () => api('open-link', { url: 'https://dash.cloudflare.com/?to=/:account/workers-and-pages' }).catch(e => say(e.message, 'warn'))), act('設定好了，重新準備', 'retry', () => publish(opts), { busy: '檢查中…' }));
+    // App 已確認網站沒被更新（或根本還沒送出），可以直接再試；結果不確定時不給這個按鈕。
+    else if (!result.url && ['not-deployed', 'not-started'].includes(result.outcome)) extra.push(act('再試一次', 'retry', () => publish(opts), { busy: '檢查中…' }));
     const tone = result.url ? 'ok' : 'warn';
     done(PUBLISH_STEPS, result.url ? '網站已發布' : '發布沒有完成', result.message, tone, { status: result.url ? 'done' : 'failed', message: result.message, tone, url: result.url || null, code: result.code || null }, extra);
   }

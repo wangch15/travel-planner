@@ -127,7 +127,7 @@ test('同份輸出即使含 10007，另有權限或網路錯誤時仍停止', (t
 
 test('部署部分失敗也不能說目標不存在或建議直接重試', (t) => {
   const h = harness(t, { result: { status: 1, stdout: 'Uploaded worker', stderr: 'trigger setup failed' } });
-  assert.throws(h.run, /部署失敗.*遠端.*可能.*更新/);
+  assert.throws(h.run, /部署失敗（退出碼 1）：trigger setup failed\n遠端.*可能.*更新/);
   assert.ok(!fs.existsSync(h.stateFile));
 });
 

@@ -11,6 +11,7 @@ const { inspectWorker, deployBuiltTrip, readState } = require('../../../scripts/
 const hash = value => createHash('sha256').update(value).digest('hex');
 const fail = (code, message) => Object.assign(new Error(message || code), { code });
 const NAME = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const QUERY_TIMEOUT_MS = 2 * 60 * 1000, DEPLOY_TIMEOUT_MS = 10 * 60 * 1000;
 
 // Execute the installed, trusted Wrangler asynchronously so Electron's main loop stays responsive.
 async function runWrangler(args, { cwd, env = {} } = {}) {
@@ -21,7 +22,8 @@ async function runWrangler(args, { cwd, env = {} } = {}) {
   const inherited = Object.fromEntries(Object.entries({ ...process.env, ...env }).filter(([key]) => !/^(NODE_OPTIONS|NODE_PATH|LD_|DYLD_)/.test(key)));
   return new Promise(resolve => {
     const child = execFile(process.execPath, wranglerArgs(binary, args), { cwd, env: { ...inherited, ELECTRON_RUN_AS_NODE: '1', CI: 'true', NO_COLOR: '1', FORCE_COLOR: '0', WRANGLER_SEND_METRICS: 'false' },
-      encoding: 'utf8', timeout: 120000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => resolve({
+      // 上傳部署要傳整個網站（含照片），網路慢時 2 分鐘不夠；其他查詢維持 2 分鐘。
+      encoding: 'utf8', timeout: args[0] === 'deploy' ? DEPLOY_TIMEOUT_MS : QUERY_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => resolve({
       status: error ? (typeof error.code === 'number' ? error.code : null) : 0, stdout, stderr, ...(error && typeof error.code !== 'number' ? { error } : {}),
     }));
     child.stdin?.end();
@@ -179,8 +181,19 @@ class PublishingService {
         { stateDir: target.stateDir, runWrangler: run, env: { ...this.env, CLOUDFLARE_ACCOUNT_ID: remote.accountId, CF_ACCOUNT_ID: remote.accountId }, log: () => {} }), runPinned);
       return { published: true, backedUp: false, url: state.url, versionId: state.versionId, message: '網站已發布；這不代表旅程資料夾已完成備份。' };
     } catch (error) {
-      return { published: false, outcome: attempted && !error.notDeployed ? 'unknown' : 'not-started', code: error.code || 'PUBLISH_FAILED', message: error.code ? error.message : '發布或結果核對未完成。遠端可能已更新；請先核對 Cloudflare 狀態，不要直接重試。' };
+      return this.explainFailure(error, { attempted, output, pending });
     } finally { if (output) fs.rmSync(output.temporary, { recursive: true, force: true }); this.busy = false; }
+  }
+  // 發布失敗時照實說原因，不叫使用者自己去 Cloudflare 查：部署指令真的送出過，就由 App 再查一次遠端有沒有新版本。
+  async explainFailure(error, { attempted, output, pending }) {
+    const reason = error.reason || (error.message && error.message !== 'async-wrangler-request' ? error.message : '發布沒有完成（沒有收到錯誤說明）。');
+    const base = { published: false, code: error.code || 'PUBLISH_FAILED', ...(error.detail ? { detail: error.detail } : {}) };
+    if (!attempted || error.notDeployed) return { ...base, outcome: 'not-started', message: `${reason}\n網站沒有被更新，還是上一版。` };
+    let remote = null;
+    try { if (output) remote = await this.inspect({ name: pending.name }, output.configFile); } catch { remote = null; }
+    if (remote && remoteIdentity(remote) === pending.remote) return { ...base, outcome: 'not-deployed', message: `${reason}\nApp 已重新確認：Cloudflare 上沒有新版本，網站還是上一版，可以處理完原因後再發布一次。` };
+    if (remote) return { ...base, outcome: 'unknown', message: `${reason}\nApp 重新確認時發現 Cloudflare 上已經有新版本，但沒辦法確定是不是這次的內容；先不要再按發布，把這個畫面給幫你設定的人看。` };
+    return { ...base, outcome: 'unknown', message: `${reason}\nApp 沒辦法重新確認 Cloudflare 上的狀態（可能是網路問題），不確定網站有沒有更新；等網路正常後重新開啟「發布網站」，App 會先核對再決定。` };
   }
   async prepareAdoption(input) {
     if (this.busy) throw fail('PUBLISH_BUSY');
