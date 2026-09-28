@@ -127,6 +127,13 @@ test('指南文字一律跳脫，資料不能注入 HTML', () => {
   assert.equal(html.includes('<b>店</b>'), false);
 });
 
+test('版面：指南入口卡不會把頁面撐寬；地圖滑過的標記名稱浮在最上層', () => {
+  const css = read('src/styles.css');
+  assert.match(css, /\.guide-entry\{[^}]*grid-template-columns:minmax\(0,1fr\)/, '入口卡的 grid 欄要能縮');
+  assert.doesNotMatch(css.match(/\.ge-s\{[^}]*\}/)[0], /nowrap/, '摘要不能設不換行，會撐爆卡片');
+  assert.match(css, /\.pin:hover,\.pin:focus-visible\{z-index:7\}/, '滑過的標記名稱不能被其他標記蓋住');
+});
+
 test('總覽的住宿列也有指南入口', () => {
   const trip = makeGuideTrip();
   assert.match(ctxFor(trip).overviewHTML(), /class="guide-open compact" data-guide="stay-a-guide"/);
