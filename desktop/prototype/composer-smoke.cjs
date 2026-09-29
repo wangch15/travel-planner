@@ -88,7 +88,12 @@ app.whenReady().then(async()=>{
   await until('document.querySelectorAll(".applied-actions").length>=3 && !document.getElementById("message").disabled');
   assert.notEqual(await fs.readFile(path.join(project,'trips/sample/data.js'),'utf8'),before);
   await js("openSettings('backup')");
-  await until('!document.getElementById("backup-discard").hidden',300);
+  try { await until('!document.getElementById("backup-discard").hidden',300); }
+  catch(error){
+    console.error('backup readiness',await js('JSON.stringify({section:ui.setting,selected:selected?.trip?.slug,headline:document.getElementById("backup-headline")?.textContent,sub:document.getElementById("backup-sub")?.textContent,scope:document.getElementById("sync-trip-select")?.value})'));
+    console.error('local backup state',await win.webContents.executeJavaScript('travelDesktop.feature("sync-overview",{slug:"sample"})'));
+    throw error;
+  }
   await js('document.getElementById("backup-discard").click()');
   await until('document.getElementById("sync-dialog").open && document.querySelector("#sync-dialog [data-flow-action=confirm]") && document.getElementById("sync-dialog-body").textContent.includes("trips/sample/data.js")');
   await js('document.querySelector("#sync-dialog [data-flow-action=confirm]").click()');
