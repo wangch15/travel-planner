@@ -1,4 +1,5 @@
 const { isDeepStrictEqual } = require('node:util');
+const acorn = require('acorn');
 const { parseLiteralModule } = require('./literal-data.cjs');
 const { copyProposal, serializeProposal, exportObjectNode, invalidEdit } = require('./day-edit.cjs');
 const { ID } = require('./stay-guides.cjs');
@@ -71,11 +72,21 @@ function replacePlaceNote(source, key, note) {
   if (existing && note !== null) {
     candidate = source.slice(0, existing.value.start) + JSON.stringify(note) + source.slice(existing.value.end);
   } else if (existing) {
-    // Remove "note: ..." together with the comma that separates it from a neighbour.
+    // Remove only the "note: ..." property and the one comma that separates it from a
+    // neighbour; comments and whitespace in between stay (a comma inside a comment is
+    // not a token, so the tokenizer never picks it).
     const index = node.properties.indexOf(existing);
-    const [from, to] = index > 0 ? [node.properties[index - 1].end, existing.end]
-      : node.properties[1] ? [existing.start, node.properties[1].start] : [existing.start, existing.end];
-    candidate = source.slice(0, from) + source.slice(to);
+    const neighbour = index > 0 ? [node.properties[index - 1].end, existing.start]
+      : node.properties[1] ? [existing.end, node.properties[1].start] : null;
+    let comma = null;
+    if (neighbour) {
+      for (const token of acorn.tokenizer(source.slice(...neighbour), { ecmaVersion: 2022 })) {
+        if (token.type.label === ',') { comma = neighbour[0] + token.start; break; }
+      }
+      if (comma === null) throw invalidEdit();
+    }
+    const cuts = [[existing.start, existing.end], ...(comma === null ? [] : [[comma, comma + 1]])].sort((a, b) => b[0] - a[0]);
+    candidate = cuts.reduce((text, [from, to]) => text.slice(0, from) + text.slice(to), source);
   } else {
     const last = node.properties.at(-1);
     candidate = last ? source.slice(0, last.end) + ', note: ' + JSON.stringify(note) + source.slice(last.end)

@@ -102,6 +102,23 @@ test('replacePlaceNote：只改那一個地點的 note，座標與檔案其他�
   assert.throws(() => replacePlaceNote(source, 'nowhere', 'x'), { code: 'INVALID_DAY_EDIT' });
 });
 
+test('replacePlaceNote 刪備註時，旁邊的註解（含註解裡的逗號）都保留', () => {
+  const { replacePlaceNote } = require('../guide-edit.cjs');
+  const cases = [
+    "const PLACES = {\n  a: { name: 'A', cat: 'hub', // 前面的說明, 有逗號\n    note: '舊備註' },\n};\nmodule.exports = { PLACES };\n",
+    "const PLACES = {\n  a: { note: '舊備註', /* 中間, 的註解 */ name: 'A', cat: 'hub' },\n};\nmodule.exports = { PLACES };\n",
+    "const PLACES = { a: { note: '舊備註' } };\nmodule.exports = { PLACES };\n",
+    "const PLACES = { a: { name: 'A', note: '舊備註', // 行尾註解\n  cat: 'hub', } };\nmodule.exports = { PLACES };\n",
+  ];
+  for (const source of cases) {
+    const result = replacePlaceNote(source, 'a', null);
+    const comments = source.match(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g) || [];
+    for (const c of comments) assert.ok(result.source.includes(c), `註解被刪掉了：${c}`);
+    assert.equal('note' in parseLiteralModule(result.source).PLACES.a, false);
+    assert.equal(result.source.includes('舊備註'), false);
+  }
+});
+
 test('總覽、清單、備註的格式檢查：不捏造欄位、不塞私人欄位、清單不重複', () => {
   const { checkOverview, checkChecklist, checkPlaceNotes, checklistDelta } = require('../trip-text.cjs');
   assert.deepEqual(checkOverview({ checked: '2026/09/29', stays: { title: '6 晚 3 處' }, dining: { hint: 'x', notes: ['a'], chips: [{ day: 2, label: '第二天' }, { detail: 'k', label: '店' }] }, foot: ['頁尾'] }), []);
