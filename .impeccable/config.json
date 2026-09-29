@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "src/index.html"
+        ],
+        "createdAt": "2026-09-29T05:33:46.168Z",
+        "reason": "Agent verified: zoomImg belongs to a closed dialog; src/app.js sets its src before showing it and removes src after closing. No empty image is displayed."
+      }
+    ]
+  }
+}
