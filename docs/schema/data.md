@@ -92,6 +92,22 @@
 | `stays` | `{ title, hint, arrive, depart }`。`title` 缺則用「N 個晚上，M 個落腳處」；`arrive`／`depart` 缺則用第一天與最後一天的日期。 |
 | `addonsHint` | 加點區塊的說明。 |
 | `foot` | 頁尾段落，字串陣列。 |
+| `reservations` | 獨立的預約提醒陣列，格式見下方。不受 `sections.checklist` 開關影響；省略或空陣列不顯示。 |
+
+### `OVERVIEW.reservations[i]`
+
+每項 `{ id, place, days, note }`，最多 80 項：
+
+- `id`：穩定且唯一的代號，小寫英數與連字號，1–80 字；調整排序時不要改 id。
+- `place`：有 `details.js` 詳情的地點 key，可指向景點或餐廳。名稱按鈕開啟詳情燈箱。
+- `days`：非空、不重複的 `DAYS[].id` 數字陣列，例如 `[2, 3]`。畫面使用該日日期，點擊切到當天。
+- `note`：1–400 字，描述預約方式或需要處理的事項；依查核資料填寫，不推測是否接受預約。
+
+例如：`{ id: 'museum-ticket', place: 'museum', days: [2], note: '可先至官網預約入場時段；票種與開放日期見詳情。' }`。
+
+預約待辦從 `CHECKLIST`／`dining.checklist` 搬到這裡時，移除原本相同的待辦；營業時間查核等資料待辦保留。若全部搬完，有有效預約提醒時允許 `CHECKLIST` 為空，原資料清單區塊會隱藏。
+舊行程不會以關鍵字自動推測或搬移。完成勾選只存裝置 localStorage，依 id 對應，不會代表店家已確認。
+不儲存訂單號、確認碼、聯絡或付款資訊；私人資訊仍放 `docs/`。
 
 ## 完整範例
 

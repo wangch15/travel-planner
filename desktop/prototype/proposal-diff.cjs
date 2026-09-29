@@ -15,6 +15,7 @@ function formatOverview(o){
   if(o.stays)lines.push(`住宿段：${[o.stays.title,o.stays.hint].filter(Boolean).join('／')||'（只有日期）'}`);
   if(o.dining)lines.push(`餐食段：${[o.dining.hint,...(o.dining.notes||[])].filter(Boolean).join('；')}`);
   if(o.addonsHint)lines.push(`加點說明：${o.addonsHint}`);
+  for(const r of o.reservations||[])lines.push(`預約提醒：${r.place} · 第 ${r.days.join('、')} 天 · ${r.note}`);
   for(const p of o.foot||[])lines.push(`頁尾：${p}`);
   return lines.join('\n');
 }

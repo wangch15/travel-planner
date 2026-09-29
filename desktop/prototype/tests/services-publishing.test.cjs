@@ -183,3 +183,31 @@ test('an archived trip can be unshipped from its archive folder', async t => {
   const plan = await f.service.prepareUnship({ root: f.root, slug: 'sample', archived: true });
   assert.equal((await f.service.confirmUnship(plan.token)).unshipped, true);
 });
+
+test('real publisher dry-run works when the App starts in the filesystem root', async t => {
+  const f = await fixture(t);
+  const output = f.service.materialize(await f.service.target(f.input));
+  const { execFile } = require('node:child_process');
+  const { promisify } = require('node:util');
+  const servicePath = require.resolve('../services/publishing.cjs');
+  const script = `require(${JSON.stringify(servicePath)}).runWrangler(${JSON.stringify(['deploy', '--dry-run', '--config', output.configFile])}).then(r => { console.log(JSON.stringify(r)); process.exitCode = r.status === 0 ? 0 : 1; });`;
+  const result = await promisify(execFile)(process.execPath, ['-e', script], {
+    cwd: path.parse(f.root).root, encoding: 'utf8', timeout: 30000,
+  });
+  assert.equal(JSON.parse(result.stdout).status, 0);
+});
+
+test('failure verification retains its config until asynchronous remote checks finish', async t => {
+  const f = await fixture(t), prepared = await f.service.prepare(f.input);
+  f.state.failDeploy = true;
+  const run = f.service.run;
+  f.service.run = async (args, options) => {
+    await new Promise(resolve => setImmediate(resolve));
+    await fs.access(args[args.indexOf('--config') + 1]);
+    return run(args, options);
+  };
+  const result = await f.service.confirm(prepared.token, f.input);
+  assert.equal(result.outcome, 'not-deployed', result.message);
+  assert.equal(f.service.busy, false);
+  assert.equal((await fs.readdir(f.service.directory)).some(name => name.startsWith('.publish-')), false);
+});

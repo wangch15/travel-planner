@@ -15,6 +15,10 @@ const QUERY_TIMEOUT_MS = 2 * 60 * 1000, DEPLOY_TIMEOUT_MS = 10 * 60 * 1000;
 
 // Execute the installed, trusted Wrangler asynchronously so Electron's main loop stays responsive.
 async function runWrangler(args, { cwd, env = {} } = {}) {
+  // Finder 啟動時 cwd 可能是 /；Wrangler 會在 cwd 寫 .wrangler/tmp。
+  // 查詢與部署都使用這次發布的暫存設定目錄，不繼承 App 的工作目錄。
+  const configIndex = args.indexOf('--config');
+  if (!cwd && configIndex >= 0 && args[configIndex + 1]) cwd = path.dirname(path.resolve(args[configIndex + 1]));
   let binary;
   // 啟動器只接受 wrangler-dist/cli.js（登入與工具檢查也用這個）；bin/wrangler.js 會被拒絕，發布就在查帳號前失敗。
   try { binary = path.join(path.dirname(require.resolve('wrangler/package.json')), 'wrangler-dist', 'cli.js'); require('node:fs').accessSync(binary); }
@@ -181,7 +185,8 @@ class PublishingService {
         { stateDir: target.stateDir, runWrangler: run, env: { ...this.env, CLOUDFLARE_ACCOUNT_ID: remote.accountId, CF_ACCOUNT_ID: remote.accountId }, log: () => {} }), runPinned);
       return { published: true, backedUp: false, url: state.url, versionId: state.versionId, message: '網站已發布；這不代表旅程資料夾已完成備份。' };
     } catch (error) {
-      return this.explainFailure(error, { attempted, output, pending });
+      // 等核對完成才進 finally，否則查詢還沒讀取設定檔就被刪掉。
+      return await this.explainFailure(error, { attempted, output, pending });
     } finally { if (output) fs.rmSync(output.temporary, { recursive: true, force: true }); this.busy = false; }
   }
   // 發布失敗時照實說原因，不叫使用者自己去 Cloudflare 查：部署指令真的送出過，就由 App 再查一次遠端有沒有新版本。

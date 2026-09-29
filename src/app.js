@@ -157,16 +157,17 @@ svg.addEventListener('pointermove', (e) => {
 const endDrag = (e) => { if (drag && e.pointerId === drag.id) { drag = null; svg.classList.remove('drag'); } };
 svg.addEventListener('pointerup', endDrag);
 svg.addEventListener('pointercancel', endDrag);
-// 滑鼠滾輪預設捲動頁面，不搶走捲動；按住 Shift（觸控板雙指縮放時瀏覽器會帶 ctrlKey）才縮放地圖。
-// 放大檢視的對話框裡沒有頁面可捲，直接縮放。按 Shift 時 macOS 會把垂直滾動轉成水平，所以也看 deltaX。
+// 滾輪預設捲動頁面；Cmd／Ctrl 加滾輪才縮放地圖，並支援帶 ctrlKey 的觸控板捏合。
+// 放大檢視的對話框裡直接縮放。
 let wheelHintTimer = 0;
 svg.addEventListener('wheel', (e) => {
-  if (!e.shiftKey && !e.ctrlKey && !mapInDialog()) {
+  if (!e.metaKey && !e.ctrlKey && !mapInDialog()) {
     const hint = $('#maphint');
     hint.hidden = false; clearTimeout(wheelHintTimer);
     wheelHintTimer = setTimeout(() => { hint.hidden = true; }, 1400);
     return;
   }
+  clearTimeout(wheelHintTimer); $('#maphint').hidden = true;
   e.preventDefault();
   const delta = e.deltaY || e.deltaX;
   if (delta) zoom(delta > 0 ? 1.18 : 1 / 1.18, e.clientX, e.clientY);
@@ -536,7 +537,7 @@ function show(id) {
   panel.setAttribute('aria-labelledby', 'tab-' + id);
   active = null;
   renderMap(day);
-  if (!day) restoreChecks();
+  if (!day) { restoreChecks(); restoreReservations(); }
   panel.querySelectorAll('[data-detail]').forEach((n) => { n.onclick = () => openDetail(n.dataset.detail, n); });
   panel.querySelectorAll('[data-guide]').forEach((n) => { n.onclick = () => openGuide(n.dataset.guide, n); });
   panel.querySelectorAll('[data-day]').forEach((n) => { n.onclick = () => { show(+n.dataset.day); toTop(); }; });
@@ -553,6 +554,7 @@ function readChecks() { try { return JSON.parse(localStorage.getItem(CONFIG.depl
 function restoreChecks() {
   const saved = readChecks();
   const boxes = panel.querySelectorAll('.checks input');
+  if (!boxes.length) return;
   const sync = () => {
     const n = [].filter.call(boxes, (b) => b.checked).length;
     $('#ptext').textContent = n + ' / ' + boxes.length;
@@ -570,6 +572,25 @@ function restoreChecks() {
   sync();
 }
 
+function restoreReservations() {
+  const key = CONFIG.deploy.name + '.reservations';
+  const read = () => {
+    try { const value = JSON.parse(localStorage.getItem(key) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
+    catch { return {}; }
+  };
+  const saved = read();
+  panel.querySelectorAll('[data-reservation]').forEach(box => {
+    const sync = () => box.closest('.reservation-item').classList.toggle('is-done', box.checked);
+    box.checked = saved[box.dataset.reservation] === true;
+    sync();
+    box.onchange = () => {
+      const next = read(); next[box.dataset.reservation] = box.checked;
+      try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
+      sync();
+    };
+  });
+}
+
 /* ── 外觀 ── */
 function applyTheme(t) {
   if (t) document.documentElement.setAttribute('data-theme', t);
@@ -585,6 +606,8 @@ try { const t = localStorage.getItem(CONFIG.deploy.name + '.theme'); if (t) appl
 
 /* ── 頁首與地圖註記：全部由 trip.config 與 basemap 的 meta 決定 ── */
 function applyChrome() {
+  const mapZoomKey = /Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘' : 'Ctrl';
+  $('#maphint').textContent = '按住 ' + mapZoomKey + ' 再滾動，即可縮放地圖';
   $('#brandTitle').textContent = CONFIG.heading || CONFIG.title;
   $('#brandSub').textContent = CONFIG.subtitle || '';
   const meta = BASEMAP && BASEMAP.meta ? BASEMAP.meta : {};

@@ -1,5 +1,6 @@
 // 行程資料的驗證規則。回傳錯誤字串陣列，空陣列代表通過。
 const { checkStayGuides } = require('./stay-guides.cjs');
+const { checkReservations } = require('./trip-text.cjs');
 const SCHEMA_VERSION = 1;
 const KINDS = new Set(['main', 'suggest', 'optional', 'stay', 'transit', 'alt']);
 const MODES = new Set(['drive', 'transit', 'walk', 'taxi', 'ferry']);
@@ -144,10 +145,12 @@ function validate(trip) {
   checkDays(trip, fail);
   checkRefsAndLists(trip, fail);
   checkStayGuides(trip, fail);
+  checkReservations(trip.OVERVIEW?.reservations, trip).forEach(fail);
   if (trip.config.sections.mapLists) checkMapLists(trip, fail);
   checkPhotosAndBasemap(trip, fail);
   checkDeploy(trip, fail);
-  if (trip.config.sections.checklist && !(trip.CHECKLIST || []).length) fail('CHECKLIST 為空');
+  // 全部待辦已搬進獨立預約提醒時，行前資料清單可以為空。
+  if (trip.config.sections.checklist && !(trip.CHECKLIST || []).length && !trip.OVERVIEW?.reservations?.length) fail('CHECKLIST 為空');
   return errs;
 }
 

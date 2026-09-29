@@ -336,3 +336,20 @@ test('AI 契約：每輪附 data.js 的總覽、清單、地點備註；餐飲�
   assert.equal(answer.discussion, undefined); assert.deepEqual(answer.tripEdits, { checklist: ['b'] });
   assert.throws(() => decodeAnswer(JSON.stringify({ summary: 'x', replacementDaysJson: '', tripEditsJson: JSON.stringify({ PLACES: {} }) }), { mode: 'discussion' }), { code: 'AI_OUTPUT_INVALID' });
 });
+
+test('預約提醒可由 AI 提案、預覽及保存，並拒絕不存在的地點與日期', async t => {
+  const f = await fixture(t), data = parseLiteralModule(f.baseline.snapshot.dataSource);
+  const overview = { ...data.OVERVIEW, reservations: [{ id: 'sample-reservation', place: 'yamadera', days: [1, 2], note: '示範預約提醒' }] };
+  const proposal = f.store.create(f.target, f.baseline, null, { summary: '新增預約提醒', tripEdits: { overview } });
+  assert.match(proposal.changes.find(c => c.key === 'overview').after, /預約提醒.*第 1、2 天.*示範預約提醒/);
+  f.store.markViewed(proposal.previewUrl); await f.store.apply(proposal.id, f.target);
+  const saved = await buildPreview(f.root, 'sample');
+  assert.deepEqual(saved.snapshot.trip.OVERVIEW.reservations, overview.reservations);
+  assert.match(saved.read('/index.html').body, /sample-reservation/);
+  const context = guideContext(saved.snapshot);
+  assert.equal(context.reservationPlaces.yamadera.name, saved.snapshot.trip.PLACES.yamadera.name);
+  for (const update of [{ place: 'missing' }, { days: [99] }]) {
+    assert.throws(() => f.store.create(f.target, saved, null, { summary: '錯誤提醒', tripEdits: { overview: { ...overview, reservations: [{ ...overview.reservations[0], ...update }] } } }),
+      e => e.code === 'INVALID_CANDIDATE' && e.problems.some(p => /reservations/.test(p)));
+  }
+});
