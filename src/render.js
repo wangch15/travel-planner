@@ -185,6 +185,19 @@ function ovAddonsHTML() {
     + '</tbody></table></div></section>';
 }
 
+function ovReservationsHTML() {
+  const reminders = OVERVIEW.reservations || [];
+  if (!reminders.length) return '';
+  return '<section aria-labelledby="reservation-title"><h3 id="reservation-title">預約提醒</h3>'
+    + '<p class="hint">先處理可提前預約的景點與餐廳。點名稱查看詳情，點日期查看當日行程；勾選只保存在這台裝置，不代表已向店家完成預約。</p>'
+    + '<ul class="reservation-list">' + reminders.map(r => {
+      const dates = DAYS.filter(d => r.days.includes(d.id));
+      return '<li class="reservation-item"><h4><button type="button" class="lk" data-detail="' + esc(r.place) + '">' + esc(PLACES[r.place].name) + ' · 查看詳情</button></h4>'
+        + '<div class="reservation-days">' + dates.map(d => '<button type="button" class="chip" data-day="' + d.id + '">Day ' + d.id + ' · ' + esc(d.date) + '</button>').join('') + '</div>'
+        + '<p>' + esc(r.note) + '</p><label class="reservation-done"><input type="checkbox" data-reservation="' + esc(r.id) + '">已處理<span class="sr-only">：' + esc(PLACES[r.place].name) + '</span></label></li>';
+    }).join('') + '</ul></section>';
+}
+
 function ovChecklistHTML() {
   if (!CONFIG.sections.checklist || !(CHECKLIST || []).length) return '';
   return '<section><h3>行前需要補齊的資料</h3>'
@@ -198,7 +211,7 @@ function overviewHTML() {
   const foot = (OVERVIEW.foot || []).length
     ? '<div class="foot">' + OVERVIEW.foot.map((p) => '<p>' + esc(p) + '</p>').join('') + '</div>' : '';
   return '<div class="panel-in ov">'
-    + ovDiningHTML() + ovStaysHTML() + ovDaysHTML() + ovAddonsHTML() + ovChecklistHTML()
+    + ovReservationsHTML() + ovDiningHTML() + ovStaysHTML() + ovDaysHTML() + ovAddonsHTML() + ovChecklistHTML()
     + extraHTML('overview') + foot + '</div>';
 }
 

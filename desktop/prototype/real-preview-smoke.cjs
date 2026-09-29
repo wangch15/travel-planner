@@ -1,7 +1,7 @@
 const { app } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const os = require('node:os');
+if (!process.env.TRAVEL_PLANNER_TEST_ROOT) throw Error('Run preview smoke through the native smoke runner');
 const assert = require('node:assert/strict');
 const { createWindow } = require('./main.cjs');
 const { createProjectStore } = require('./project-store.cjs');
@@ -15,7 +15,7 @@ async function waitFor(test) {
 }
 app.whenReady().then(async () => {
   timeout = setTimeout(() => app.exit(1), 30000);
-  root = await fs.mkdtemp(path.join(os.tmpdir(), 'travel-real-preview-'));
+  root = await fs.realpath(process.env.TRAVEL_PLANNER_TEST_ROOT);
   const project = path.join(root, 'project');
   const stateDirectory = path.join(root, 'state');
   await fs.mkdir(path.join(project, 'scripts'), { recursive: true });
@@ -58,6 +58,6 @@ app.whenReady().then(async () => {
     realEngineRendered: true, previewHasNoNodeOrIPC: true, previewCannotReadParent: true }));
 }).catch(error => { console.error(error); exitStatus = 1; }).finally(async () => {
   clearTimeout(timeout); if (win && !win.isDestroyed()) win.destroy();
-  if (root) await fs.rm(root, { recursive: true, force: true });
+  // 由 native-smoke-runner 在 Electron 退出、Windows 釋放檔案鎖後清理 root。
   app.exit(exitStatus);
 });
