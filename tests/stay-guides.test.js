@@ -130,7 +130,9 @@ test('指南文字一律跳脫，資料不能注入 HTML', () => {
 test('版面：指南入口卡不會把頁面撐寬；地圖滑過的標記名稱浮在最上層', () => {
   const css = read('src/styles.css');
   assert.match(css, /\.guide-entry\{[^}]*grid-template-columns:minmax\(0,1fr\)/, '入口卡的 grid 欄要能縮');
-  assert.doesNotMatch(css.match(/\.ge-s\{[^}]*\}/)[0], /nowrap/, '摘要不能設不換行，會撐爆卡片');
+  const digest = css.match(/\.ge-s\{[^}]*\}/)[0];
+  assert.doesNotMatch(digest, /nowrap|line-clamp|ellipsis/, '摘要要自動換行、完整顯示，不截斷');
+  assert.match(digest, /overflow-wrap:anywhere/, '沒有空格的長字串也要能換行');
   assert.match(css, /\.pin:hover,\.pin:focus-visible\{z-index:7\}/, '滑過的標記名稱不能被其他標記蓋住');
 });
 

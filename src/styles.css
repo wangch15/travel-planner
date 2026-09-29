@@ -411,8 +411,8 @@ dialog.lb[open]::backdrop{animation:lbfade .34s ease}
 .ge-main{display:flex;flex-direction:column;min-width:0;flex:1 1 auto}
 .ge-k{font:500 10.5px/1.4 var(--sans);letter-spacing:.06em;color:var(--ink-3)}
 .ge-t{font-weight:700;font-size:14px;line-height:1.35;overflow-wrap:anywhere}
-/* 摘要最多兩行，太長就截斷；不能把卡片撐得比畫面寬 */
-.ge-s{font-size:12px;line-height:1.5;color:var(--ink-2);overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+/* 摘要自動換行、完整顯示，不截斷；也不能把卡片撐得比畫面寬 */
+.ge-s{font-size:12px;line-height:1.5;color:var(--ink-2);overflow-wrap:anywhere;white-space:normal}
 .guide-open.compact{margin-top:8px;min-height:44px;padding:8px 10px}
 .guide .g-srcline{font-size:12px;color:var(--ink-3);margin:6px 0 0}
 .g-src{display:inline-flex;align-items:center;gap:3px;flex-wrap:wrap}
