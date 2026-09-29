@@ -35,10 +35,22 @@ app.whenReady().then(async()=>{
   // 貼上一張截圖 → 輸入框出現附件；送出後附件移到訊息泡泡，輸入框清空。
   await js(`(()=>{const png=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='),c=>c.charCodeAt(0));const dt=new DataTransfer();dt.items.add(new File([png],'image.png',{type:'image/png'}));document.getElementById('message').dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true}));})()`);
   await until('document.querySelectorAll("#composer-attachments .composer-attachment").length===1');
+  // Windows 原生滑鼠事件需要視窗焦點，與選單測試相同。
+  if(process.platform==='win32'){
+    win.show();win.focus();win.webContents.focus();
+    for(let i=0;i<100&&!win.isFocused();i++)await new Promise(r=>setTimeout(r,20));
+    assert.ok(win.isFocused(),'Windows native hover requires a focused window');
+    await js('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+  }
+  // 只拍附件本身：不要把輸入框的游標或相鄰 UI 算成附件閃爍。
   // 滑鼠停在附件的 × 上：連拍畫面，內容要穩定（不閃爍）。
   const box=JSON.parse(await js('JSON.stringify(document.querySelector("#composer-attachments button").getBoundingClientRect())'));
   const x=Math.round(box.x+box.width/2),y=Math.round(box.y+box.height/2);win.webContents.sendInputEvent({type:'mouseMove',x,y});
-  await new Promise(r=>setTimeout(r,400));const rect={x:Math.max(0,x-60),y:Math.max(0,y-30),width:120,height:60};const frames=new Set();
+  await until('document.querySelector("#composer-attachments button").matches(":hover")');
+  await js('Promise.all([...document.querySelectorAll("#composer-attachments img")].map(img=>img.decode()))');
+  await new Promise(r=>setTimeout(r,400));
+  const area=JSON.parse(await js('JSON.stringify(document.querySelector("#composer-attachments .composer-attachment").getBoundingClientRect())'));
+  const rect={x:Math.floor(area.x),y:Math.floor(area.y),width:Math.ceil(area.width),height:Math.ceil(area.height)};const frames=new Set();
   for(let i=0;i<12;i++){frames.add((await win.webContents.capturePage(rect)).toPNG().toString('base64'));await new Promise(r=>setTimeout(r,120));}
   console.log('hover frames',frames.size);assert.equal(frames.size,1,'滑過附件的 × 時畫面有變動');
   win.webContents.sendInputEvent({type:'mouseMove',x:5,y:5});
