@@ -85,3 +85,20 @@ test('an existing Claude is updated in place with its own official updater, then
   const result=await service.install(plan.token,{confirmed:true});assert.equal(result.state,'updated');assert.equal(result.toolStatus.version,'2.1.282');assert.equal(terminal.length,0);assert.equal(calls.some(c=>c.command==='/bin/bash'),false,'a working updater does not re-run the installer');});
 test('when Claude cannot update itself, the official installer runs instead',async t=>{const calls=[];const {service}=await fixture(t,{run:async(command,args=[])=>{calls.push({command,args});if(command==='/opt/claude'&&args[0]==='update')throw Object.assign(Error('update failed'),{code:1});if(command==='/opt/claude')return {stdout:'2.1.282 (Claude Code)'};if(command==='/bin/bash')return {stdout:''};if(command===process.execPath)return {stdout:'4.135.0'};throw Error('missing');}});service.resolveCommand=async id=>id==='claude'?{command:'/opt/claude',args:[],env:{},source:'system'}:null;
   const plan=await service.prepare('claude');const result=await service.install(plan.token,{confirmed:true});assert.equal(result.state,'updated');assert.match(calls.find(c=>c.command==='/bin/bash').args[1],/claude\.ai\/install\.sh/);});
+
+test('applying tool paths preserves Windows case-insensitive process.env aliases', async t => {
+  // Windows retains the original key spelling when setting process.env.PATH.
+  const original = { Path: 'old-tools' };
+  const keyFor = key => Object.keys(original).find(k => k.toLowerCase() === String(key).toLowerCase()) || key;
+  const env = new Proxy(original, {
+    get: (_target, key) => original[keyFor(key)],
+    set: (_target, key, value) => { original[keyFor(key)] = value; return true; },
+    deleteProperty: (_target, key) => { delete original[keyFor(key)]; return true; },
+  });
+  const { service } = await fixture(t, { platform: 'win32', env });
+  service.environment = async () => ({ PATH: 'managed-tools;git-tools' });
+  await service.applyEnvironment();
+  assert.equal(env.PATH, 'managed-tools;git-tools');
+  await service.applyEnvironment();
+  assert.equal(env.PATH, 'managed-tools;git-tools');
+});
