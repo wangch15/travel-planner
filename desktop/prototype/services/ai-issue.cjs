@@ -32,20 +32,27 @@ function scrub(text, { names = [], codes = [] } = {}) {
 }
 
 const firstSentence = (text) => String(text).split(/[。！？\n]/)[0].trim();
+// 分類：標題開頭一定有（誰都看得到），GitHub 標籤用原專案既有的 bug／enhancement（沒權限加標籤時由 issue-report 略過）。
+const KINDS = Object.freeze({
+  bug: { prefix: '[App 錯誤]', labels: ['bug'], heading: '發生什麼問題' },
+  ui: { prefix: '[畫面問題]', labels: ['bug'], heading: '畫面上的問題' },
+  feature: { prefix: '[功能建議]', labels: ['enhancement'], heading: '使用者想要的' },
+});
 
 function aiIssueReport({ gap, trip, slug, codes = [], appVersion, engineVersion, platform }) {
   if (!gap || typeof gap.missing !== 'string' || !gap.missing.trim()) return null;
   const rules = { names: tripNames(trip, slug), codes };
   const summary = scrub(gap.missing, rules).trim();
   const details = scrub(gap.handoffPrompt || '', rules).trim();
-  const title = `[App 建議] ${firstSentence(summary).slice(0, 80) || '使用者回報'}`;
+  const kind = KINDS[gap.kind] || KINDS.feature;
+  const title = `${kind.prefix} ${firstSentence(summary).slice(0, 80) || '使用者回報'}`;
   const body = [
-    '## 使用者想要的', summary, '',
+    `## ${kind.heading}`, summary, '',
     ...(details ? ['## 詳細說明與驗收', details, ''] : []),
     '## 環境', `- App 版本：${appVersion || '未知'}`, `- 網站引擎（旅程資料夾）：${engineVersion || '未知'}`, `- 作業系統：${platform || '未知'}`, '',
     '_由 Travel Planner 桌面版裡的 AI 助手整理，使用者看過後送出；已自動去掉行程名稱、地點、日期、網址與私人資訊。_',
   ].join('\n');
-  return { id: randomUUID(), title: title.slice(0, 200), body: body.slice(0, 20000) };
+  return { id: randomUUID(), title: title.slice(0, 200), body: body.slice(0, 20000), labels: [...kind.labels] };
 }
 
-module.exports = { aiIssueReport, scrub, tripNames };
+module.exports = { aiIssueReport, scrub, tripNames, KINDS };

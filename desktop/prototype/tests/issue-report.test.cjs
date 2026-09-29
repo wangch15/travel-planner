@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { IssueReportService, REPORT_REPO } = require('../services/issue-report.cjs');
 
-const issue = { title: '[App 回報] 預覽無法建立：INVALID_TRIP（data.js）', body: '## 環境\n- App 版本：0.1.6' };
+const issue = { title: '[App 錯誤] 預覽無法建立：INVALID_TRIP（data.js）', body: '## 環境\n- App 版本：0.1.6' };
 
 test('submits to the template repository only and returns the new issue link', async () => {
   const calls = [];
@@ -25,4 +25,18 @@ test('the browser fallback opens a prefilled new-issue page on the template repo
   assert.equal(url.origin + url.pathname, `https://github.com/${REPORT_REPO}/issues/new`);
   assert.equal(url.searchParams.get('title'), issue.title);
   assert.equal(url.searchParams.get('body'), issue.body);
+});
+
+test("labels the issue with the template repository's own labels and retries without them when not permitted", async () => {
+  const calls = [];
+  const ok = new IssueReportService({ run: async (bin, args) => { calls.push(args); return { stdout: `https://github.com/${REPORT_REPO}/issues/7\n` }; } });
+  await ok.submit({ ...issue, labels: ['enhancement', 'made-up', 'enhancement'] });
+  assert.deepEqual(calls[0].slice(-2), ['--label', 'enhancement'], '只帶原專案既有的標籤，不重複、不建新標籤');
+  const attempts = [];
+  const noPermission = new IssueReportService({ run: async (bin, args) => { attempts.push(args); if (args.includes('--label')) throw Object.assign(Error('Command failed'), { stderr: 'could not add label: \'bug\' not found or permission denied' }); return { stdout: `https://github.com/${REPORT_REPO}/issues/8\n` }; } });
+  assert.deepEqual(await noPermission.submit({ ...issue, labels: ['bug'] }), { url: `https://github.com/${REPORT_REPO}/issues/8` });
+  assert.equal(attempts.length, 2); assert.equal(attempts[1].includes('--label'), false, '沒權限就不帶標籤再送一次');
+  const loggedOut = new IssueReportService({ run: async () => { throw Object.assign(Error('x'), { stderr: 'please run: gh auth login' }); } });
+  await assert.rejects(loggedOut.submit({ ...issue, labels: ['bug'] }), { code: 'GITHUB_LOGIN_REQUIRED' });
+  assert.equal(new URL(ok.newIssueURL({ ...issue, labels: ['bug'] })).searchParams.get('labels'), 'bug');
 });

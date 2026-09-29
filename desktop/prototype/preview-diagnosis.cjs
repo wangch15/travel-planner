@@ -112,7 +112,7 @@ function developerIssue({ safeCode, where, areas, list, update, backup, appVersi
     `- 上次備份：${!backup ? '無法確認' : backup.pendingFiles > 0 ? (backup.usable ? '可以正常顯示' : '也無法顯示') : '沒有未備份的修改'}`,
     '', '_由 Travel Planner 桌面版產生，已去掉行程內容、地點代碼、網址與電腦上的位置。_',
   ];
-  return { title: `[App 回報] 預覽無法建立：${safeCode}${mainFile ? `（${mainFile}）` : ''}`, body: lines.join('\n') };
+  return { title: `[App 錯誤] 預覽無法建立：${safeCode}${mainFile ? `（${mainFile}）` : ''}`, body: lines.join('\n'), labels: ['bug'] };
 }
 
 module.exports = { diagnosePreviewFailure, problemFile, generalizeProblem, FILE_LABELS };

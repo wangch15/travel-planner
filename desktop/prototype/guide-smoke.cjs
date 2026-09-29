@@ -32,7 +32,7 @@ app.whenReady().then(async()=>{
     makeIssueReporter:()=>{const {IssueReportService}=require('./services/issue-report.cjs');return new IssueReportService({run:async(bin,args)=>{submitted.push(args);return {stdout:'https://github.com/wangch15/travel-planner/issues/77\n'};}});},
     makeEditor:()=>({active:null,stop:async()=>({requested:true}),generate:async({model,dayId,mode,text,snapshot,thread})=>{calls.push({dayId,mode,text,thread});
       // 使用者要回報：AI 回 appAction=report 與內容；故意把行程裡的地名寫進去，App 要去識別化。
-      if(text.startsWith('我想回報給 App 開發者'))return {model,threadId:'t',turnId:'r'+calls.length,summary:'我整理好了，可以按下方的按鈕回報。',discussion:true,appAction:'report',capabilityGap:{missing:'希望 AI 能直接修改全程總覽與行前清單。',handoffPrompt:'在範例民宿 A 這趟 10/11 的行程裡發現的；請開放 OVERVIEW／CHECKLIST 的編輯。'}};
+      if(text.startsWith('我想回報給 App 開發者'))return {model,threadId:'t',turnId:'r'+calls.length,summary:'我整理好了，可以按下方的按鈕回報。',discussion:true,appAction:'report',capabilityGap:{missing:'希望 AI 能直接修改全程總覽與行前清單。',handoffPrompt:'在範例民宿 A 這趟 10/11 的行程裡發現的；請開放 OVERVIEW／CHECKLIST 的編輯。',kind:'feature'}};
       // 假 AI：照指示把長文拆成指南，並把原本那段備案拿掉；故意漏掉拉麵的網址，App 要提醒。
       // 第一次故意把來源標籤寫太長，App 要自己把問題交回給 AI 修正，不能丟給使用者。
       const day=parseLiteralModule(snapshot.dataSource).DAYS[0];
@@ -70,13 +70,14 @@ app.whenReady().then(async()=>{
   await js('[...document.querySelectorAll(".action-card button")].find(b=>b.textContent==="檢查回報內容").click()');
   await until('document.getElementById("report-dialog").open');
   const preview=await js('document.getElementById("report-preview").textContent');
-  assert.match(preview,/^\[App 建議\] 希望 AI 能直接修改全程總覽與行前清單/);
+  assert.match(preview,/^\[功能建議\] 希望 AI 能直接修改全程總覽與行前清單/);
+  assert.match(await js('document.getElementById("report-labels").textContent'),/分類：功能建議.*enhancement/);
   assert.equal(preview.includes('範例民宿 A'),false,'地名要去掉');assert.equal(preview.includes('10/11'),false,'日期要去掉');
   assert.equal(submitted.length,0,'打開視窗不會送出');
   await js('document.getElementById("submit-report").click()');
   await until('!document.getElementById("view-report").hidden');
   assert.equal(submitted.length,1);assert.deepEqual(submitted[0].slice(0,3),['issue','create','-R']);assert.equal(submitted[0][3],'wangch15/travel-planner');
-  assert.equal(submitted[0].includes('範例民宿 A'),false);
+  assert.equal(submitted[0].includes('範例民宿 A'),false);assert.deepEqual(submitted[0].slice(-2),['--label','enhancement'],'自動分類成功能建議');
   await js('document.getElementById("report-dialog").close()');
   console.log(JSON.stringify({passed:true,reportFromChat:true,reportDeidentified:true,reportSentOnlyAfterConfirm:true,selfRepairedInvalidAnswer:true,suggestionShown:true,migrationHeldForPreview:true,lostLinkWarned:true,noResearchGateForTextMove:true,savedAfterPreview:true,timelineUnchanged:true,suggestionClearedAfterSave:true}));
 }).catch(async e=>{status=1;console.error(e);if(win&&!win.isDestroyed())console.error(await js('JSON.stringify({note:document.getElementById("notification")?.textContent,proposal:document.getElementById("proposal-note")?.textContent,last:[...document.querySelectorAll(".message")].slice(-2).map(m=>m.textContent.slice(0,300))})').catch(()=>''));})

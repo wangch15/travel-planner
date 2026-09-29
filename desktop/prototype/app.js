@@ -469,6 +469,11 @@ async function openReportDialog(id) {
   reportIssueURL = null; reportSay('');
   $('report-repo').textContent = r.repo;
   $('report-preview').textContent = `${r.issue.title}\n\n${r.issue.body}`;
+  // 分類：標題開頭已經寫了；GitHub 標籤要有權限才加得上，沒有也照樣送出。
+  const names = { bug: '錯誤或畫面問題', enhancement: '功能建議' };
+  const labels = (r.issue.labels || []).filter(l => names[l]);
+  $('report-labels').hidden = !labels.length;
+  $('report-labels').textContent = labels.length ? `分類：${labels.map(l => names[l]).join('、')}（GitHub 標籤：${labels.join('、')}；帳號沒有加標籤的權限時，只用標題開頭分類）` : '';
   for (const id of ['submit-report', 'open-report', 'copy-report']) { $(id).hidden = false; $(id).disabled = false; }
   $('view-report').hidden = true;
   $('report-dialog').showModal();

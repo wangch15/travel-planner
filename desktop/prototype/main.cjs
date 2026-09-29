@@ -964,7 +964,7 @@ async function createWindow({ pickDirectory,pickReferences,saveArchivePath,pickA
   // 回報給開發者：內容只用 main 剛產生的去識別化回報，不收畫面傳來的文字。畫面先顯示完整內容與公開目的地，人按確認才送。
   // 回報有兩個來源：預覽診斷（previewReport），或對話裡某則 AI 回覆存下的草稿（用 reportId 找，內容仍是 main 存的）。
   const currentReport=async input=>{const target=selectedTarget(input);
-    if(input.reportId!==undefined){if(typeof input.reportId!=='string')throw Error('INVALID_INPUT');const state=await conversations.read(target);const found=state.messages.find(m=>m.report?.id===input.reportId)?.report;if(!found)throw Object.assign(Error('REPORT_STALE'),{userMessage:'找不到這則回報，可能是對話已經換過。請在對話裡再說一次要回報的內容。'});return {title:found.title,body:found.body};}
+    if(input.reportId!==undefined){if(typeof input.reportId!=='string')throw Error('INVALID_INPUT');const state=await conversations.read(target);const found=state.messages.find(m=>m.report?.id===input.reportId)?.report;if(!found)throw Object.assign(Error('REPORT_STALE'),{userMessage:'找不到這則回報，可能是對話已經換過。請在對話裡再說一次要回報的內容。'});return {title:found.title,body:found.body,labels:found.labels||[]};}
     if(previewReport?.key!==`${target.projectId}\0${target.slug}`)throw Object.assign(Error('REPORT_STALE'),{userMessage:'請先按「重新檢查」，再回報。'});return previewReport.issue;};
   let issueReporter=null;
   feature('preview-report-prepare',async input=>({issue:await currentReport(input),repo:REPORT_REPO}));

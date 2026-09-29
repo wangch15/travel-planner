@@ -22,7 +22,7 @@ function validMessageAttachments(m){return m.attachments===undefined||(m.role===
 // AI 直接套用的修改：記下版本與前一版，聊天裡才能「查看修改對照」「回到修改前」。
 const optionalString=(v,max)=>v===null||string(v,max),optionalNumber=v=>v===null||Number.isSafeInteger(v);
 // 回報給開發者的草稿（已去識別化）：送出時只用這份，不收畫面傳來的文字。
-function validReport(m){const r=m.report;return r===undefined||(m.role==='assistant'&&r&&typeof r==='object'&&string(r.id,64)&&r.id.length>0&&string(r.title,200)&&r.title.trim().length>0&&string(r.body,20000));}
+function validReport(m){const r=m.report;return r===undefined||(m.role==='assistant'&&r&&typeof r==='object'&&string(r.id,64)&&r.id.length>0&&string(r.title,200)&&r.title.trim().length>0&&string(r.body,20000)&&(r.labels===undefined||(Array.isArray(r.labels)&&r.labels.length<=3&&r.labels.every(l=>['bug','enhancement'].includes(l)))));}
 function validApplied(m){const a=m.applied;return a===undefined||(m.role==='assistant'&&a&&typeof a==='object'&&optionalString(a.versionId,200)&&optionalNumber(a.number)&&optionalString(a.previousId,200)&&optionalNumber(a.previousNumber)&&Array.isArray(a.labels)&&a.labels.length<=30&&a.labels.every(l=>string(l,200))&&typeof a.research==='boolean');}
 function valid(s) {
   return s?.version===1 && (s.started===undefined||typeof s.started==='boolean') && (s.provider===undefined||['codex','claude','gemini'].includes(s.provider)) && validConversations(s)&&validPlan(s.plan)&&validResearch(s.research)&&validJob(s.job) && (s.effort===undefined||string(s.effort,40)) && (s.handoff===undefined||s.handoff===null||string(s.handoff,16000)) && string(s.draft,2000) && string(s.model,200) && (s.dayId===null || Number.isSafeInteger(s.dayId))

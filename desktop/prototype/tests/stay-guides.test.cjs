@@ -200,7 +200,9 @@ test('AI 契約：每輪附 schemaVersion、可編輯範圍與既有指南；解
   assert.equal(onlyGuide.privateNotes, '門鎖 1234');
   const editDay = decodeAnswer(JSON.stringify({ summary: '好', replacementDayJson: '', stayGuidesJson: JSON.stringify([guide()]), privateNotes: '', missingCapability: '', handoffPrompt: '' }), { mode: 'edit-day' });
   assert.equal(editDay.replacementDay, undefined);
-  const gap = decodeAnswer(JSON.stringify({ summary: '做不到', replacementDaysJson: '', stayGuidesJson: '', privateNotes: '', missingCapability: '指南還不支援菜單照片輪播。', handoffPrompt: '請新增 menuPhotos 欄位…' }), { mode: 'discussion' });
+  const gap = decodeAnswer(JSON.stringify({ summary: '做不到', replacementDaysJson: '', stayGuidesJson: '', privateNotes: '', missingCapability: '指南還不支援菜單照片輪播。', handoffPrompt: '請新增 menuPhotos 欄位…', reportKind: 'feature' }), { mode: 'discussion' });
+  assert.equal(gap.capabilityGap.kind, 'feature');
+  assert.throws(() => decodeAnswer(JSON.stringify({ summary: 'x', replacementDaysJson: '', missingCapability: 'y', reportKind: 'urgent' }), { mode: 'discussion' }), { code: 'AI_OUTPUT_INVALID' });
   assert.equal(gap.discussion, true);
   assert.match(capabilityGapText(gap.capabilityGap), /目前還做不到：\*\*指南還不支援菜單照片輪播。[\s\S]*menuPhotos/);
   assert.throws(() => decodeAnswer(JSON.stringify({ summary: 'x', replacementDaysJson: '', stayGuidesJson: '{"id":1}' }), { mode: 'discussion' }), { code: 'AI_OUTPUT_INVALID' });
@@ -252,7 +254,12 @@ test('回報給開發者：AI 整理的建議先去掉行程名稱、地點、�
     gap: { missing: '住宿指南在 PF GUEST HOUSE 的描述太長時會爆版。', handoffPrompt: '10/11 入住時看到；旬菜酒場 虎龍那一項也一樣。參考 https://secret.example.com/booking?id=1 與 https://github.com/wangch15/travel-planner/issues/1。聯絡 owner@example.com，門鎖 4821，專案在 /Users/someone/trips。' },
     trip, slug: 'sendai-trip', codes: ['4821'], appVersion: '0.1.12', engineVersion: '1.2.1', platform: 'darwin arm64' });
   assert.match(report.id, /^[0-9a-f-]{36}$/);
-  assert.equal(report.title, '[App 建議] 住宿指南在 〔地點或名稱〕 的描述太長時會爆版');
+  assert.equal(report.title, '[功能建議] 住宿指南在 〔地點或名稱〕 的描述太長時會爆版');
+  assert.deepEqual(report.labels, ['enhancement'], '沒分類時當成功能建議');
+  const ui = aiIssueReport({ gap: { missing: '入口卡的文字太長時會撐出畫面。', kind: 'ui' }, trip, slug: 'x' });
+  assert.match(ui.title, /^\[畫面問題\] /); assert.deepEqual(ui.labels, ['bug']); assert.match(ui.body, /^## 畫面上的問題/);
+  const bug = aiIssueReport({ gap: { missing: '發布一直失敗。', kind: 'bug' }, trip, slug: 'x' });
+  assert.match(bug.title, /^\[App 錯誤\] /); assert.deepEqual(bug.labels, ['bug']);
   for (const secret of ['PF GUEST HOUSE', '旬菜酒場', 'secret.example.com', 'owner@example.com', '4821', '/Users/someone', '10/11']) assert.equal(report.body.includes(secret), false, secret);
   assert.match(report.body, /https:\/\/github\.com\/wangch15\/travel-planner\/issues\/1/, '原專案的網址保留');
   assert.match(report.body, /App 版本：0\.1\.12[\s\S]*網站引擎（旅程資料夾）：1\.2\.1/);
