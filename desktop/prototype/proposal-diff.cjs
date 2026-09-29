@@ -3,9 +3,33 @@ const { parseLiteralModule } = require('@travel-planner/engine');
 const { replaceDay } = require('../../packages/engine/day-edit.cjs');
 const fields={title:'標題',theme:'行程重點',lead:'行程說明',cautions:'提醒事項',color:'代表色',route:'停留安排與備案'};
 const fail=code=>Object.assign(Error(code),{code});
-const { replaceStayGuides } = require('../../packages/engine/guide-edit.cjs');
-// DAYS 與 STAY_GUIDES 是 AI 能改、App 會記版本的範圍；其他資料必須原封不動。
-const scope=data=>{const {DAYS,STAY_GUIDES,...rest}=data;return rest;};
+const { replaceStayGuides, replaceExport, replacePlaceNote } = require('../../packages/engine/guide-edit.cjs');
+const { checklistDelta } = require('../../packages/engine/trip-text.cjs');
+// AI 能改、App 會記版本的範圍：每日、住宿指南、全程總覽、行前清單、地點備註；其他資料必須原封不動。
+const stripNotes=places=>places&&typeof places==='object'?Object.fromEntries(Object.entries(places).map(([k,p])=>{if(!p||typeof p!=='object')return [k,p];const {note,...rest}=p;return [k,rest];})):places;
+const scope=data=>{const {DAYS,STAY_GUIDES,OVERVIEW,CHECKLIST,...rest}=data;return {...rest,...(Object.hasOwn(rest,'PLACES')?{PLACES:stripNotes(rest.PLACES)}:{})};};
+function formatOverview(o){
+  if(!o||!Object.keys(o).length)return '未設定';
+  const lines=[];
+  if(o.checked)lines.push(`查核日期：${o.checked}`);
+  if(o.stays)lines.push(`住宿段：${[o.stays.title,o.stays.hint].filter(Boolean).join('／')||'（只有日期）'}`);
+  if(o.dining)lines.push(`餐食段：${[o.dining.hint,...(o.dining.notes||[])].filter(Boolean).join('；')}`);
+  if(o.addonsHint)lines.push(`加點說明：${o.addonsHint}`);
+  for(const p of o.foot||[])lines.push(`頁尾：${p}`);
+  return lines.join('\n');
+}
+function textChanges(before,after){
+  const changes=[];
+  const ob=before.OVERVIEW||{},oa=after.OVERVIEW||{};
+  if(!isDeepStrictEqual(ob,oa))changes.push({key:'overview',dayId:null,field:'overview',label:'全程總覽',before:formatOverview(ob),after:formatOverview(oa)});
+  const cb=before.CHECKLIST||[],ca=after.CHECKLIST||[];
+  if(!isDeepStrictEqual(cb,ca)){const d=checklistDelta(cb,ca);
+    changes.push({key:'checklist',dayId:null,field:'checklist',label:`行前需要補齊的資料（新增 ${d.added.length} 項、移除 ${d.removed.length} 項）`,
+      before:cb.length?cb.map(c=>(d.removed.includes(c)?'✕ ':'• ')+c).join('\n'):'無',after:ca.length?ca.map(c=>(d.added.includes(c)?'＋ ':'• ')+c).join('\n'):'無'});}
+  const pb=before.PLACES||{},pa=after.PLACES||{};
+  for(const key of Object.keys(pb)){const x=pb[key]?.note,y=pa[key]?.note;if(x!==y)changes.push({key:`note:${key}`,dayId:null,field:'note',placeKey:key,label:`地點備註 · ${pb[key]?.name||key}`,before:x||'未設定',after:y||'未設定（刪除）'});}
+  return changes;
+}
 const guidesOf=data=>Array.isArray(data.STAY_GUIDES)?data.STAY_GUIDES:[];
 const LIST_TITLE={shopping:'採買',dining:'餐飲',onsen:'泡湯'},SECTION_TITLE={checkin:'入住方式',parking:'停車',checkout:'退房'};
 // 對照表用的人話摘要：看得出改了哪些分類、哪些店，不把整份 JSON 攤出來。
@@ -38,7 +62,7 @@ function changesBetween(beforeSource,afterSource) {
   const before=parseLiteralModule(beforeSource),after=parseLiteralModule(afterSource);
   if(!isDeepStrictEqual(scope(before),scope(after)) || !Array.isArray(before.DAYS) || !Array.isArray(after.DAYS)
     )throw fail('UNSUPPORTED_DAY_CHANGE');
-  if(!isDeepStrictEqual(before.DAYS.map(d=>[d.id,d.date]),after.DAYS.map(d=>[d.id,d.date])))return [{key:'days:structure',dayId:null,field:'structure',label:'整體每日結構（天數、日期與順序）',before:format(before.DAYS),after:format(after.DAYS)},...guideChanges(before,after)];
+  if(!isDeepStrictEqual(before.DAYS.map(d=>[d.id,d.date]),after.DAYS.map(d=>[d.id,d.date])))return [{key:'days:structure',dayId:null,field:'structure',label:'整體每日結構（天數、日期與順序）',before:format(before.DAYS),after:format(after.DAYS)},...guideChanges(before,after),...textChanges(before,after)];
   const changes=[];
   for(let i=0;i<before.DAYS.length;i++){
     const a=before.DAYS[i],b=after.DAYS[i];
@@ -50,7 +74,7 @@ function changesBetween(beforeSource,afterSource) {
       if(!isDeepStrictEqual(av,bv))changes.push({key:`${a.id}:${field}`,dayId:a.id,field,label:`第 ${a.id} 天 · ${fields[field]}`,before:format(av),after:format(bv)});
     }
   }
-  return [...changes,...guideChanges(before,after)];
+  return [...changes,...guideChanges(before,after),...textChanges(before,after)];
 }
 function selectChanges(beforeSource,fullSource,keys) {
   const changes=changesBetween(beforeSource,fullSource);
@@ -60,7 +84,22 @@ function selectChanges(beforeSource,fullSource,keys) {
   const structure=changes.some(c=>c.field==='structure');
   let source=structure&&selected.has('days:structure')?fullSource:beforeSource;
   if(!structure)source=selectDays(source,beforeSource,changes,selected,desired);
-  return selectGuides(source,parseLiteralModule(beforeSource),full,selected);
+  source=selectGuides(source,parseLiteralModule(beforeSource),full,selected);
+  return selectText(source,parseLiteralModule(beforeSource),full,selected);
+}
+// 總覽、清單、備註：勾選的換成新版，沒勾的維持修改前。
+function selectText(source,before,full,selected){
+  const current=parseLiteralModule(source);
+  const want=(key,a,b)=>selected.has(key)?b:a;
+  const overview=want('overview',before.OVERVIEW,full.OVERVIEW);
+  if(!isDeepStrictEqual(current.OVERVIEW,overview))source=replaceExport(source,'OVERVIEW',overview||{},'object').source;
+  const checklist=want('checklist',before.CHECKLIST,full.CHECKLIST);
+  if(!isDeepStrictEqual(current.CHECKLIST,checklist))source=replaceExport(source,'CHECKLIST',checklist||[],'array').source;
+  for(const key of Object.keys(before.PLACES||{})){
+    const note=want(`note:${key}`,before.PLACES[key]?.note,full.PLACES?.[key]?.note)??null;
+    if((parseLiteralModule(source).PLACES[key]?.note??null)!==note)source=replacePlaceNote(source,key,note).source;
+  }
+  return source;
 }
 // 只套用勾選的指南：未勾的維持修改前（新增的就不加、刪除的就保留）。
 function selectGuides(source,before,full,selected){

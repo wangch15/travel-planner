@@ -673,7 +673,8 @@ function renderProposal() {
   // 把日程長文搬進住宿指南時，先提醒要核對；修改後消失的連結直接列出來，避免搬漏。
   const migration=pendingProposal.migration?'這次把日程裡的內容搬進住宿指南，請在預覽確認資訊都還在；保存後也能從「版本紀錄」回到修改前。':'';
   const lost=(pendingProposal.lostLinks||[]).length?`注意：修改後少了 ${pendingProposal.lostLinks.length} 個連結：${pendingProposal.lostLinks.join('、')}`:'';
-  $('proposal-note').textContent=[migration,lost,base].filter(Boolean).join('\n');
+  const removed=(pendingProposal.removedChecklist||[]).length?`注意：這次會從「行前需要補齊的資料」移除 ${pendingProposal.removedChecklist.length} 項：${pendingProposal.removedChecklist.join('、')}。確定都已經不需要再保存。`:'';
+  $('proposal-note').textContent=[migration,removed,lost,base].filter(Boolean).join('\n');
   $('save-proposal').textContent=research?'先查核，再保存':'確認保存到你的行程';
   $('save-proposal').disabled=research?aiBusy:!pendingProposal.previewLoaded||aiBusy||!pendingProposal.selectedKeys?.length;
   $('discard-proposal').disabled=aiBusy;$('review-changes').disabled=aiBusy;

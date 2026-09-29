@@ -73,3 +73,45 @@ test('快照讀取指南圖片：檔頭要對、改指南不影響脈絡雜湊',
   assert.equal(after.contextDigest, before.contextDigest);
   assert.notEqual(after.digest, before.digest);
 });
+
+test('replaceExport：總覽（物件）與行前清單（陣列）整份替換；不能拿來改 DAYS', async () => {
+  const { replaceExport } = require('../guide-edit.cjs');
+  const source = await fs.readFile(path.join(__dirname, '../../../trips/_example/data.js'), 'utf8');
+  const overview = replaceExport(source, 'OVERVIEW', { checked: '2026/09/29', foot: ['新的頁尾'] }, 'object');
+  assert.deepEqual(parseLiteralModule(overview.source).OVERVIEW, { checked: '2026/09/29', foot: ['新的頁尾'] });
+  const checklist = replaceExport(overview.source, 'CHECKLIST', ['確認租車', '確認停車'], 'array');
+  assert.deepEqual(parseLiteralModule(checklist.source).CHECKLIST, ['確認租車', '確認停車']);
+  assert.throws(() => replaceExport(source, 'DAYS', []), { code: 'INVALID_DAY_EDIT' });
+  assert.throws(() => replaceExport(source, 'OVERVIEW', ['not', 'object'], 'object'), { code: 'INVALID_DAY_EDIT' });
+});
+
+test('replacePlaceNote：只改那一個地點的 note，座標與檔案其他文字（含註解）不動', async () => {
+  const { replacePlaceNote } = require('../guide-edit.cjs');
+  const source = await fs.readFile(path.join(__dirname, '../../../trips/_example/data.js'), 'utf8');
+  const before = parseLiteralModule(source).PLACES;
+  const changed = replacePlaceNote(source, 'stationA', '租車櫃檯改到東口。');
+  const after = parseLiteralModule(changed.source).PLACES;
+  assert.equal(after.stationA.note, '租車櫃檯改到東口。');
+  assert.equal(after.stationA.lat, before.stationA.lat);
+  assert.ok(changed.source.includes('// cat: hub | stay | sight | food | shop'), '註解保留');
+  const added = replacePlaceNote(source, 'matsushima', '新增的備註');
+  assert.equal(parseLiteralModule(added.source).PLACES.matsushima.note, '新增的備註');
+  const removed = replacePlaceNote(source, 'stationA', null);
+  assert.equal('note' in parseLiteralModule(removed.source).PLACES.stationA, false);
+  assert.equal(replacePlaceNote(source, 'stationA', before.stationA.note).changed, false);
+  assert.throws(() => replacePlaceNote(source, 'nowhere', 'x'), { code: 'INVALID_DAY_EDIT' });
+});
+
+test('總覽、清單、備註的格式檢查：不捏造欄位、不塞私人欄位、清單不重複', () => {
+  const { checkOverview, checkChecklist, checkPlaceNotes, checklistDelta } = require('../trip-text.cjs');
+  assert.deepEqual(checkOverview({ checked: '2026/09/29', stays: { title: '6 晚 3 處' }, dining: { hint: 'x', notes: ['a'], chips: [{ day: 2, label: '第二天' }, { detail: 'k', label: '店' }] }, foot: ['頁尾'] }), []);
+  assert.match(checkOverview({ flights: 'x' }).join('\n'), /不支援的欄位 flights/);
+  assert.match(checkOverview({ privateNotes: '1234' }).join('\n'), /不能有 privateNotes/);
+  assert.match(checkOverview({ dining: { chips: [{ label: 'x' }] } }).join('\n'), /chips/);
+  assert.deepEqual(checkChecklist(['確認租車', '確認停車']), []);
+  assert.match(checkChecklist(['a', 'a']).join('\n'), /重複/);
+  assert.match(checkChecklist(['', 'b']).join('\n'), /非空字串/);
+  assert.match(checkPlaceNotes({ nowhere: 'x' }, { stationA: {} }).join('\n'), /沒有的地點：nowhere/);
+  assert.deepEqual(checkPlaceNotes({ stationA: null }, { stationA: {} }), []);
+  assert.deepEqual(checklistDelta(['a', 'b'], ['b', 'c']), { added: ['c'], removed: ['a'] });
+});

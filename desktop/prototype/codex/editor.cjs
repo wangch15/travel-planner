@@ -49,9 +49,9 @@ function decodeAnswer(text,{mode,threadId,turnId,model}){
   const noDays=!daysRaw||daysRaw==='[]'||(mode==='edit-day'&&daysRaw==='{}');
   if(mode==='discussion'){
     if(Object.keys(a).some(k=>!['summary','replacementDaysJson',...EDIT_EXTRA_KEYS].includes(k))||(a.replacementDaysJson!==undefined&&typeof a.replacementDaysJson!=='string'))throw error('AI_OUTPUT_INVALID');
-    if(noDays)return extras.stayGuides?{...base,...extras}:{...base,discussion:true,...extras};
+    if(noDays)return extras.stayGuides||extras.tripEdits?{...base,...extras}:{...base,discussion:true,...extras};
   }
-  if(noDays&&extras.stayGuides)return {...base,...extras};
+  if(noDays&&(extras.stayGuides||extras.tripEdits))return {...base,...extras};
   let replacement;
   try{replacement=JSON.parse(a[key]);}catch{throw error('AI_OUTPUT_INVALID');}
   if(mode!=='edit-day'){if(!Array.isArray(replacement)||!replacement.length||replacement.length>90||new Set(replacement.map(d=>d?.id)).size!==replacement.length)throw error('AI_OUTPUT_INVALID');return {...base,...extras,replacementDays:replacement};}

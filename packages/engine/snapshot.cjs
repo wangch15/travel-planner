@@ -120,8 +120,10 @@ async function readTripSnapshot(tripDirectory, { slug, includePhotoBytes = false
     const dataSource = await text('data.js');
     let data = {};
     if (dataSource !== null) { try { data = parseLiteralModule(dataSource); } catch (e) { throw inFile('data.js', e); } }
-    // DAYS 與 STAY_GUIDES 由 App 的版本紀錄管理（改它們會留版本、可回復），其餘內容才算「脈絡」。
-    const {DAYS:_days,STAY_GUIDES:_guides,...nonDayData}=data;
+    // AI 能改的部分（每日、住宿指南、全程總覽、行前清單、地點備註）由 App 的版本紀錄管理，改它們會留版本、可回復；
+    // 其餘內容才算「脈絡」。地點只排除 note，座標與名稱仍算脈絡。
+    const {DAYS:_days,STAY_GUIDES:_guides,OVERVIEW:_overview,CHECKLIST:_checklist,...nonDayData}=data;
+    if(nonDayData.PLACES&&typeof nonDayData.PLACES==='object')nonDayData.PLACES=Object.fromEntries(Object.entries(nonDayData.PLACES).map(([k,p])=>{if(!p||typeof p!=='object')return [k,p];const {note:_note,...rest}=p;return [k,rest];}));
     contextDigest.update(JSON.stringify(nonDayData));
     const DETAILS = await js('details.js', {});
     const DINING = await js('dining.js', { checked: '', places: {}, venues: {}, days: {} });

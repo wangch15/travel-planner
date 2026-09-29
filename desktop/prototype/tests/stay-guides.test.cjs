@@ -270,3 +270,62 @@ test('對話紀錄接受回報動作與草稿，格式不對就拒絕', async t 
   await assert.rejects(store.update(target, s => { s.messages.push({ role: 'user', text: 'x', report }); }), { code: 'CONVERSATION_STORE_INVALID' });
   await assert.rejects(store.update(target, s => { s.messages.push({ role: 'assistant', text: 'x', report: { ...report, title: '' } }); }), { code: 'CONVERSATION_STORE_INVALID' });
 });
+
+test('AI 改全程總覽、行前清單、地點備註：一次提案、可逐項選、保存後可回復', async t => {
+  const f = await fixture(t);
+  const versions = new VersionStore(path.join(f.root, 'app-state'));
+  f.store.beforeWrite = async p => { await versions.observe(p.target, { source: p.originalSource, contextDigest: p.contextDigest }); return versions.prepare(p.target, { beforeSource: p.originalSource, afterSource: p.source, contextDigest: p.contextDigest, label: p.label, kind: p.kind }); };
+  f.store.afterWrite = (p, id) => versions.finish(p.target, id, p.source);
+  const data = parseLiteralModule(f.baseline.snapshot.dataSource);
+  const tripEdits = { overview: { ...data.OVERVIEW, foot: ['距離與車程是規劃時查到的，出發前再看一次。'] },
+    checklist: [...data.CHECKLIST, '確認租車報到地點與最晚受理時間'], placeNotes: { stationA: '租車櫃檯在西口，實際以租車公司通知為準。' } };
+  const proposal = f.store.create(f.target, f.baseline, null, { summary: '更新總覽與清單', tripEdits });
+  assert.deepEqual(new Set(proposal.changes.map(c => c.key)), new Set(['overview', 'checklist', 'note:stationA']));
+  assert.equal(proposal.holdForReview, false, '只新增清單項目，照一般修改直接保存');
+  assert.match(proposal.changes.find(c => c.key === 'checklist').label, /新增 1 項、移除 0 項/);
+  // 只勾備註：總覽與清單維持原樣
+  const onlyNote = f.store.select(proposal.id, ['note:stationA']);
+  const partial = parseLiteralModule(f.store.pending.source);
+  assert.deepEqual(partial.OVERVIEW, data.OVERVIEW); assert.deepEqual(partial.CHECKLIST, data.CHECKLIST);
+  assert.equal(partial.PLACES.stationA.note, tripEdits.placeNotes.stationA);
+  assert.equal(partial.PLACES.stationA.lat, data.PLACES.stationA.lat, '座標不動');
+  const all = f.store.select(onlyNote.id, proposal.changes.map(c => c.key));
+  f.store.markViewed(all.previewUrl);
+  await f.store.apply(all.id, f.target);
+  const saved = await buildPreview(f.root, 'sample');
+  assert.equal(saved.snapshot.contextDigest, f.baseline.snapshot.contextDigest, '總覽、清單、備註都在可回復的範圍');
+  assert.ok(saved.snapshot.trip.CHECKLIST.includes('確認租車報到地點與最晚受理時間'));
+  assert.ok(saved.read('/index.html').body.includes('距離與車程是規劃時查到的，出發前再看一次。'));
+  await versions.observe(f.target, { source: saved.snapshot.dataSource, contextDigest: saved.snapshot.contextDigest });
+  const history = await versions.read(f.target);
+  const restore = f.store.createSource(f.target, saved, history.revisions[0].source, { kind: 'restore', label: '回到 V1' });
+  f.store.markViewed(restore.previewUrl); await f.store.apply(restore.id, f.target);
+  assert.equal(await fs.readFile(f.sourceFile, 'utf8'), f.baseline.snapshot.dataSource);
+});
+
+test('行前清單被刪掉項目時先留成提案給人看；格式不對或亂加地點就交回 AI 修正', async t => {
+  const f = await fixture(t);
+  const data = parseLiteralModule(f.baseline.snapshot.dataSource);
+  const trimmed = f.store.create(f.target, f.baseline, null, { summary: '精簡清單', tripEdits: { checklist: data.CHECKLIST.slice(1) } });
+  assert.equal(trimmed.holdForReview, true);
+  assert.deepEqual(trimmed.removedChecklist, [data.CHECKLIST[0]]);
+  f.store.discard();
+  assert.throws(() => f.store.create(f.target, f.baseline, null, { summary: 'x', tripEdits: { placeNotes: { newAirport: '航廈內取車' } } }),
+    e => e.code === 'INVALID_CANDIDATE' && e.problems.some(p => /沒有的地點：newAirport/.test(p)));
+  assert.throws(() => f.store.create(f.target, f.baseline, null, { summary: 'x', tripEdits: { overview: { flights: '11:35' } } }),
+    e => e.code === 'INVALID_CANDIDATE' && e.problems.some(p => /不支援的欄位 flights/.test(p)));
+});
+
+test('AI 契約：每輪附 data.js 的總覽、清單、地點備註；餐飲清單唯讀；解碼 tripEditsJson', () => {
+  const { guideContext, aiCapabilities } = require('../codex/capabilities.cjs');
+  const snapshot = { dataSource: "module.exports = { DAYS: [], OVERVIEW: { foot: ['x'] }, CHECKLIST: ['a'], PLACES: { s: { name: '車站', cat: 'hub', note: 'n', lat: 1, lng: 2 } } };",
+    trip: { PLACES: { s: {}, diner: {} }, DINING: { places: { diner: {} }, checklist: ['訂位'] } } };
+  const ctx = guideContext(snapshot);
+  assert.deepEqual(ctx.overview, { foot: ['x'] }); assert.deepEqual(ctx.checklist, ['a']); assert.deepEqual(ctx.diningChecklist, ['訂位']);
+  assert.deepEqual(ctx.placeNotes, { s: { name: '車站', cat: 'hub', note: 'n' } }, '只給名稱、分類、備註，不給座標；餐飲地點不在可改範圍');
+  assert.ok(aiCapabilities('discussion').editable.includes('checklist'));
+  assert.equal(aiCapabilities('edit-day').editable.includes('overview'), false);
+  const answer = decodeAnswer(JSON.stringify({ summary: '已更新', replacementDaysJson: '', stayGuidesJson: '', tripEditsJson: JSON.stringify({ checklist: ['b'] }), privateNotes: '', missingCapability: '', handoffPrompt: '' }), { mode: 'discussion' });
+  assert.equal(answer.discussion, undefined); assert.deepEqual(answer.tripEdits, { checklist: ['b'] });
+  assert.throws(() => decodeAnswer(JSON.stringify({ summary: 'x', replacementDaysJson: '', tripEditsJson: JSON.stringify({ PLACES: {} }) }), { mode: 'discussion' }), { code: 'AI_OUTPUT_INVALID' });
+});

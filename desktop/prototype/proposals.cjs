@@ -6,7 +6,8 @@ const { execFile } = require('node:child_process');
 const { promisify, isDeepStrictEqual } = require('node:util');
 const { replaceDay } = require('../../packages/engine/day-edit.cjs');
 const { changesBetween, selectChanges, lostLinks } = require('./proposal-diff.cjs');
-const { replaceStayGuides, mergeStayGuides } = require('../../packages/engine/guide-edit.cjs');
+const { replaceStayGuides, mergeStayGuides, replaceExport, replacePlaceNote } = require('../../packages/engine/guide-edit.cjs');
+const { checkOverview, checkChecklist, checkPlaceNotes, checklistDelta } = require('../../packages/engine/trip-text.cjs');
 const { IMAGE_FILE, imageType, imageBytesMatch, guideImageFiles, checkGuideReadability } = require('../../packages/engine/stay-guides.cjs');
 const { parseLiteralModule, validate } = require('@travel-planner/engine');
 const { createRenderer } = require('@travel-planner/engine/render');
@@ -39,6 +40,22 @@ async function appendStatus(dir, text) {
     await handle.appendFile(text);
     await checkDirectory(docs, folder);
   } finally { await handle.close(); }
+}
+
+// AI 的總覽、行前清單、地點備註：先檢查格式，有問題就整批退回給 AI 修正（帶逐項原因），再寫進原始碼。
+function applyTripEdits(source, edits) {
+  const invalid = problems => Object.assign(fail('INVALID_CANDIDATE'), { problems: problems.slice(0, 5) });
+  const current = parseLiteralModule(source);
+  const problems = [
+    ...(edits.overview !== undefined ? checkOverview(edits.overview) : []),
+    ...(edits.checklist !== undefined ? checkChecklist(edits.checklist) : []),
+    ...(edits.placeNotes !== undefined ? checkPlaceNotes(edits.placeNotes, current.PLACES) : []),
+  ];
+  if (problems.length) throw invalid(problems);
+  if (edits.overview !== undefined) source = replaceExport(source, 'OVERVIEW', edits.overview, 'object').source;
+  if (edits.checklist !== undefined) source = replaceExport(source, 'CHECKLIST', edits.checklist, 'array').source;
+  for (const [key, note] of Object.entries(edits.placeNotes || {})) source = replacePlaceNote(source, key, note === null ? null : note.trim()).source;
+  return source;
 }
 
 function checkAssets(assets) {
@@ -92,6 +109,7 @@ class ProposalStore {
     if(answer.replacementDays)for(const day of answer.replacementDays)source=replaceDay(source,day.id,day).source;
     else if(answer.replacementDay)source=replaceDay(source,dayId,answer.replacementDay).source;
     if(answer.stayGuides)source=replaceStayGuides(source,mergeStayGuides(parseLiteralModule(source).STAY_GUIDES,answer.stayGuides)).source;
+    if(answer.tripEdits)source=applyTripEdits(source,answer.tripEdits);
     if(source===baseline.snapshot.dataSource&&!answer.replacementDays)return {changed:false,summary:answer.summary};
     return this.createSource(target,baseline,source,{label:answer.summary,kind:'save',assets});
   }
@@ -106,14 +124,24 @@ class ProposalStore {
     const parsed=parseLiteralModule(source);
     candidate.trip.DAYS=parsed.DAYS.map(day=>({...day,meals:candidate.trip.DINING.days?.[day.id]||[],mapList:candidate.trip.MAP_LISTS[day.id]||null}));
     candidate.trip.STAY_GUIDES=parsed.STAY_GUIDES||[];
+    // 總覽、行前清單（再併上餐飲清單，同載入時的接線）、地點備註（只動 data.js 的地點，不動座標）。
+    candidate.trip.OVERVIEW=parsed.OVERVIEW||{};
+    candidate.trip.CHECKLIST=[...(parsed.CHECKLIST||[]),...(candidate.trip.DINING.checklist||[])];
+    for(const [key,place] of Object.entries(parsed.PLACES||{})){
+      if(!candidate.trip.PLACES[key]||Object.hasOwn(candidate.trip.DINING.places||{},key))continue;
+      const next={...candidate.trip.PLACES[key]};if(place?.note===undefined)delete next.note;else next.note=place.note;candidate.trip.PLACES[key]=next;
+    }
     // 只留這份候選真的引用、而且專案裡還沒有的圖片。
     const referenced=new Set(guideImageFiles(candidate.trip.STAY_GUIDES));
     const known=candidate.trip.GUIDE_IMAGES||{};
     const newAssets=checkAssets(assets).filter(a=>referenced.has(a.file)&&!Object.hasOwn(known,a.file));
     candidate.trip.GUIDE_IMAGES={...known,...Object.fromEntries(newAssets.map(a=>[a.file,'img/'+a.file]))};
     let errors;try{errors=validate(candidate.trip);}catch{throw fail('INVALID_CANDIDATE');}
-    // 這次新增或改過的指南才套用好讀規則（回復舊版本不套用）；舊資料照原樣可用。
-    if(kind!=='restore'){const before=baseline.snapshot.trip.STAY_GUIDES||[];for(const g of candidate.trip.STAY_GUIDES)if(!before.some(b=>isDeepStrictEqual(b,g)))errors=[...errors,...checkGuideReadability(g)];}
+    // 這次新增或改過的指南、總覽、清單才套用格式規則（回復舊版本不套用）；舊資料照原樣可用。
+    if(kind!=='restore'){const before=baseline.snapshot.trip.STAY_GUIDES||[];for(const g of candidate.trip.STAY_GUIDES)if(!before.some(b=>isDeepStrictEqual(b,g)))errors=[...errors,...checkGuideReadability(g)];
+      const original=parseLiteralModule(baseline.snapshot.dataSource);
+      if(!isDeepStrictEqual(original.OVERVIEW??{},parsed.OVERVIEW??{}))errors=[...errors,...checkOverview(parsed.OVERVIEW??{})];
+      if(!isDeepStrictEqual(original.CHECKLIST??[],parsed.CHECKLIST??[]))errors=[...errors,...checkChecklist(parsed.CHECKLIST??[])];}
     // 逐項原因只在本機顯示給擁有者看，讓人知道 AI 哪裡寫錯（例如指南欄位超過字數）。
     if(errors.length)throw Object.assign(fail('INVALID_CANDIDATE'),{problems:errors.slice(0,5)});
     candidate.dataSource=source;
@@ -126,12 +154,14 @@ class ProposalStore {
     const originalDays=parseLiteralModule(baseline.snapshot.dataSource).DAYS;
     const stopsChanged=parsed.DAYS.some(day=>!isDeepStrictEqual(day.stops,originalDays.find(d=>d.id===day.id)?.stops));
     const requiresResearch=kind!=='restore'&&active.some(c=>c.field==='structure'||(c.field==='route'&&(!migration||stopsChanged)));
+    // 行前清單被刪掉的項目：先給人看過再保存，不讓重要待辦被悄悄覆蓋。
+    const removedChecklist=kind!=='restore'&&active.some(c=>c.field==='checklist')?checklistDelta(parseLiteralModule(baseline.snapshot.dataSource).CHECKLIST||[],parsed.CHECKLIST||[]).removed:[];
     const artifact={token,url:`travel-preview://${token}/index.html`,digest:hash(html),snapshot:candidate,summary:baseline.summary,
       read:key=>{if(key==='/index.html')return {body:html,type:'text/html; charset=utf-8'};const asset=newAssets.find(a=>'/img/'+a.file===key);return asset?{body:asset.bytes,type:imageType(asset.file)}:baseline.read(key);}};
     this.pending={id,target:{...target},baselineDigest:baseline.digest,source,fullSource,originalSource:baseline.snapshot.dataSource,
       contextDigest:baseline.snapshot.contextDigest,artifact,baseline,seen:false,createdAt:Date.now(),kind,label:String(label).slice(0,1000),
       changes,selectedKeys:[...selectedKeys],requiresResearch,dayId:active[0]?.dayId,
-      assets:newAssets,allAssets:checkAssets(assets),lostLinks:lostLinks(baseline.snapshot.dataSource,source),migration};
+      assets:newAssets,allAssets:checkAssets(assets),lostLinks:lostLinks(baseline.snapshot.dataSource,source),migration,removedChecklist};
     return this.view();
   }
   view(){
@@ -139,7 +169,8 @@ class ProposalStore {
     return {id:p.id,changed:true,summary:p.label,kind:p.kind,changes:p.changes,selectedKeys:p.selectedKeys,
       changedFields:[...new Set(p.changes.filter(c=>p.selectedKeys.includes(c.key)).flatMap(c=>c.field==='route'?['stops','alts']:[c.field]))],
       requiresResearch:p.requiresResearch,previewUrl:p.artifact.url,selectedCount:p.selectedKeys.length,previewLoaded:p.seen,
-      migration:p.migration,lostLinks:p.lostLinks.slice(0,20),newImages:p.assets.map(a=>a.file)};
+      migration:p.migration,lostLinks:p.lostLinks.slice(0,20),newImages:p.assets.map(a=>a.file),
+      removedChecklist:p.removedChecklist.slice(0,30),holdForReview:p.migration||p.removedChecklist.length>0};
   }
   select(id,keys){
     const p=this.pending;if(!p||p.id!==id)throw fail('STALE_PROPOSAL');
