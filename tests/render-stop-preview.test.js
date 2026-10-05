@@ -34,3 +34,12 @@ test('預覽屬性逸出，沒有詳情時不建立無作用按鈕', () => {
   delete t.DETAILS.sightA;
   assert.doesNotMatch(render(t), /stop-preview/);
 });
+test('預覽版型只對明確子元素指定滿寬，標頭留在照片右側', () => {
+  const css = fs.readFileSync(path.join(__dirname, '../src/styles.css'), 'utf8');
+  const H = '.stop>.row:has(>.stop-preview:not([hidden]))';
+  // 萬用的 >:not(...) 選擇器優先權高於 >.sh，曾讓標頭橫跨整欄而與照片重疊。
+  assert.doesNotMatch(css, /stop-preview:not\(\[hidden\]\)\)>:not\(/);
+  assert.ok(css.includes(H + '>.sh{grid-column:2;grid-row:1'));
+  assert.ok(css.includes(H + '>.slabel{grid-column:2;grid-row:2'));
+  assert.ok(css.includes(H + '>:is(.snote,.glink,.stop-parking){grid-column:1 / -1'));
+});
