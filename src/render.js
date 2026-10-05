@@ -45,7 +45,12 @@ function stopHTML(s, i, stops) {
   const title = DETAILS[s.place]
     ? '<button type="button" data-detail="' + esc(s.place) + '" aria-label="' + esc(p.name) + '，查看詳細說明">' + esc(p.name) + ico('i-open') + '</button>'
     : esc(p.name);
-  h += '<div class="row"><span class="dot"></span><div class="sh"><time>' + esc(s.time) + '</time>'
+  const photo = p.cat === 'sight' && DETAILS[s.place]
+    ? (PHOTOS[s.place] || []).find((ph) => ph && typeof ph.src === 'string' && ph.src.trim()) : null;
+  const preview = photo ? '<button type="button" class="stop-preview" data-detail="' + esc(s.place)
+    + '" aria-label="' + esc(p.name) + '，查看照片與詳細說明"><img src="' + esc(photo.src)
+    + '" alt="" loading="lazy" decoding="async" width="104" height="104"></button>' : '';
+  h += '<div class="row">' + preview + '<span class="dot"></span><div class="sh"><time>'  + esc(s.time) + '</time>'
     + '<h3>' + title + '</h3>'
     + '<span class="kind k-' + s.kind + '">' + KIND[s.kind] + '</span></div>'
     + '<p class="slabel">' + esc(s.label) + '</p>'

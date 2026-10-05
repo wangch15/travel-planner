@@ -378,6 +378,11 @@ function startSpy() {
 
 /* ── 面板 ── */
 const panel = $('#panel');
+// error 不冒泡，用捕捉處理懶載入失敗，移除圖片欄並保留文字入口。
+panel.addEventListener('error', (event) => {
+  const preview = event.target.closest?.('.stop-preview');
+  if (preview) preview.hidden = true;
+}, true);
 
 /* ── 詳細燈箱 ── */
 const lb = $('#lb'), lbTrack = $('#lbTrack'), lbDots = $('#lbDots'), lbBody = $('#lbBody');
