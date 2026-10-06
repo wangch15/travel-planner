@@ -211,9 +211,10 @@ test('rejects invalid timer and line limits instead of unbounded or overflowing 
 
 test('an older Codex that rejects the App config at startup reports an update-needed error', async (t) => {
   const reject = 'process.stderr.write("Error: config.toml:29:1: unknown configuration field `features.new_flag`\n"); process.exit(1);';
-  const outdated = transport(t, { args: ['-e', reject] });
+  // 子程序會立刻結束，逾時只是上限；Windows CI 啟動 node 可能超過預設的 1.5 秒。
+  const outdated = transport(t, { args: ['-e', reject], requestTimeoutMs: 15000 });
   await assert.rejects(outdated.start(), { code: 'CLI_OUTDATED' });
   // Any other early exit keeps its original error.
-  const crashed = transport(t, { args: ['-e', 'process.stderr.write("panic\n"); process.exit(1);'] });
+  const crashed = transport(t, { args: ['-e', 'process.stderr.write("panic\n"); process.exit(1);'], requestTimeoutMs: 15000 });
   await assert.rejects(crashed.start(), (error) => error.code !== 'CLI_OUTDATED');
 });
