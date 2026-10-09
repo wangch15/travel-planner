@@ -623,8 +623,17 @@ function applyChrome() {
   $('#mapCredit').textContent = '© OpenStreetMap' + (meta.demCredit ? '・地形 © ' + meta.demCredit : '');
 }
 
+/* 手機頁首只讓分頁列黏住：量標題列（含上內距與列間距）的高度，交給 CSS 當負的 sticky 位移 */
+function syncBrandOffset() {
+  const box = $('.top-in'), cs = getComputedStyle(box);
+  const off = $('.brand').offsetHeight + parseFloat(cs.paddingTop) + (parseFloat(cs.rowGap) || 0);
+  document.documentElement.style.setProperty('--brand-off', off + 'px');
+}
+
 /* ── 啟動 ── */
 applyChrome();
+syncBrandOffset();
+if ('ResizeObserver' in window) new ResizeObserver(syncBrandOffset).observe($('.brand'));
 drawBase();
 buildTabs();
 let start = 0;

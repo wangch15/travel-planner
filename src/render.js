@@ -216,7 +216,7 @@ function overviewHTML() {
   const foot = (OVERVIEW.foot || []).length
     ? '<div class="foot">' + OVERVIEW.foot.map((p) => '<p>' + esc(p) + '</p>').join('') + '</div>' : '';
   return '<div class="panel-in ov">'
-    + ovReservationsHTML() + ovDiningHTML() + ovStaysHTML() + ovDaysHTML() + ovAddonsHTML() + ovChecklistHTML()
+    + ovDaysHTML() + ovStaysHTML() + ovReservationsHTML() + ovDiningHTML() + ovAddonsHTML() + ovChecklistHTML()
     + extraHTML('overview') + foot + '</div>';
 }
 
