@@ -629,6 +629,10 @@ drawBase();
 buildTabs();
 let start = 0;
 try { const v = localStorage.getItem(CONFIG.deploy.name + '.tab'); if (v != null && (+v === 0 || DAYS.some((x) => x.id === +v))) start = +v; } catch (e) {}
+/* 旅程期間打開就是當天；第一天常要回總覽確認事項，所以開總覽 */
+const liveDay = tripDayToday(CONFIG.dates && CONFIG.dates.start, DAYS.length, new Date());
+if (liveDay === 1) start = 0;
+else if (liveDay && DAYS.some((x) => x.id === liveDay)) start = liveDay;
 show(start);
 armFab();
 openFromHash();

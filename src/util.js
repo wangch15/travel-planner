@@ -11,6 +11,15 @@ const mapsUrl = (p) => p.gurl
 /* 路線連結：起訖都用實際停留點的座標，而不是參考地標 */
 const routeUrl = (from, to, mode) => 'https://www.google.com/maps/dir/?api=1&origin=' + ll(from)
   + '&destination=' + ll(to) + '&travelmode=' + (mode === 'walk' ? 'walking' : 'driving');
+/* 今天是旅程第幾天（1 起算），不在旅程期間回 null。以裝置的當地日曆日計算。 */
+const tripDayToday = (startISO, dayCount, now) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(startISO || '');
+  if (!m) return null;
+  const start = new Date(+m[1], +m[2] - 1, +m[3]);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const id = Math.round((today - start) / 86400000) + 1;
+  return id >= 1 && id <= dayCount ? id : null;
+};
 /* 每人／全團金額。幣別與人數取自 trip.config。 */
 const money = (range) => {
   const c = CONFIG.currency, n = CONFIG.party;
