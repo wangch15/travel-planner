@@ -5,7 +5,7 @@ const vm = require('node:vm');
 // 原始碼接成一段執行，最後再把要用的名字逐一掛上 globalThis（沒宣告的用 try 略過）。
 const EXPORTS = ['esc', 'ico', 'md', 'money', 'KIND', 'll', 'mapsUrl', 'routeUrl',
   'legHTML', 'stopHTML', 'mealsHTML', 'dayHTML', 'overviewHTML', 'roleOf', 'detailBodyHTML', 'extraHTML', 'stopParkingHTML',
-  'lightboxSliderHTML', 'guideEntryHTML', 'guideBodyHTML', 'guidesForDay', 'guideDigest'];
+  'lightboxSliderHTML', 'guideEntryHTML', 'guideBodyHTML', 'guidesForDay', 'guideDigest', 'tripDayToday'];
 
 function renderContext(trip, sources) {
   const ctx = {
