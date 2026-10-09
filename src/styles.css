@@ -85,6 +85,15 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 
 /* ── 版面 ── */
 .wrap{max-width:var(--maxw);margin:0 auto;padding:0 20px 72px}
+/* 手機：標題列捲出畫面，只留分頁列；--brand-off 由 app.js 依標題列實際高度設定。
+   頁尾多留空間，地圖按鈕不蓋住最後一行；交通與停車卡片收緊。 */
+@media (max-width:919px){
+  .top{top:calc(env(safe-area-inset-top,0px) - var(--brand-off,0px))}
+  .meals{scroll-margin-top:60px}
+  .wrap{padding-bottom:104px}
+  .leg{padding-top:6px;padding-bottom:6px}
+  .stop-parking{padding:6px 10px}
+}
 .split{display:grid;gap:30px}
 /* grid 項目預設最小寬度是 min-content，表格的 min-width 會把整欄撐開；歸零才會跟著視窗縮 */
 .split>*{min-width:0}
@@ -93,7 +102,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 /* ── 地圖 ── */
 .mapwrap{margin:0 -20px 6px;background:var(--paper);padding:10px 0 12px}
 @media (min-width:920px){.mapwrap{position:sticky;z-index:30;top:calc(env(safe-area-inset-top,0px) + var(--headh));margin:0;padding:18px 0 0}}
-.map{position:relative;margin:0;height:min(40vh,320px);border-block:1px solid var(--rule);background:var(--land);overflow:hidden;
+.map{position:relative;margin:0;height:min(32vh,260px);border-block:1px solid var(--rule);background:var(--land);overflow:hidden;
   --mk:21px;--mk-fs:11px;--mk-ico:13px}
 @media (min-width:920px){
   .map{height:calc(100dvh - var(--headh) - env(safe-area-inset-top,0px) - 92px);min-height:420px;
@@ -140,7 +149,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .scaleline{height:7px;border:1px solid var(--rule-2);border-top:0;width:70px}
 .mapfoot .sp{flex:1 1 auto}
 /* ── 手機：地圖捲出畫面後的浮動按鈕，與地圖燈箱 ── */
-.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:35;width:52px;height:52px;border-radius:50%;
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:35;width:46px;height:46px;border-radius:50%;
   display:grid;place-items:center;color:#FFF8EC;background:var(--accent);box-shadow:0 4px 14px rgba(40,28,10,.32),0 1px 3px rgba(40,28,10,.2);
   opacity:0;transform:translateY(12px) scale(.9);pointer-events:none;transition:opacity .22s var(--ease),transform .22s var(--ease)}
 .fab.show{opacity:1;transform:none;pointer-events:auto}
@@ -243,7 +252,8 @@ details>summary .n{font:400 11px/1.5 var(--mono);color:var(--ink-3);margin-left:
 .meal-row time{font-size:12px;font-weight:400;color:var(--ink-2)}
 .meal-row p{margin:8px 0}
 .meal-venues{list-style:none;margin:14px 0;padding:0}
-.meal-venue{padding:10px 0}
+.meal-venue{padding:8px 12px;margin:6px 0;border-radius:8px;background:color-mix(in srgb,var(--sunk) 60%,transparent)}
+.meal-venue p{margin:2px 0 0}
 .meal-venue button{text-align:left;color:var(--accent);font-weight:600;min-height:36px;text-decoration:underline;text-underline-offset:4px}
 .meal-venue button .ico{margin-left:5px}
 .meal-venue .meal-facts{color:var(--ink);font-size:12px;font-variant-numeric:tabular-nums}
