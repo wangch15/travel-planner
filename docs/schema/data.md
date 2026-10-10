@@ -50,6 +50,30 @@
 | `label` | ✔ | string | 在這裡做什麼。 |
 | `note` | ✘ | string | 額外提醒。 |
 | `leg` | ✘ | object | 從**上一個**停留點到這裡的交通。第一個 stop 通常沒有。 |
+| `links` | ✘ | object[] | 直接顯示在這個停留點下面的連結，最多 4 個。見下方 `stop.links` 與 `stop.help`。 |
+| `help` | ✘ | object | 一顆「？」按鈕，點開展開詳細步驟與連結。見下方。 |
+
+### `stop.links` 與 `stop.help`
+
+這兩個欄位給「這一站要先做某件事、但時間軸上沒地方放說明」的情況：先查天氣、先打電話確認、先訂位、要問房東什麼。
+地點本身已經有 `details.js` 的燈箱（點地點名稱就開）時，不需要重複寫。
+
+| 欄位 | 必填 | 型別 | 說明 |
+|---|---|---|---|
+| `links[].label` | ✔ | string | 按鈕文字，1–30 字。 |
+| `links[].url` | ✔ | string | 只接受 `http://` 與 `https://`；其他一律被 `check` 擋下，渲染時也會略過。 |
+| `help.title` | ✘ | string | 按鈕旁的文字，≤30 字；省略時顯示「詳細說明」。 |
+| `help.steps` | ✔ | string[] | 展開後的步驟，1–8 步，每步 ≤200 字。 |
+| `help.links` | ✘ | object[] | 展開內容底下的連結，格式同 `links`，最多 4 個。 |
+
+`help` 用原生的 `<details>` 展開，預設收合，不需要 JavaScript。兩個欄位都不能夾帶其他欄位。
+
+```js
+{ time: '08:30', place: 'stayA', kind: 'stay', label: '看道路與山頂能見度後出發',
+  links: [{ label: '即時鏡頭', url: 'https://example.com/camera' }],
+  help: { title: '怎麼決定要不要上山', steps: ['先看鏡頭有沒有被雲蓋住。', '被蓋住就先吃早午餐，10:30 再看一次。'],
+          links: [{ label: '道路公告', url: 'https://example.com/road' }] } }
+```
 
 ### `stop.leg`
 

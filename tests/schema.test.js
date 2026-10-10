@@ -135,3 +135,75 @@ test('deploy.target 只能是 workers 或 pages', () => {
   trip.config.deploy.target = 'netlify';
   assert.ok(has(validate(trip), /deploy\.target 不合法/));
 });
+
+// ── 停留點的 links 與 help ──
+const withStop = (extra) => {
+  const trip = makeTrip();
+  trip.DAYS[1].stops[0] = { ...trip.DAYS[1].stops[0], ...extra };
+  return trip;
+};
+
+test('stop 的 links 與 help 合法時沒有錯誤', () => {
+  const trip = withStop({
+    links: [{ label: '官網', url: 'https://example.com/a' }],
+    help: { title: '怎麼查', steps: ['第一步', '第二步'], links: [{ label: '公告', url: 'https://example.com/b' }] },
+  });
+  assert.deepEqual(validate(trip), []);
+});
+
+test('stop.links 網址不是 http(s) 會被抓到', () => {
+  assert.ok(has(validate(withStop({ links: [{ label: '壞', url: 'javascript:alert(1)' }] })), /Day 2 stop 0 links\[0\].*網址/));
+});
+
+test('stop.links 缺 label 或網址會被抓到', () => {
+  assert.ok(has(validate(withStop({ links: [{ url: 'https://example.com/' }] })), /links\[0\].*label/));
+  assert.ok(has(validate(withStop({ links: [{ label: '只有名稱' }] })), /links\[0\].*網址/));
+});
+
+test('stop.links 超過 4 個或不是陣列會被抓到', () => {
+  const five = Array.from({ length: 5 }, (_, i) => ({ label: `連結${i}`, url: 'https://example.com/' }));
+  assert.ok(has(validate(withStop({ links: five })), /links.*最多 4/));
+  assert.ok(has(validate(withStop({ links: 'https://example.com/' })), /links.*陣列/));
+});
+
+test('stop.links 有不支援的欄位會被抓到', () => {
+  assert.ok(has(validate(withStop({ links: [{ label: '官網', url: 'https://example.com/', icon: 'x' }] })), /links\[0\].*不支援的欄位 icon/));
+});
+
+test('stop.help 缺 steps 或 steps 為空會被抓到', () => {
+  assert.ok(has(validate(withStop({ help: { title: '只有標題' } })), /help.*steps/));
+  assert.ok(has(validate(withStop({ help: { steps: [] } })), /help.*steps/));
+});
+
+test('stop.help 步驟太多、太長或不是字串會被抓到', () => {
+  const nine = Array.from({ length: 9 }, (_, i) => `步驟${i}`);
+  assert.ok(has(validate(withStop({ help: { steps: nine } })), /help.*最多 8/));
+  assert.ok(has(validate(withStop({ help: { steps: ['長'.repeat(201)] } })), /help.steps\[0\].*200/));
+  assert.ok(has(validate(withStop({ help: { steps: [42] } })), /help.steps\[0\]/));
+});
+
+test('stop.help 標題太長、或有不支援的欄位會被抓到', () => {
+  assert.ok(has(validate(withStop({ help: { title: '標'.repeat(31), steps: ['一步'] } })), /help.title.*30/));
+  assert.ok(has(validate(withStop({ help: { steps: ['一步'], body: 'x' } })), /help.*不支援的欄位 body/));
+});
+
+test('stop.help.links 同樣檢查網址', () => {
+  assert.ok(has(validate(withStop({ help: { steps: ['一步'], links: [{ label: '壞', url: 'ftp://example.com' }] } })), /help.links\[0\].*網址/));
+});
+
+test('stop.links 網址需要主機名且不含空白；HTTPS 大小寫可以', () => {
+  for (const url of ['https://', 'http:///x', 'https://x y', ' https://example.com/']) {
+    assert.ok(has(validate(withStop({ links: [{ label: '壞', url }] })), /links\[0\].*網址/), `應擋下：${url}`);
+  }
+  assert.deepEqual(validate(withStop({ links: [{ label: '好', url: 'HTTPS://Example.com/a' }] })), []);
+});
+
+test('stop.help.title 是空字串或純空白時，訊息說「必須是非空字串」，不是講字數', () => {
+  const errs = validate(withStop({ help: { title: '   ', steps: ['一步'] } }));
+  assert.ok(has(errs, /help.title.*非空/));
+  assert.ok(!has(errs, /help.title.*不能超過/));
+});
+
+test('stop.help.steps 純空白字串會被抓到', () => {
+  assert.ok(has(validate(withStop({ help: { steps: ['   '] } })), /help.steps\[0\].*非空/));
+});

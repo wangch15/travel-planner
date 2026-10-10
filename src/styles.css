@@ -219,6 +219,22 @@ dialog.mapdlg[open]{animation:lbin .3s var(--ease)}
   margin-top:7px;padding-bottom:2px;border-bottom:1px solid var(--rule);transition:color .16s,border-color .16s}
 .glink .ico{width:11px;height:11px}
 .glink:hover{color:var(--dct);border-color:currentColor}
+/* 停留點的直接連結與「？」展開說明（data 的 stops[].links / help） */
+.stop-links{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}
+.slink{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:6px 12px;border-radius:8px;
+  border:1px solid var(--rule-2);background:var(--card);color:var(--dct);font-size:13px;font-weight:500;text-decoration:none}
+.slink .ico{width:12px;height:12px}
+.slink:hover{background:var(--sunk);border-color:var(--dct)}
+/* 全域的 details 規則（分隔線、上方間距、summary 內距）在這裡不適用，所以逐項覆寫 */
+.stop-help{margin:8px 0 0;border-top:0;max-width:62ch}
+.stop-help>summary{display:inline-flex;gap:8px;min-height:36px;padding:0;color:var(--ink);font-size:13.5px;font-weight:600}
+.stop-help>summary:hover{color:var(--ink)}
+.stop-help[open]>summary .ico{transform:rotate(180deg)}
+.sh-q{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:22px;height:22px;border-radius:50%;
+  border:1.5px solid var(--dct);color:var(--dct);font:600 13px/1 var(--sans)}
+.sh-steps{margin:6px 0 0;padding:10px 12px 10px 30px;background:var(--sunk);border-radius:8px;font-size:13px;line-height:1.75;color:var(--ink-2)}
+.sh-steps li+li{margin-top:4px}
+.sh-links{margin-top:0;padding:0 0 4px}
 
 /* ── 路段 ── */
 .leg{display:flex;flex-wrap:wrap;align-items:center;gap:3px 14px;margin:2px 0 2px -28px;padding:8px 13px 8px 28px;

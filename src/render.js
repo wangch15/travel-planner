@@ -38,6 +38,24 @@ function stopParkingHTML(p) {
     + '" target="_blank" rel="noopener">導航到停車場' + ico('i-ext') + '</a>'
     + '</div>';
 }
+/* 停留點自己的連結與「？」說明。只有 http(s) 網址會被渲染；其餘一律略過，不讓資料變成可執行連結。 */
+const isWebUrl = (u) => typeof u === 'string' && /^https?:\/\/[^\s/?#]+\S*$/i.test(u);
+function stopLinksHTML(links, cls) {
+  const ok = (Array.isArray(links) ? links : []).filter((l) => l && isWebUrl(l.url) && l.label);
+  if (!ok.length) return '';
+  return '<div class="' + cls + '">' + ok.map((l) => '<a class="slink" href="' + esc(l.url)
+    + '" target="_blank" rel="noopener" aria-label="' + esc(l.label) + '（新分頁）">' + esc(l.label) + ico('i-ext') + '</a>').join('') + '</div>';
+}
+const STOP_HELP_TITLE = '詳細說明';
+function stopHelpHTML(help) {
+  const steps = help && Array.isArray(help.steps) ? help.steps.filter((x) => typeof x === 'string' && x.trim()) : [];
+  if (!steps.length) return '';
+  const title = help.title || STOP_HELP_TITLE;
+  return '<details class="stop-help"><summary>'
+    + '<span class="sh-q" aria-hidden="true">?</span><span class="sh-t">' + esc(title) + '</span>' + ico('i-chev') + '</summary>'
+    + '<ol class="sh-steps">' + steps.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol>'
+    + stopLinksHTML(help.links, 'stop-links sh-links') + '</details>';
+}
 function stopHTML(s, i, stops) {
   const p = PLACES[s.place];
   let h = '<li class="stop" data-place="' + esc(s.place) + '"' + (s.kind === 'stay' ? ' data-stay="1"' : '') + '>';
@@ -56,6 +74,7 @@ function stopHTML(s, i, stops) {
     + '<p class="slabel">' + esc(s.label) + '</p>'
     + (s.note ? '<p class="snote">' + esc(s.note) + '</p>' : '')
     + (p.note && s.kind === 'stay' ? '<p class="snote">' + esc(p.note) + '</p>' : '')
+    + stopLinksHTML(s.links, 'stop-links') + stopHelpHTML(s.help)
     + '<a class="glink" href="' + esc(mapsUrl(p)) + '" target="_blank" rel="noopener">在 Google Maps 開啟' + ico('i-ext') + '</a>'
     + (stops.slice(0, i).some((x) => x.place === s.place) ? '' : stopParkingHTML(p))
     + '</div></li>';

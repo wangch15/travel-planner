@@ -30,6 +30,48 @@ function checkLeg(day, s, j, fail) {
   if (s.leg.mode === 'drive' && !s.leg.dist) fail(`Day ${day.id} stop ${j} 自駕的 leg 缺 dist`);
 }
 
+// 停留點的 links（直接可點的連結）與 help（「？」展開說明）。網址只允許 http(s)，欄位不得夾帶其他東西。
+const LINK_LIMITS = Object.freeze({ items: 4, label: 30 });
+const HELP_LIMITS = Object.freeze({ steps: 8, step: 200, title: 30 });
+// 必須有主機名、不含空白；與 src/render.js 的 isWebUrl 規則相同，驗證放行的渲染也放行。
+const isWebUrl = (u) => typeof u === 'string' && /^https?:\/\/[^\s/?#]+\S*$/i.test(u);
+
+function checkLinkList(list, where, fail) {
+  if (!Array.isArray(list)) return fail(`${where} 必須是陣列`);
+  if (list.length > LINK_LIMITS.items) fail(`${where} 最多 ${LINK_LIMITS.items} 個連結`);
+  list.forEach((l, k) => {
+    const at = `${where}[${k}]`;
+    if (!l || typeof l !== 'object' || Array.isArray(l)) return fail(`${at} 必須是 { label, url }`);
+    for (const key of Object.keys(l)) if (key !== 'label' && key !== 'url') fail(`${at} 有不支援的欄位 ${key}`);
+    if (typeof l.label !== 'string' || !l.label.trim() || l.label.length > LINK_LIMITS.label) fail(`${at} 缺 label（1–${LINK_LIMITS.label} 字）`);
+    if (!isWebUrl(l.url)) fail(`${at} 網址必須是 http(s)：${l.url}`);
+  });
+}
+
+function checkHelp(help, where, fail) {
+  if (!help || typeof help !== 'object' || Array.isArray(help)) return fail(`${where} 必須是物件 { title?, steps, links? }`);
+  for (const key of Object.keys(help)) if (!['title', 'steps', 'links'].includes(key)) fail(`${where} 有不支援的欄位 ${key}`);
+  if (help.title !== undefined) {
+    if (typeof help.title !== 'string' || !help.title.trim()) fail(`${where}.title 必須是非空字串（不想自訂就整個省略）`);
+    else if (help.title.length > HELP_LIMITS.title) fail(`${where}.title 不能超過 ${HELP_LIMITS.title} 字`);
+  }
+  if (!Array.isArray(help.steps) || !help.steps.length) fail(`${where}.steps 至少要有 1 步`);
+  else {
+    if (help.steps.length > HELP_LIMITS.steps) fail(`${where}.steps 最多 ${HELP_LIMITS.steps} 步`);
+    help.steps.forEach((x, k) => {
+      if (typeof x !== 'string' || !x.trim()) fail(`${where}.steps[${k}] 必須是非空字串`);
+      else if (x.length > HELP_LIMITS.step) fail(`${where}.steps[${k}] 不能超過 ${HELP_LIMITS.step} 字`);
+    });
+  }
+  if (help.links !== undefined) checkLinkList(help.links, `${where}.links`, fail);
+}
+
+function checkStopExtras(day, s, j, fail) {
+  const where = `Day ${day.id} stop ${j}`;
+  if (s.links !== undefined) checkLinkList(s.links, `${where} links`, fail);
+  if (s.help !== undefined) checkHelp(s.help, `${where} help`, fail);
+}
+
 function checkMeals(trip, d, fail) {
   if (!Array.isArray(d.meals) || !d.meals.length) {
     fail(`Day ${d.id} 缺餐食規劃（sections.dining 已開啟）`);
@@ -56,6 +98,7 @@ function checkDays(trip, fail) {
       if (!KINDS.has(s.kind)) fail(`Day ${d.id} stop ${j} kind 不合法：${s.kind}`);
       if (!s.time) fail(`Day ${d.id} stop ${j} 缺 time`);
       if (s.leg) checkLeg(d, s, j, fail);
+      checkStopExtras(d, s, j, fail);
     });
     (d.alts || []).forEach((a, j) => {
       [...(a.place ? [a.place] : []), ...(a.places || [])].forEach((k) => {
