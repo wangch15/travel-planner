@@ -223,11 +223,13 @@ dialog.mapdlg[open]{animation:lbin .3s var(--ease)}
 .addr{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-top:8px;padding:6px 8px;
   border:1px solid var(--rule);border-radius:8px;font-size:13px;color:var(--ink-2);max-width:62ch}
 .addr-k{font-size:11px;color:var(--ink-3)}
-.addr-t{flex:1 1 12em;min-width:0;color:var(--ink);user-select:all;-webkit-user-select:all;overflow-wrap:anywhere}
+.addr-t{flex:1 1 12em;min-width:0;color:var(--ink);user-select:all;-webkit-user-select:all;word-break:keep-all;overflow-wrap:anywhere}
 .addr-copy{font:inherit;font-size:12px;padding:4px 12px;min-height:32px;border-radius:999px;cursor:pointer;
   border:1px solid var(--rule-2);background:transparent;color:var(--accent-t)}
 .addr-copy.is-done{background:color-mix(in srgb,var(--accent) 15%,transparent);border-color:var(--accent)}
 .stop>.row:has(>.stop-preview:not([hidden]))>.addr{grid-column:1 / -1}
+/* 住宿指南項目是兩欄 grid（名稱｜按鈕），地址獨佔下一列，不擠壓名稱欄 */
+.g-item>.addr{grid-column:1 / -1;grid-row:2}
 /* 停留點的直接連結與「？」展開說明（data 的 stops[].links / help） */
 .stop-links{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}
 .slink{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:6px 12px;border-radius:8px;
