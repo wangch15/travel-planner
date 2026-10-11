@@ -1,5 +1,6 @@
 // 住宿指南（STAY_GUIDES）的欄位規格與驗證。一份指南只存一次，由 days 決定哪幾天出現入口，
 // 不會變成時間軸上的停留點。欄位說明見 docs/schema/stay-guides.md。
+const { checkAddr } = require('./addr.cjs');
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const IMAGE_FILE = /^guide-[a-z0-9][a-z0-9-]{0,80}\.(jpg|png|webp)$/;
 const DATE = /^\d{4}[-/]\d{2}[-/]\d{2}$/;
@@ -18,7 +19,7 @@ const FIELDS = {
   section: ['id', 'kind', 'title', 'steps', 'images'],
   image: ['id', 'file', 'alt', 'caption', 'source'],
   list: ['id', 'kind', 'title', 'items'],
-  item: ['id', 'name', 'summary', 'tags', 'place', 'links', 'source', 'facts', 'note'],
+  item: ['id', 'name', 'summary', 'tags', 'place', 'addr', 'links', 'source', 'facts', 'note'],
   link: ['kind', 'label', 'url'],
   fact: ['label', 'value', 'source', 'checked'],
 };
@@ -113,6 +114,8 @@ function checkItem(trip, it, n, c, where, fail) {
   c.text(it.note, `${n}.note`, LIMITS.note);
   c.array(it.tags, `${n}.tags`).forEach((t, x) => c.text(t, `${n}.tags[${x}]`, LIMITS.tag, true));
   if (it.place !== undefined && !trip.PLACES[it.place]) fail(`${where} ${n}.place 指向未知地點：${it.place}`);
+  const addrErr = checkAddr(it.addr);
+  if (addrErr) fail(`${where} ${n}.addr ${addrErr}`);
   c.source(it.source, `${n}.source`);
   c.array(it.links, `${n}.links`).forEach((ln, x) => {
     const name = `${n}.links[${x}]`;

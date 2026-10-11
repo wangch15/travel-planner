@@ -432,6 +432,30 @@ lbBody.addEventListener('click', (e) => {
   if (zoom) openZoom(zoom);
 });
 
+/* 日文地址的「複製」按鈕：時間軸、餐食與燈箱共用一個委派。
+   clipboard API 在非 HTTPS 或舊瀏覽器不可用時，退回 execCommand；兩者都失敗就請使用者長按地址自己複製。 */
+const COPY_RESET_MS = 1800;
+async function copyText(text, host) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* 退回下面的作法 */ }
+  // 暫存欄位放在按鈕旁：燈箱是 modal dialog，放到 body 會被 inert 擋住選取
+  const ta = el('textarea');
+  ta.value = text; ta.readOnly = true; ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+  host.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  ta.remove();
+  return ok;
+}
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest && e.target.closest('.addr-copy');
+  if (!btn) return;
+  const ok = await copyText(btn.dataset.copy || '', btn.parentNode);
+  btn.textContent = ok ? '已複製' : '請長按地址複製';
+  btn.classList.toggle('is-done', ok);
+  clearTimeout(btn.resetTimer);
+  btn.resetTimer = setTimeout(() => { btn.textContent = '複製'; btn.classList.remove('is-done'); }, COPY_RESET_MS);
+});
+
 /* 圖片放大：疊在燈箱上的第二層 dialog，Esc／背景／關閉鈕都能關，關掉後焦點回到縮圖 */
 const zoomDlg = $('#zoomdlg'), zoomImg = $('#zoomImg'), zoomCap = $('#zoomCap');
 let zoomOpener = null;

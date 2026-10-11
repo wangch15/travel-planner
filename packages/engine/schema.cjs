@@ -1,6 +1,7 @@
 // 行程資料的驗證規則。回傳錯誤字串陣列，空陣列代表通過。
 const { checkStayGuides } = require('./stay-guides.cjs');
 const { checkReservations } = require('./trip-text.cjs');
+const { checkAddr } = require('./addr.cjs');
 const SCHEMA_VERSION = 1;
 const KINDS = new Set(['main', 'suggest', 'optional', 'stay', 'transit', 'alt']);
 const MODES = new Set(['drive', 'transit', 'walk', 'taxi', 'ferry']);
@@ -16,6 +17,8 @@ function checkPlaces(trip, fail) {
       fail(`PLACES.${key} 座標超出 region.bbox：${p.lat},${p.lng}`);
     }
     if (!p.gq && !p.gurl) fail(`PLACES.${key} 缺 gq 或 gurl`);
+    const addrErr = checkAddr(p.addr);
+    if (addrErr) fail(`PLACES.${key} addr ${addrErr}`);
     if (p.parking && (typeof p.parking.lat !== 'number' || typeof p.parking.lng !== 'number')) {
       fail(`PLACES.${key} 的 parking 缺座標`);
     }

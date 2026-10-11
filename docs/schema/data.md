@@ -21,6 +21,7 @@
 | `lat` / `lng` | ✔ | number | 座標，必須落在 `region.bbox` 內。 |
 | `gq` | ✔* | string | Google Maps 搜尋字串。`gq` 與 `gurl` 至少要有一個。 |
 | `gurl` | ✔* | string | 官方的 Google Maps 連結；有它就優先用它。 |
+| `addr` | ✘ | string | 日文地址，一行、≤120 字。停留點、餐食候選與燈箱會顯示它和「複製」按鈕，給只吃日文地址的導航 App（例如 NAVITIME）用。不要附郵遞區號。住宿的完整門牌會公開在網頁上，要不要放請先問行程擁有者。 |
 | `cat` | ✔ | string | `hub`（交通節點）、`stay`（住宿）、`sight`（景點）、`food`（餐廳）、`shop`（商店）。 |
 | `note` | ✘ | string | 一句話提醒，會出現在停留點與燈箱。 |
 | `approximate` | ✘ | boolean | 座標只是街區概略位置；連結改用名稱搜尋而不是座標。 |

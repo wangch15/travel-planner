@@ -46,6 +46,12 @@ function stopLinksHTML(links, cls) {
   return '<div class="' + cls + '">' + ok.map((l) => '<a class="slink" href="' + esc(l.url)
     + '" target="_blank" rel="noopener" aria-label="' + esc(l.label) + '（新分頁）">' + esc(l.label) + ico('i-ext') + '</a>').join('') + '</div>';
 }
+/* 日文地址與複製按鈕：給只吃日文地址的導航 App（例如 NAVITIME）。按鈕行為在 app.js。 */
+function addrHTML(addr, name) {
+  if (typeof addr !== 'string' || !addr.trim()) return '';
+  return '<div class="addr"><span class="addr-k">日文地址</span><span class="addr-t" lang="ja">' + esc(addr) + '</span>'
+    + '<button type="button" class="addr-copy" data-copy="' + esc(addr) + '" aria-label="複製' + esc(name || '') + '的日文地址">複製</button></div>';
+}
 const STOP_HELP_TITLE = '詳細說明';
 function stopHelpHTML(help) {
   const steps = help && Array.isArray(help.steps) ? help.steps.filter((x) => typeof x === 'string' && x.trim()) : [];
@@ -75,6 +81,7 @@ function stopHTML(s, i, stops) {
     + (s.note ? '<p class="snote">' + esc(s.note) + '</p>' : '')
     + (p.note && s.kind === 'stay' ? '<p class="snote">' + esc(p.note) + '</p>' : '')
     + stopLinksHTML(s.links, 'stop-links') + stopHelpHTML(s.help)
+    + addrHTML(p.addr, p.name)
     + '<a class="glink" href="' + esc(mapsUrl(p)) + '" target="_blank" rel="noopener">在 Google Maps 開啟' + ico('i-ext') + '</a>'
     + (stops.slice(0, i).some((x) => x.place === s.place) ? '' : stopParkingHTML(p))
     + '</div></li>';
@@ -92,7 +99,8 @@ function mealsHTML(day) {
       return '<li class="meal-venue"><button type="button" data-detail="' + esc(key) + '">' + esc(PLACES[key].name) + ico('i-open') + '</button>'
         + (venue ? '<span class="meal-tag">' + esc(venue.booking) + '</span>' : '')
         + '<p class="meal-facts">' + esc(budget) + '</p>'
-        + (venue ? '<p><strong>餐點選擇：</strong>' + esc(venue.menu) + '</p>' : '') + '</li>';
+        + (venue ? '<p><strong>餐點選擇：</strong>' + esc(venue.menu) + '</p>' : '')
+        + addrHTML(PLACES[key].addr, PLACES[key].name) + '</li>';
     }).join('');
     const total = DINING.cooking && DINING.cooking.total;
     return '<section class="meal-row"><h4>' + esc(meal.slot) + '<time>' + esc(meal.time) + '</time></h4>'
@@ -295,6 +303,7 @@ function detailBodyHTML(key) {
     + (d.info && d.info.length ? '<div class="lb-h">實用資訊</div><dl class="lb-info">' + d.info.map((r) => '<dt>' + esc(r[0]) + '</dt><dd>' + md(r[1]) + '</dd>').join('') + '</dl>' : '')
     + parkingHTML(p)
     + '<div class="lb-h">參考資料</div><ul class="lb-refs">' + d.refs.map((r) => '<li><a href="' + esc(r.u) + '" target="_blank" rel="noopener">' + esc(r.t) + ico('i-ext') + '</a></li>').join('') + '</ul>'
+    + addrHTML(p.addr, p.name)
     + '<div class="lb-foot"><a class="glink" href="' + esc(mapsUrl(p)) + '" target="_blank" rel="noopener">在 Google Maps 開啟' + ico('i-ext') + '</a>'
     + (p.note ? '<span class="lb-note" style="margin:0">' + esc(p.note) + '</span>' : '') + '</div>'
     + '<p class="lb-note">' + checked + ' 照片來源標於各張下方。</p>'
@@ -386,7 +395,7 @@ function guideItemHTML(it, g, shared) {
     + (it.source && (it.source.url || it.source.date) ? '<p class="gi-srcline">推薦來源：' + guideSourceHTML(it.source) + '</p>' : '');
   return '<li class="g-item" id="gi-' + esc(g.id) + '-' + esc(it.id) + '">'
     + (body ? '<details class="gi"><summary>' + head + ico('i-chev') + '</summary><div class="gi-body">' + body + '</div></details>' : '<div class="gi gi-static">' + head + '</div>')
-    + guideLinksHTML(it) + '</li>';
+    + guideLinksHTML(it) + addrHTML(it.addr || (PLACES[it.place] && PLACES[it.place].addr), it.name) + '</li>';
 }
 function guideImageHTML(im) {
   const src = (typeof GUIDE_IMAGES !== 'undefined' && GUIDE_IMAGES || {})[im.file];
