@@ -1,6 +1,6 @@
 ---
 name: create-rule-folder
-description: Use when creating persistent rule documentation for a large feature module, page logic, calculator, workflow, domain area, or long-lived project knowledge area.
+description: Use when creating persistent rule documentation for a large feature module, page logic, calculator, workflow, domain area, or long-lived project knowledge area, or when the user asks to record a rule or decision so future sessions keep it.
 ---
 
 # Create Rule Folder
@@ -13,6 +13,8 @@ The pattern has two parts:
 
 1. **Local canonical docs** near the implementation. These are the source of truth.
 2. **Global agent reference** under `.ai/rules/`. This is the searchable trigger that tells agents when and how to read the local docs.
+
+Do not leave rules only in a chat summary or a one-off handoff note; they are lost when the session ends.
 
 ## When To Use
 
@@ -29,7 +31,7 @@ Do not use this for:
 
 - Small one-off changes
 - Pure copy or style edits
-- Areas that already have clear rules docs and only need content updates
+- Areas that already have clear rules docs and only need content updates. Update those docs directly, or use that area's own update skill if it has one.
 
 ## Required Inputs
 
@@ -68,6 +70,7 @@ The global agent reference is not the primary storage for detailed rules. It sho
 `.ai/rules/<area>-rules-reference.md` should define:
 
 - Which paths or work types trigger this rule set
+- The same trigger paths as `paths` frontmatter, so Claude Code loads the reference only when it reads a matching file and the generated rule index lists it for Codex. Leave `paths` out only when the rule must be in every session. Keep the frontmatter and the trigger list in the body identical; change both together.
 - The canonical local index and topic docs
 - The read order before editing related code
 - Cross-area docs that must also be read
@@ -141,7 +144,7 @@ The common failure mode in a growing rules folder is not a wrong rule. It is **t
 - `Invariant`: A single Change-Type Matrix row must not list both a summary document and its detail documents. That makes every task read the same material twice. Give the summary document its own row, for the case where the layer of divergence is not yet known.
 - `Invariant`: Every appendix file must be referenced by a mainline rule. An appendix with zero references that declares itself superseded is dead weight and should be deleted; git keeps it recoverable.
 - `Decision`: When a mainline document contains a run of consecutive rule cards on one subject, and that subject has its own trigger conditions, split it into its own document and add a Change-Type Matrix row. The test is "would these cards be read together with the rest of this file", not line count.
-- `Invariant`: Section numbers must be unique within a document, and heading depth must match numbering depth. Numbers collide as content grows. Two real examples found in one repo: a document with two `2.5.1` sections (one at `###`, one at `##`), and another with two `## 3.` sections. Neither raises an error; they just make anchors resolve to the wrong place and make grep unreliable.
+- `Invariant`: Section numbers must be unique within a document, and heading depth must match numbering depth. Numbers collide as content grows, and a duplicate number or a `2.5.1` at `##` depth raises no error; it makes anchors resolve to the wrong place and grep unreliable.
 - `Decision`: Rule cards nested under a numbered section are fine; that mix is not the problem. What to avoid is **renumbering rule cards** or letting two numbering schemes compete at the same level. Prefer rule cards for new structure, because their ids do not shift when neighbors are added or removed. Renumbering breaks every anchor into those sections; rule card ids do not.
 
 ## Maintenance Health Checks
@@ -216,8 +219,11 @@ If this is a reorganization of an **existing** rules folder rather than a new on
 6. Add topic files only when the area already has enough detail to justify them.
 7. For complex areas, add `Change-Type Matrix`, `cases/`, or `appendix/` only when they reduce required reading.
 8. Create or update `.ai/rules/<area>-rules-reference.md` unless there is a clear reason future agents should not be forced to read it.
-9. Run the agent asset sync command if `.ai/` changed.
-10. Run the smallest useful verification command.
+9. Run the agent asset sync command if `.ai/` changed. If the repo has no sync script, update `AGENTS.md` / `CLAUDE.md` by hand and say so in your report.
+10. Verify by change type:
+    - Docs only: `git diff --check`, and confirm every new link and anchor resolves.
+    - Agent assets or the sync script: the sync script's tests if the repo has them, then the sync, then read its warnings.
+    - Rules that change implementation semantics: the owning area's tests.
 
 ## Local Index Template
 
@@ -252,6 +258,12 @@ If this is a reorganization of an **existing** rules folder rather than a new on
 ## Global Reference Template
 
 ```markdown
+---
+paths:
+  - "<primary path>/**"
+  - "<related path>/**"
+---
+
 # <Area> Rules Reference
 
 When work touches any of these areas, read the local rules first:

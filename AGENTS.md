@@ -1,8 +1,7 @@
-
 # AGENTS.md
 
 > 本檔由 `scripts/sync-agent-assets.mjs` 自動產生，不要直接編輯。
-> 要改內容請編輯 `.ai/entrypoints/project-context.md` 與 `.ai/rules/*.md`，然後跑 `npm run sync:agent-assets`。
+> 要改內容請編輯 `.ai/entrypoints/project-context.md` 與 `.ai/rules/*.md`，然後執行 `npm run sync:agent-assets`。
 
 這份文件給在這個 repo 裡工作的 coding agent 看，說明專案的共同規則與流程。
 
@@ -149,76 +148,35 @@ gh issue create -R wangch15/travel-planner
 
 這一段由 `.ai/rules/` 自動產生，不要直接改這裡。
 
-## Agent 文件的管理規則
+一律載入的規則全文附在下方。有 `paths` 的規則不附全文：讀取或修改符合其 paths 的檔案之前，先讀那份規則檔。
 
-這個專案把「人維護的、跨工具共用的」內容放在 `.ai/`，那是唯一來源。
+### 規則索引
 
-## 唯一來源
+- `.ai/rules/agent-asset-management-rules.md` — Agent 文件的管理規則: `.ai/**`, `AGENTS.md`, `CLAUDE.md`, `.agent/**`, `.agents/**`, `.claude/**`, `.codex/**`, `scripts/sync-agent-assets.mjs`, `scripts/sync-agent-assets-lib/**`
+- `.ai/rules/contributing-upstream.md` — 把改進回饋給模板: 一律載入（全文在下方）
+- `.ai/rules/data-schema-reference.md` — 改資料前先讀 schema 文件: 一律載入（全文在下方）
+- `.ai/rules/diagnostic-sharing.md` — 對外診斷摘要由 agent 去識別化: 一律載入（全文在下方）
+- `.ai/rules/engine-content-boundary.md` — 引擎與內容的邊界: 一律載入（全文在下方）
+- `.ai/rules/privacy.md` — 隱私: 一律載入（全文在下方）
+- `.ai/rules/progress-tracking.md` — 更新既有 status.md 做交接: 一律載入（全文在下方）
+- `.ai/rules/repo-ownership.md` — 這份 repo 是誰的: 一律載入（全文在下方）
+- `.ai/rules/research-integrity.md` — 研究誠信: 一律載入（全文在下方）
+- `.ai/rules/stage-backup.md` — 階段保存與異地備份: 一律載入（全文在下方）
+- `.ai/rules/which-trip.md` — 先確定是哪一趟: 一律載入（全文在下方）
 
-共用內容一律維護在這裡：
-
-- `.ai/rules/`
-- `.ai/skills/`
-- `.ai/commands/`
-- `.ai/workflows/`
-- `.ai/entrypoints/`
-
-**不要**在各工具自己的資料夾裡另外維護同一份內容：
-
-- `.agent/`
-- `.agents/`
-- `.claude/`
-- `.codex/`
-
-那些資料夾要當成「同步產物」看待，不是來源。
-
-## 正式進入點
-
-各家工具掃描資料夾的行為不一致，所以要產生並維持這兩個進入點檔案：
-
-- `AGENTS.md` —— 給 Codex 與其他通用 coding agent
-- `CLAUDE.md` —— 給 Claude Code
-
-另外 `GEMINI.md` 是手寫的指路檔（Gemini CLI 目前不會自動讀 `AGENTS.md`）。
-
-**不要直接改產物裡的共用規則段落。** 改 `.ai/entrypoints/project-context.md`
-或 `.ai/rules/*.md`，然後跑同步指令。
-
-## 什麼放共用、什麼放工具目錄
-
-放 `.ai/`：穩定的、人維護的內容。
-
-留在工具自己的目錄：產生出來的或該工具專屬的東西，例如
-
-- 工具自動產生的 command
-- 本機設定
-- 快取資料夾
-- worktree 狀態
-- 第三方工具產生的 skill
-
-## 改了共用內容之後
-
-改動規則、skill、command、workflow 或進入點的內容時：
-
-1. 改 `.ai/` 底下那份來源檔。
-2. 跑 `npm run sync:agent-assets`。
-3. 檢查 `AGENTS.md`、`CLAUDE.md` 與各工具目錄有沒有跟上。
-
-如果 `AGENTS.md` 或 `CLAUDE.md` 在產生的標題之前有工具自己加的前言，
-同步腳本必須保留它。
 ## 把改進回饋給模板
 
 **什麼時候適用：** 使用者提出一個建議、或你在用的過程中發現引擎有問題，
 而你在考慮要不要把它送回模板。
 
-## 對外內容先由 agent 處理
+### 對外內容先由 agent 處理
 
 回報錯誤或附診斷資料時，先讀 `.ai/rules/diagnostic-sharing.md`：由 agent 產出去識別化的
 最小診斷摘要，不叫非技術使用者自己從 stack trace 找秘密。把最終文字、附件與公開目的地
 交給使用者看過並確認，才執行後面的 issue／PR 對外動作。人類模板中的個資警告仍是第二道。
 `contrib-check` 只檢查檔案路徑，不能替代這份摘要的內容審查。
 
-## 先決定：issue 還是 PR
+### 先決定：issue 還是 PR
 
 | 你手上有什麼 | 走哪條 |
 |---|---|
@@ -228,14 +186,14 @@ gh issue create -R wangch15/travel-planner
 
 **分不出來就開 issue。** issue 的成本對雙方都低，被退回的 PR 才貴。
 
-## 「純粹的改進」與「設計取捨」怎麼分
+### 「純粹的改進」與「設計取捨」怎麼分
 
 **判準只有一個：這件事能不能用「現在的行為是錯的」來描述？**
 
 - 可以 → 純粹的改進，開 PR
 - 只能用「這樣比較好」來描述 → 設計取捨，開 issue
 
-### 純粹的改進（可以直接開 PR）
+#### 純粹的改進（可以直接開 PR）
 
 - 某個輸入會讓 `check` 或 `build` 崩潰
 - 錯誤訊息沒講清楚該做什麼，改成講清楚
@@ -244,7 +202,7 @@ gh issue create -R wangch15/travel-planner
 - 同樣的輸出但更快、或不再重複抓同一份資料
 - 在某個作業系統／Node 版本上壞掉
 
-### 設計取捨（先開 issue 問）
+#### 設計取捨（先開 issue 問）
 
 - 新增一個資料欄位、一個頁面區塊
 - 改變任何預設值（`sections` 的開關、`basemap` 的等高線間距）
@@ -256,7 +214,7 @@ gh issue create -R wangch15/travel-planner
 **改外觀之前先試兩個插槽**（`theme.css`、`extra.js`）。九成的需求插槽就能解決，
 那些不需要動引擎，也就不需要 PR。
 
-## PR 的硬規則：分支裡不能有任何 `trips/` 的東西
+### PR 的硬規則：分支裡不能有任何 `trips/` 的東西
 
 **模板的 fork 一定是公開的**，GitHub 不允許把公開 repo 的 fork 改成私有。
 分支裡只要夾帶一個 `trips/` 底下的檔案，使用者的行程、訂房確認碼與私人筆記
@@ -278,7 +236,7 @@ npm run contrib-check
 仍須人工審查；也不要換成包含私人歷史的 base 來讓檢查過關。
 檢查後若新增 commit、合併或改寫歷史，推送前必須重跑。
 
-## pre-push 會再驗一次歷史
+### pre-push 會再驗一次歷史
 
 公開目的地不是一律禁止：**乾淨的引擎分支**在目的地與本次推送範圍查核通過後，兩道都會放行。
 夾帶 `trips/`（`_example` 除外）的分支，`contrib-check` 與 pre-push **兩道都會擋**，新增後刪除或改名也一樣。
@@ -292,7 +250,7 @@ npm run contrib-check
 **agent 不得自行加 `--no-verify`、改 hooksPath 或停用 hook** 來開 PR。
 測試與歷史查核通過仍不是對外送出的授權，還是要使用者看過並同意。
 
-## 為什麼要另外 fork
+### 為什麼要另外 fork
 
 使用者自己的私有 repo 是 `gh repo create` 開的，**跟模板沒有 fork 關係**，
 GitHub 不接受從無關的 repo 開 PR。所以要另外 fork 一份**只拿來送 PR** 的複本：
@@ -308,7 +266,7 @@ git remote add contrib https://github.com/<他的帳號>/travel-planner-contrib.
 
 那個 fork 是公開的，但它**只會收到乾淨的引擎分支**，不會收到他的 `main`。
 
-## 完整流程
+### 完整流程
 
 **驗證範圍**（2026-09-22 實測）：
 
@@ -350,7 +308,7 @@ gh pr create -R wangch15/travel-planner --head <他的帳號>:contrib-<主題>
 
 `.github/PULL_REQUEST_TEMPLATE.md` 會問你四件事，照實填。
 
-## 永遠不做的事
+### 永遠不做的事
 
 - `git push upstream <任何分支>`——使用者沒有寫入權，而且那不是流程
 - `git push contrib main`——他的 `main` 有 `trips/`，那個 fork 是公開的
@@ -358,12 +316,12 @@ gh pr create -R wangch15/travel-planner --head <他的帳號>:contrib-<主題>
 - **代替使用者決定要不要送**。這是他的東西，也會掛他的名字。
   你判斷「這是純粹的改進、可以送」之後，**還是要問他一句**再送。
 
-## 有寫入權的人：模板作者與協作者
+### 有寫入權的人：模板作者與協作者
 
 上面整套 fork 流程是給**沒有模板寫入權**的人用的。模板作者（與他加的協作者）
 有寫入權，**不需要 fork**，流程更短——但判準與閘門一樣不能省。
 
-### 改引擎 → 在模板自己的工作目錄做，不要在行程 repo 做
+#### 改引擎 → 在模板自己的工作目錄做，不要在行程 repo 做
 
 ```
 模板的工作目錄（origin 就是 wangch15/travel-planner）
@@ -386,7 +344,7 @@ gh pr create -R wangch15/travel-planner --head <他的帳號>:contrib-<主題>
 review 的 diff——自己看一次、或交給另一個 agent 看一次——再合併。
 小改動不想 review 直接推 `main` 也行，那是作者的決定。
 
-### 做行程時撞到引擎 bug，順手修了
+#### 做行程時撞到引擎 bug，順手修了
 
 這才會用到上面的 cherry-pick 流程，差別只在**不用 fork**：
 
@@ -404,20 +362,20 @@ review 的 diff——自己看一次、或交給另一個 agent 看一次——�
 pre-push hook 仍然會跑：目的地是模板、而 `trips/` 有真實行程，它會檢查**這條分支
 的歷史**乾不乾淨。乾淨就放行，夾帶就擋——跟朋友的路徑同一道閘門。
 
-### 判準與朋友一樣
+#### 判準與朋友一樣
 
 「現在的行為是錯的」還是「這樣比較好」的判斷、`contrib-check`、`npm test`、
 改了 `.ai/` 要 `sync:agent-assets`——**一樣都要**。有寫入權省掉的只有 fork，
 不是閘門。
 
-### 兩個方向、兩條路，沒有第三條
+#### 兩個方向、兩條路，沒有第三條
 
 ```
 模板 ──(tp-update)──▶ 行程 repo
 模板 ◀──(PR)───────── 行程 repo（或模板的分支）
 ```
 
-## 只想回報不想修
+### 只想回報不想修
 
 ```
 gh issue create -R wangch15/travel-planner
@@ -425,11 +383,12 @@ gh issue create -R wangch15/travel-planner
 
 `.github/ISSUE_TEMPLATE/` 有 bug 與功能建議兩個模板，兩個都要求填引擎版本
 （`npm run update-check` 看得到）。模板是公開的，任何 GitHub 帳號都能開 issue。
+
 ## 改資料前先讀 schema 文件
 
 **什麼時候適用：** 你要修改 `trips/<slug>/` 底下任何一個資料檔之前。
 
-## 規則
+### 規則
 
 **不要憑印象填欄位。** 每個資料檔都有一份對應的欄位文件，裡面有必填／選填、型別、
 範例，以及 `npm run check` 會吐出什麼錯誤訊息。
@@ -445,7 +404,7 @@ gh issue create -R wangch15/travel-planner
 
 這份 rule 刻意**不重複**欄位表——重複就會脫節。以 `docs/schema/` 為準。
 
-## 改完一定要跑
+### 改完一定要跑
 
 ```
 npm run check -- <slug>
@@ -454,13 +413,14 @@ npm run check -- <slug>
 `check` 的錯誤訊息就是你的待辦清單。**不要為了讓它過而刪掉資料或放寬規則**——
 那些規則存在的原因是它們對應到頁面上真的會出錯的地方（座標畫到海裡、
 燈箱點開是空的、地圖清單少一個點）。
+
 ## 對外診斷摘要由 agent 去識別化
 
 **適用：** 要把錯誤、log、截圖、重現資料、issue／PR 文字或附件送給其他人時。
 公開 GitHub 與私下傳給邀請者都適用。非技術使用者不負責從 stack trace 辨識秘密；
 bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
 
-## 對外分享順序
+### 對外分享順序
 
 1. 由 agent 從原始資訊產生**去識別化的最小診斷摘要**，不是請使用者自己從原始 log 辨認敏感內容。
    只保留重現與判斷問題必要的技術資訊，不是將整份 log 遮幾個字後全部貼上。
@@ -471,7 +431,7 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
 4. 使用者明確同意後，只送那份核准的摘要；不附回原始 log、私人筆記或未審核附件。
    確認後若補內容、換目的地或加附件，就重新去識別化並請人確認。
 
-## agent 必須移除的內容
+### agent 必須移除的內容
 
 - 姓名、電子郵件、電話與其他可識別人的資訊。
 - 私人網址：私有 repo、行程網站、Maps 清單、訂單連結與含權杖的 query；用 `https://example.invalid/` 等假網址取代。
@@ -483,7 +443,7 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
 截圖要裁成必要區域或用假資料重做；附件也要檢查內容與檔名。不要假設純文字遮罩涵蓋圖片中的秘密。
 最小化與複查都是 agent 的責任；單一正則或遮罩不能保證去識別化完整。
 
-## 摘要只保留這些
+### 摘要只保留這些
 
 - 引擎版本、Node 版本、作業系統。
 - 用假 slug／假網址重現的最短操作。
@@ -493,7 +453,7 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
 
 原始診斷留在本機或該趟私人 docs/，不要搬到公開 issue 或根目錄 docs/。
 
-## 條件 → 動作
+### 條件 → 動作
 
 | 條件 | agent 必做 | 分享判定 |
 |---|---|---|
@@ -502,16 +462,17 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
 | 摘要已去識別化，但使用者尚未看過同意 | 顯示最終摘要、收件對象及公開程度，停下來等 | 不可送出 |
 | 使用者已同意該份最終摘要與目的地 | 只送核准的摘要，不附回原始 log | 可送出 |
 | 確認後又新增內容或附件 | 重新去識別化並請人確認 | 尚不可送出 |
+
 ## 引擎與內容的邊界
 
 **什麼時候適用：** 任何時候你要建立或修改這個 repo 裡的檔案。
 
-## 這條邊界是什麼
+### 這條邊界是什麼
 
 這個 repo 有兩種東西：**引擎**（模板作者維護）與**內容**（行程擁有者的資料）。
 兩邊的檔案集合**不相交**——同一個檔案不會既是引擎又是內容。
 
-## 哪些是引擎、哪些是內容
+### 哪些是引擎、哪些是內容
 
 | | 路徑 | 誰維護 |
 |---|---|---|
@@ -527,7 +488,7 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
 - 引擎會讀：`trip.config.json`、五個資料檔、`photos/`、`basemap.json`、兩個插槽（`theme.css`、`extra.js`）
 - 引擎**永遠不讀**：`docs/`（你的筆記）、`.cache/`（快取，gitignore）
 
-## 呈現邏輯與互動狀態
+### 呈現邏輯與互動狀態
 
 **決定 HTML 內容的純邏輯放 `src/render.js`；DOM 與互動狀態留在 `src/app.js`。**
 
@@ -542,7 +503,7 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
 `desktop/prototype/app.js` 是桌面工作台的 UI，另由原生 Electron smoke tests 驗證；
 此分工不要求把桌面的狀態判斷搬進旅程網頁的 `src/render.js`。
 
-### 執行環境與信任邊界
+#### 執行環境與信任邊界
 
 - CLI 建置會透過 Node 載入行程模組，包括 `extra.js`，因此只能對可信任的專案執行；
   這些模組在建置時具有該 Node 程序的權限，並非只在瀏覽器執行。
@@ -553,13 +514,13 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
 - 純函式分工改善可測性；實際權限隔離由靜態解析、Electron 與預覽限制維持，
   不會因為把函式搬到 `render.js` 就自動取得安全隔離。
 
-## 為什麼重要
+### 為什麼重要
 
 行程擁有者的複本要能長期 `git merge upstream/main` 拿到引擎更新。
 只要雙方的 commit 只碰各自那一邊，merge 就不會衝突。
 一旦你把行程資料寫進 `src/`，或把引擎邏輯寫進 `trips/`，這個保證就沒了。
 
-## 想改引擎之前
+### 想改引擎之前
 
 **先試插槽，九成的需求插槽就能解決：**
 
@@ -572,11 +533,12 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
   下次 merge 衝突時，那份筆記就是你怎麼解的依據。
 - 考慮用 `.github/ISSUE_TEMPLATE/feature.md` 回報給模板作者，讓它變成引擎的正式功能，
   你就不用一直自己維護那個修改。
+
 ## 隱私
 
 **什麼時候適用：** 任何時候你要寫下使用者告訴你的資訊。
 
-## 這些永遠不進資料檔
+### 這些永遠不進資料檔
 
 只能放 `trips/<slug>/docs/`：
 
@@ -587,7 +549,7 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
 - 護照、證件號碼
 - 信用卡與任何付款資訊
 
-## 這些東西放哪裡
+### 這些東西放哪裡
 
 | 檔案 | 放什麼 | 進產物嗎 |
 |---|---|---|
@@ -604,37 +566,38 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
 **飲食限制的正確用法：** 拿它來挑餐廳，然後在資料檔裡只寫「這家店有什麼菜」，
 不要寫「因為某人不吃牛」。挑選的理由留在 `docs/dining-research.md`。
 
-## 關閉區塊不是隱私保護
+### 關閉區塊不是隱私保護
 
 `sections` 關閉只停用該區塊的顯示與對應檢查；build 仍會把全部資料物件內嵌進 HTML。
 不能把私人資訊留在關閉的區塊、`trip.config.json` 或插槽裡，以為畫面看不到就安全。
 私人筆記留在 `docs/`／`_profile.md`，不會因為關掉區塊而改變這條邊界。
 
-## 網站的隱私程度要講清楚
+### 網站的隱私程度要講清楚
 
 產出的網站帶 `noindex` 與 `robots.txt` 的 `Disallow: /`，要求搜尋引擎不要收錄，但那是請求不是保證；任何拿到網址的人都能開啟。
 **這不是密碼保護。**
 
 第一次跟使用者講部署的時候就要說清楚這一點，不要讓他們以為那是私人頁面。
 
-## 旅程結束之後可以把網站下線
+### 旅程結束之後可以把網站下線
 
 `npm run unship -- <slug>` 會把 Cloudflare 上那份公開網頁移除，**行程資料留在
 他自己的私有 repo**。旅程結束之後那個網址的內容（每天住哪、幾號到幾號不在家）
 價值歸零但風險不變，所以**要主動提這件事**，流程見 `tp-ship`。
 
-## 其他
+### 其他
 
 - 勾選清單的狀態只存在那台裝置的瀏覽器 localStorage，不同步、不上傳、不會被別人看到。
 - 住宿座標用街區層級就好，並標 `approximate: true`；不要把確切門牌寫進公開頁面。
   導航連結會自動改用名稱搜尋而不是座標。
+
 ## 更新既有 status.md 做交接
 
 **適用：** 每個 tp-* skill 完成、停下來等人、遇到阻礙或中途交接時。
 使用既有 `trips/<slug>/docs/status.md`，不新增狀態系統、資料庫或另一份進度檔。
 它是工作交接，不是人類同意或備份成功的證明。
 
-## 更新順序
+### 更新順序
 
 1. 先確認目標行程與 repo ownership。只有 slug 明確、資料夾已存在且允許寫入時才改該趟 status。
    尚無行程目錄、slug 未確定或 ownership 未通過，就只在回話交接下面四欄與未寫入原因；
@@ -656,7 +619,7 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
    網站上線、內容驗證成功、備份成功要分開說。重新接手時先讀 status，再核對檔案、對話與遠端結果，
    不能只因有勾選就跳過人類閘門或每次推送的私有檢查。
 
-## 條件 → 動作
+### 條件 → 動作
 
 不能寫入的前提優先（下表首列）；其餘更新動作只適用已確認可寫的行程。
 
@@ -671,11 +634,12 @@ bug 模板的人類警告保留作第二道，不能取代 agent 的責任。
 setup 尚無行程時的交接，在 tp-plan 的 new 成功後補到新建的既有 status.md。
 如果只是略過選用 Maps 清單，就記「未啟用／略過」，不是假稱已對帳。
 私人的進度只留該趟 docs/；部署網址若尚未知或只存在 `.local/`，記狀態及紀錄位置，不自行補假網址。
+
 ## 這份 repo 是誰的
 
 **什麼時候適用：** 開工前，以及任何你要執行 `git push` 的時候。
 
-## 規則
+### 規則
 
 **模板是公開唯讀的，行程擁有者在自己的私有 repo 上工作。**
 
@@ -684,7 +648,7 @@ setup 尚無行程時的交接，在 tp-plan 的 new 成功後補到新建的既
 - 行程擁有者的複本是**私有**的。`trips/<slug>/docs/` 會進 git，裡面放訂房確認碼、
   飲食限制、門鎖密碼這些東西（見 `privacy.md`），所以那個 repo 一定要是私有的。
 
-## 開工前先確認
+### 開工前先確認
 
 ```
 git remote -v
@@ -695,7 +659,7 @@ git remote -v
 
 `upstream` 沒接好，以後就拿不到引擎更新；照下面「取得專案的正確方式」補上。
 
-## 每次備份 push 前都要重新查
+### 每次備份 push 前都要重新查
 
 開工時檢查過不算下一次推送的許可。**每次 push 前**都要依 `.ai/rules/stage-backup.md`
 重新核對 origin 的實際 push URL，並對那個 repo 執行 `gh repo view --json visibility` 查核
@@ -703,7 +667,7 @@ git remote -v
 只有本次成功得到 PRIVATE 才能 push；查不到、gh 未登入、非私有或離線都停下來，不推送。
 回報「目前只有本機備份，尚未異地備份」，直到推送與遠端 commit 核對都成功才算階段完成。
 
-### `origin` 是 `wangch15/travel-planner` 的時候
+#### `origin` 是 `wangch15/travel-planner` 的時候
 
 這有兩種可能，**先分清楚是哪一種再動手**：
 
@@ -718,7 +682,7 @@ git remote -v
 分不出來是哪一種就問使用者一句。**有一個情況不用問：`origin` 是模板、
 而 `trips/` 底下有 `_example` 以外的東西（包括 `_archived/` 封存的旅程）——那一定是 (a)，停下來。**
 
-## 取得專案的正確方式
+### 取得專案的正確方式
 
 ```
 git clone https://github.com/wangch15/travel-planner.git
@@ -738,7 +702,7 @@ gh repo create travel-planner --private --source=. --remote=origin
 之後 `git merge upstream/main` 要 `--allow-unrelated-histories`，每個檔案都衝突——
 這個 repo 的引擎／內容邊界就是為了讓那個 merge 乾淨才設計的。
 
-## 模板 repo 裡不放任何真實行程
+### 模板 repo 裡不放任何真實行程
 
 **如果你現在就在模板 repo（`origin` 是 `wangch15/travel-planner`）裡工作——
 包含模板作者本人——`trips/` 底下只能有 `_example`。**
@@ -746,7 +710,7 @@ gh repo create travel-planner --private --source=. --remote=origin
 模板作者自己的行程也走上面那條路：另一個私有 repo。模板 repo 是公開的，
 任何 commit 進去的行程資料都會公開，而且 git 歷史刪不掉。
 
-## 最後一道 pre-push
+### 最後一道 pre-push
 
 `.githooks/pre-push` 由 `npm install` 的 prepare 安裝：設定本 repo 的 `core.hooksPath` 為 `.githooks`。
 引擎更新時 hook 檔案會隨 merge 流入複本；既有使用者也要跑 npm install 並確認安裝結果。
@@ -784,7 +748,7 @@ PUBLIC 對每個更新使用 `remote-sha..local-sha`，不是工作目錄 HEAD �
 若工具不執行 Git hooks、直接走 API，或尚未安裝／被改掉 hooksPath，也沒有這道保護；不能保證每款桌面工具都會攔。
 查核後 repo 可見度仍可能被人更改，hook 不是持續監控或能撤回資料的機制。
 
-## 永遠不做的事
+### 永遠不做的事
 
 - `git push upstream <任何分支>`
 - 把任何真實行程 commit 進模板 repo
@@ -798,17 +762,18 @@ gh issue create -R wangch15/travel-planner
 
 `.github/ISSUE_TEMPLATE/` 有 bug 與功能建議兩個模板。
 
-## 為什麼
+### 為什麼
 
 模板作者維護引擎，每個行程擁有者維護自己的 `trips/<slug>/`。
 公開的模板加上私有的複本，讓兩件事同時成立：引擎更新可以流向所有人，
 而沒有人的行程資料會流向任何人。
+
 ## 研究誠信
 
 **什麼時候適用：** 任何時候你要把一個「事實」寫進資料檔——營業時間、票價、
 車程、距離、訂位方式、公休日。
 
-## 規則
+### 規則
 
 **每個事實都要有出處與查核日期。**
 
@@ -840,13 +805,14 @@ gh issue create -R wangch15/travel-planner
 如果你這個 agent 沒有瀏覽器或搜尋工具，**停下來告訴使用者**，不要用記憶裡的內容填表。
 模型記憶裡的營業時間與票價經常是舊的，而且你無法分辨哪些是舊的。
 
-## 完成的定義
+### 完成的定義
 
 1. `npm run check -- <slug>` 通過，而且
 2. `trips/<slug>/docs/sources.md` 列得出每一條資料的來源與查核日期，而且
 3. 依 `.ai/rules/stage-backup.md` 保存成果並驗證異地備份成功。
 
 三個都達成才算研究階段完成；資料查核通過不能代替備份。
+
 ## 階段保存與異地備份
 
 **適用：** 行程擁有者在自己的私有 repo 規劃、維護或更新行程。這是階段完成條件，
@@ -856,11 +822,11 @@ gh issue create -R wangch15/travel-planner
 模板作者維護公開引擎、或送公開貢獻分支，不能套用這份私有行程備份流程；
 前者遵守 repo-ownership 的模板限制，後者另走 contributing-upstream 的人類閘門。
 
-## 執行順序
+### 執行順序
 
 以下是**有停止條件的步驟**，不能把指令整段無條件串接執行。
 
-### 1. 保存本機 checkpoint
+#### 1. 保存本機 checkpoint
 
 先完成該 skill 的內容驗證與必要的人類確認，再盤點 `git status --short`、diff 與 staged 檔案。
 若有本階段進度更新，先寫完再保存；只加入這趟與本次已確認的改動，含必要的 docs/、profile、照片。
@@ -874,7 +840,7 @@ git commit -m "<本階段改動摘要>"
 如果本次沒有檔案差異，不造空 commit，但仍要確認目前成果的異地備份狀態。
 commit 失敗就保留工作檔、回報阻礙，不能稱已完成保存，更不能丟棄改動來讓它過。
 
-### 2. 每次 push 前重新核對真正的 origin
+#### 2. 每次 push 前重新核對真正的 origin
 
 **每次嘗試 push 都必須重新查，不能沿用開工時、上一階段或上次重試的結果。**
 先核對 GitHub 帳號／repo 與本次分支是不是使用者已確認的備份目的地：
@@ -898,7 +864,7 @@ gh repo view <origin-owner>/<repo> --json visibility
 查詢失敗、gh 未登入、離線、輸出無法判讀、PUBLIC（public repo）、INTERNAL 或未知值都停止，**不要 push**。
 不要為了讓檢查過而自行改 repo 的可見度。這是每次推送的前置條件，不是一次性 setup 檢查。
 
-### 3. 僅推送到這次已驗證的 origin
+#### 3. 僅推送到這次已驗證的 origin
 
 ```
 git push origin HEAD:<已確認的分支>
@@ -911,7 +877,7 @@ git push origin HEAD:<已確認的分支>
 遠端已有的歷史，那只有規則擋得住。所以**不要因為 hook 放行就以為 force 是允許的**。若中途切換目的地、分支或重試，回到第 2 步重查。
 push 失敗就停止，保留本機成果；不為了「完成」而換 remote、強推或跳過權限檢查。
 
-### 4. 驗證遠端，再回報完成
+#### 4. 驗證遠端，再回報完成
 
 ```
 git ls-remote origin refs/heads/<已確認的分支>
@@ -922,7 +888,7 @@ git ls-remote origin refs/heads/<已確認的分支>
 只有 push 成功且遠端核對成功，才能回報本階段完成。網站已上線、check 通過或本機 commit 成功，
 都不能代替這個條件。只補備份時不要再 ship 一次。
 
-## 條件 → 動作
+### 條件 → 動作
 
 下表的失敗措辭針對**本輪成果**，即使舊版曾有異地備份，也不能把舊版當成本輪已備份。
 
@@ -938,16 +904,17 @@ git ls-remote origin refs/heads/<已確認的分支>
 這份流程仍是 agent 的**第一道**查核；另有 `.githooks/pre-push` 當 Git 推送的**最後一道**，見 repo-ownership。
 兩者都要保留：規則擋不住非 agent 的推送，hook 又可被 `--no-verify` 或不執行 hooks 的工具繞過。
 它們都不保證 repo 在查核後永遠保持私有；hook 放行也不等於遠端已成功備份。
+
 ## 先確定是哪一趟
 
 **什麼時候適用：** 有兩趟以上行程的時候，你要**讀或改** `trips/` 底下任何檔案、
 或要跑任何帶 slug 的指令之前。
 
-## 規則
+### 規則
 
 **指定有歧義就停下來問，不要猜。** 完全省略指定時，才依下面的順序判斷能否沿用。
 
-## 為什麼這條單獨列一條規則
+### 為什麼這條單獨列一條規則
 
 `npm run check` 這類指令沒帶 slug 會直接報錯，所以**指令這一層是安全的**。
 
@@ -958,7 +925,7 @@ git ls-remote origin refs/heads/<已確認的分支>
 
 他傳給家人的連結還在，內容卻變成別趟的。而他多半要等到人在旅途中才發現。
 
-## 判斷順序
+### 判斷順序
 
 **由上往下，第一個成立的就是答案。不要跳過，也不要合併判斷。**
 
@@ -970,7 +937,7 @@ git ls-remote origin refs/heads/<已確認的分支>
    **回話時複述一次**：「大阪那趟的第三天午餐改成 ⋯⋯」。
 4. **仍無法確定** → **跑 `npm run trips`，把候選唸給他選。**
 
-## 第 4 步怎麼問
+### 第 4 步怎麼問
 
 不要丟一句「你是指哪一趟？」——他可能也不記得 slug 長什麼樣。
 **把 `npm run trips` 的結果翻成人話**，用他認得出來的東西：
@@ -983,7 +950,7 @@ git ls-remote origin refs/heads/<已確認的分支>
 標題、日期、最後更新都在 `npm run trips` 的輸出裡。
 「我上次在弄的那個」用最後更新提出候選，等待使用者確認，不直接編輯。
 
-## 絕對不要
+### 絕對不要
 
 - **不要用「最近改過的那個」當預設**去動檔案。那是用來**問**他的線索，不是答案。
 - **不要因為只有一趟資料完整就假設是它。** 他很可能正是要改那趟還沒做完的。
@@ -991,7 +958,7 @@ git ls-remote origin refs/heads/<已確認的分支>
 - **不要靠 `npm run check` 幫你發現搞錯了。** 它只驗你指定的那一趟，
   你指錯它就跟著錯。
 
-## 確認過之後
+### 確認過之後
 
 **在回話裡說出是哪一趟**，每一次都說，不要只有第一次說。
 `ship` 之前尤其要說——那是唯一會改到線上內容的一步。

@@ -1,0 +1,33 @@
+{
+  "rules": [
+    "agent-asset-management-rules.md",
+    "contributing-upstream.md",
+    "data-schema-reference.md",
+    "diagnostic-sharing.md",
+    "engine-content-boundary.md",
+    "privacy.md",
+    "progress-tracking.md",
+    "repo-ownership.md",
+    "research-integrity.md",
+    "stage-backup.md",
+    "which-trip.md"
+  ],
+  "workflows": [],
+  "skills": [
+    "create-rule-folder",
+    "tp-basemap",
+    "tp-maps-lists",
+    "tp-photos",
+    "tp-plan",
+    "tp-research",
+    "tp-setup",
+    "tp-ship",
+    "tp-update"
+  ],
+  "commands": [
+    "create-rule-folder.md"
+  ],
+  "commandSkills": [
+    "source-command-create-rule-folder"
+  ]
+}
