@@ -1,3 +1,6 @@
 {
-  "locale": "zh-TW"
+  "locale": "zh-TW",
+  "vendorSkills": [
+    "create-rule-folder"
+  ]
 }

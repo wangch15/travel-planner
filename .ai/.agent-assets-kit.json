@@ -5,7 +5,7 @@
     ".ai/commands/create-rule-folder.md": "796859fee6e7d2ff657a33504589662aca91bdb3814ca3bc646b06682b4c3001",
     ".ai/entrypoints/project-context.md": "fbd91a61d42697f5a8776926892d2c4862a1baa2ad35d4db1d6f1a39b148c1e5",
     ".ai/rules/agent-asset-management-rules.md": "f3d951c999865ffce1150ce2053a645221647e869f864e0b540750c273e010ce",
-    ".ai/skills/create-rule-folder/SKILL.md": "b434637eab8823d29821b1b9fd930368a82328148f303e3266a9577eeef27688",
+    ".ai/skills/create-rule-folder/SKILL.md": "fd47058e34a1bc24ded61605bd697de416af11e17e03fbdcada925e3accfad59",
     "scripts/sync-agent-assets-lib/frontmatter.mjs": "2e772bd722f461fe744f8de96f5f6cf8089ca10831bb5485753ebda053231a59",
     "scripts/sync-agent-assets-lib/fs-safe.mjs": "9c45cf8553b02011b8e16fef7baf02ae1efd7efe6ff678eb4c7c6b7db3b7775a",
     "scripts/sync-agent-assets-lib/strings.mjs": "0f972a1e67cf4e0939aaaac256dac57a172eead58e552858b16f06351a378065",

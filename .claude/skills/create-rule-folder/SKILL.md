@@ -290,6 +290,14 @@ Work rules:
 
 Create a domain-specific command only when that area will be updated frequently. Commands should stay thin: they trigger the skill and summarize input, but they should not duplicate the full workflow.
 
+## Improving This Skill
+
+This skill is shared across projects; its source of truth is `skills/create-rule-folder/` in the home repo, and the global skill folders link to it. When a project teaches a better rule-folder structure:
+
+- If it generalizes, edit the home copy (resolve this skill folder's real path to find it) and tell the user it is a home change to commit there. Every project picks it up; vendored copies pick it up with `agent-assets-kit update --apply`.
+- If it only fits one project, record it in that project's `.ai/rules/` instead of changing this skill.
+- Never edit a vendored copy under a project's `.ai/skills/create-rule-folder/`; the next update treats it as a conflict and it drifts.
+
 ## Completion Checklist
 
 - Local canonical rules index exists or was updated.
