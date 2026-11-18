@@ -4,7 +4,7 @@
     ".ai/README.md": "bafd1be3474b1f0d9c26727d8689d57abbfa7acca47e10ec498b387fe6c05ed0",
     ".ai/commands/create-rule-folder.md": "796859fee6e7d2ff657a33504589662aca91bdb3814ca3bc646b06682b4c3001",
     ".ai/entrypoints/project-context.md": "fbd91a61d42697f5a8776926892d2c4862a1baa2ad35d4db1d6f1a39b148c1e5",
-    ".ai/rules/agent-asset-management-rules.md": "f3d951c999865ffce1150ce2053a645221647e869f864e0b540750c273e010ce",
+    ".ai/rules/agent-asset-management-rules.md": "c177cb24115ea4ab0b7161b87912efb603c0d223b6b93bcf24287035e9d8e645",
     ".ai/skills/create-rule-folder/SKILL.md": "fd47058e34a1bc24ded61605bd697de416af11e17e03fbdcada925e3accfad59",
     "scripts/sync-agent-assets-lib/frontmatter.mjs": "2e772bd722f461fe744f8de96f5f6cf8089ca10831bb5485753ebda053231a59",
     "scripts/sync-agent-assets-lib/fs-safe.mjs": "9c45cf8553b02011b8e16fef7baf02ae1efd7efe6ff678eb4c7c6b7db3b7775a",

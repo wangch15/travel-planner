@@ -24,10 +24,6 @@
     "tp-ship",
     "tp-update"
   ],
-  "commands": [
-    "create-rule-folder.md"
-  ],
-  "commandSkills": [
-    "source-command-create-rule-folder"
-  ]
+  "commands": [],
+  "commandSkills": []
 }

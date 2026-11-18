@@ -20,7 +20,7 @@ paths:
 共用內容只維護在：
 
 - `.ai/rules/`
-- `.ai/skills/`（一個 skill 一個資料夾，裡面要有 `SKILL.md`；其他東西不會被同步）
+- `.ai/skills/`（一個 skill 一個資料夾，裡面要有 `SKILL.md`；其他東西不會被同步）。`.ai/agent-assets.config.json` 的 `vendorSkills` 列出的是 home 全域 skill 的副本：要改進就改 home 的正本，再執行 `agent-assets-kit update --apply`。
 - `.ai/commands/`
 - `.ai/workflows/`
 - `.ai/entrypoints/`（`project-context.md`，以及選用的 `claude-preamble.md` / `agents-preamble.md`）
